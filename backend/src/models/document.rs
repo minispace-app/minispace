@@ -54,6 +54,9 @@ pub struct Document {
     pub child_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub is_encrypted: bool,
+    pub encryption_iv: Option<Vec<u8>>,
+    pub encryption_tag: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Deserialize)]
