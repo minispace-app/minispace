@@ -217,6 +217,47 @@ impl EmailService {
         Ok(())
     }
 
+    pub async fn send_media_notification(
+        &self,
+        to_email: &str,
+        to_name: &str,
+        uploader_name: &str,
+        content_kind: &str, // ex: "de nouvelles photos", "une vidéo", "un nouveau document"
+        app_url: &str,
+        garderie_name: &str,
+    ) -> anyhow::Result<()> {
+        let from = Mailbox::new(Some(garderie_name.to_string()), self.from.email.clone());
+        let to: Mailbox = format!("{to_name} <{to_email}>")
+            .parse()
+            .unwrap_or_else(|_| to_email.parse().expect("valid email address"));
+
+        let subject = format!("Nouveau contenu partagé — {garderie_name}");
+
+        let text = format!(
+            "Bonjour {to_name},\n\n\
+            {uploader_name} a partagé {content_kind} vous concernant sur {garderie_name}.\n\n\
+            Connectez-vous pour voir le contenu :\n\
+            {app_url}\n\n\
+            Cordialement,\n\
+            {garderie_name}"
+        );
+
+        let html = format!(
+            r#"<html><body style="font-family:sans-serif;max-width:600px;margin:auto">
+            <p>Bonjour {to_name},</p>
+            <p><strong>{uploader_name}</strong> a partagé {content_kind} vous concernant sur <strong>{garderie_name}</strong>.</p>
+            <p style="margin:24px 0">
+              <a href="{app_url}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600">
+                Voir le contenu
+              </a>
+            </p>
+            <p style="color:#64748b;font-size:12px">{garderie_name}</p>
+            </body></html>"#
+        );
+
+        self.send_email(from, to, &subject, &text, &html).await
+    }
+
     pub async fn send_to_parents(
         &self,
         recipients: Vec<(String, String)>,
