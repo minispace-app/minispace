@@ -24,6 +24,7 @@ pub async fn upload_document(
         &tenant,
         user.user_id,
         &state.config.media_dir,
+        &state.config.encryption_master_key,
         multipart,
     )
     .await

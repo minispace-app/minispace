@@ -7,12 +7,14 @@ use uuid::Uuid;
 use crate::{
     db::tenant::schema_name,
     models::document::{Document, DocumentQuery, UpdateDocumentRequest},
+    services::encryption,
 };
 
 /// Explicit column list for Document — casts category enum to TEXT.
 const DOC_COLS: &str =
     "id, uploader_id, title, category::TEXT as category, original_filename,
-     storage_path, content_type, size_bytes, group_id, child_id, created_at, updated_at";
+     storage_path, content_type, size_bytes, group_id, child_id, created_at, updated_at,
+     is_encrypted, encryption_iv, encryption_tag";
 
 pub struct DocumentService;
 
@@ -22,6 +24,7 @@ impl DocumentService {
         tenant: &str,
         uploader_id: Uuid,
         media_dir: &str,
+        encryption_master_key: &str,
         mut multipart: Multipart,
     ) -> anyhow::Result<Document> {
         let doc_dir = PathBuf::from(media_dir).join(tenant).join("documents");
@@ -79,13 +82,27 @@ impl DocumentService {
         let storage_path_full = doc_dir.join(&storage_filename);
         let storage_path_rel = format!("{}/documents/{}", tenant, storage_filename);
 
-        tokio::fs::write(&storage_path_full, &bytes).await?;
+        // Decode master key and derive tenant key
+        let master_key_bytes = hex::decode(encryption_master_key)?;
+        if master_key_bytes.len() != 32 {
+            anyhow::bail!("Master key must be 32 bytes");
+        }
+        let mut master_key = [0u8; 32];
+        master_key.copy_from_slice(&master_key_bytes);
+        let tenant_key = encryption::derive_tenant_key(&master_key, tenant)?;
+
+        // Encrypt file data
+        let (encrypted_bytes, iv, tag) = encryption::encrypt_file(&bytes, &tenant_key)?;
+
+        // Write encrypted file to disk
+        tokio::fs::write(&storage_path_full, &encrypted_bytes).await?;
 
         let schema = schema_name(tenant);
         let doc = sqlx::query_as::<_, Document>(&format!(
             "INSERT INTO {schema}.documents
-             (uploader_id, title, category, original_filename, storage_path, content_type, size_bytes, group_id, child_id)
-             VALUES ($1, $2, $3::\"{schema}\".doc_category, $4, $5, $6, $7, $8, $9)
+             (uploader_id, title, category, original_filename, storage_path, content_type, size_bytes, group_id, child_id,
+              is_encrypted, encryption_iv, encryption_tag)
+             VALUES ($1, $2, $3::\"{schema}\".doc_category, $4, $5, $6, $7, $8, $9, $10, $11, $12)
              RETURNING {DOC_COLS}"
         ))
         .bind(uploader_id)
@@ -94,9 +111,12 @@ impl DocumentService {
         .bind(&original_filename)
         .bind(&storage_path_rel)
         .bind(&content_type)
-        .bind(bytes.len() as i64)
+        .bind(encrypted_bytes.len() as i64)
         .bind(group_id)
         .bind(child_id)
+        .bind(true) // is_encrypted
+        .bind(&iv)
+        .bind(&tag)
         .fetch_one(pool)
         .await?;
 
