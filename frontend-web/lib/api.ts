@@ -157,6 +157,18 @@ export const mediaApi = {
     apiClient.post("/media/bulk", data),
 };
 
+// Tenant settings
+export const tenantApi = {
+  uploadLogo: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiClient.post("/tenant/logo", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  deleteLogo: () => apiClient.delete("/tenant/logo"),
+};
+
 // Documents
 export const documentsApi = {
   list: (params?: { category?: string; group_id?: string; page?: number }) =>

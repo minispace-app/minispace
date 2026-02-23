@@ -103,7 +103,13 @@
     "passwordMismatch": "New passwords do not match",
     "passwordTooShort": "Password must be at least 8 characters",
     "invalidEmail": "Invalid email",
-    "updateError": "Error updating"
+    "updateError": "Error updating",
+    "logoSection": "Daycare logo",
+    "logoHint": "PNG, JPG, WebP or GIF — max 5 MB",
+    "logoUploadButton": "Upload",
+    "logoUpdated": "Logo updated successfully",
+    "logoDeleted": "Logo removed",
+    "logoDelete": "Remove logo"
   },
   "messages": {
     "title": "Messages",
