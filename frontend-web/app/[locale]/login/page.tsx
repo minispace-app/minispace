@@ -16,7 +16,7 @@ export default function LoginPage() {
   const router = useRouter();
   const params = useParams();
   const locale = params.locale as string;
-  const { name: tenantName, notFound } = useTenantInfo();
+  const { name: tenantName, logo_url: tenantLogoUrl, notFound } = useTenantInfo();
 
   // Step 1 state
   const [email, setEmail] = useState("");
@@ -103,7 +103,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
         <div className="text-center mb-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="minispace.app" className="w-40 mx-auto mb-3" />
+          <img src={tenantLogoUrl || "/logo.png"} alt="minispace.app" className="w-40 mx-auto mb-3" />
           <h1 className="text-2xl font-bold text-slate-800">{tenantName || tc("appName")}</h1>
           <p className="text-slate-500 mt-1">
             {step === 1 ? t("login") : t("twoFaTitle")}
