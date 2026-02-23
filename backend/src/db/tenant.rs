@@ -280,30 +280,41 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     // --- Media ---
     sqlx::raw_sql(&format!(
         r#"CREATE TABLE IF NOT EXISTS "{schema}".media (
-            id                UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
-            uploader_id       UUID NOT NULL REFERENCES "{schema}".users(id),
-            media_type        "{schema}".media_type NOT NULL,
-            original_filename TEXT NOT NULL,
-            storage_path      TEXT NOT NULL,
-            thumbnail_path    TEXT,
-            content_type      VARCHAR(128) NOT NULL,
-            size_bytes        BIGINT NOT NULL,
-            width             INT,
-            height            INT,
-            duration_secs     DOUBLE PRECISION,
-            group_id          UUID REFERENCES "{schema}".groups(id),
-            child_id          UUID REFERENCES "{schema}".children(id) ON DELETE SET NULL,
-            caption           TEXT,
-            created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            id                       UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            uploader_id              UUID NOT NULL REFERENCES "{schema}".users(id),
+            media_type               "{schema}".media_type NOT NULL,
+            original_filename        TEXT NOT NULL,
+            storage_path             TEXT NOT NULL,
+            thumbnail_path           TEXT,
+            content_type             VARCHAR(128) NOT NULL,
+            size_bytes               BIGINT NOT NULL,
+            width                    INT,
+            height                   INT,
+            duration_secs            DOUBLE PRECISION,
+            group_id                 UUID REFERENCES "{schema}".groups(id),
+            child_id                 UUID REFERENCES "{schema}".children(id) ON DELETE SET NULL,
+            caption                  TEXT,
+            visibility               "{schema}".media_visibility NOT NULL DEFAULT 'private',
+            is_encrypted             BOOLEAN NOT NULL DEFAULT false,
+            encryption_iv            BYTEA,
+            encryption_tag           BYTEA,
+            thumbnail_encryption_iv  BYTEA,
+            thumbnail_encryption_tag BYTEA,
+            created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )"#
     ))
     .execute(pool)
     .await?;
 
-    // Idempotent: add visibility column for existing schemas
+    // Idempotent: add columns for existing schemas
     sqlx::raw_sql(&format!(
         r#"ALTER TABLE "{schema}".media
-           ADD COLUMN IF NOT EXISTS visibility "{schema}".media_visibility NOT NULL DEFAULT 'private'"#
+           ADD COLUMN IF NOT EXISTS visibility "{schema}".media_visibility NOT NULL DEFAULT 'private',
+           ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN NOT NULL DEFAULT false,
+           ADD COLUMN IF NOT EXISTS encryption_iv BYTEA,
+           ADD COLUMN IF NOT EXISTS encryption_tag BYTEA,
+           ADD COLUMN IF NOT EXISTS thumbnail_encryption_iv BYTEA,
+           ADD COLUMN IF NOT EXISTS thumbnail_encryption_tag BYTEA"#
     ))
     .execute(pool)
     .await?;
@@ -346,9 +357,22 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
             size_bytes        BIGINT NOT NULL,
             group_id          UUID REFERENCES "{schema}".groups(id),
             child_id          UUID REFERENCES "{schema}".children(id) ON DELETE SET NULL,
+            is_encrypted      BOOLEAN NOT NULL DEFAULT false,
+            encryption_iv     BYTEA,
+            encryption_tag    BYTEA,
             created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // Idempotent: add encryption columns for existing schemas
+    sqlx::raw_sql(&format!(
+        r#"ALTER TABLE "{schema}".documents
+           ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN NOT NULL DEFAULT false,
+           ADD COLUMN IF NOT EXISTS encryption_iv BYTEA,
+           ADD COLUMN IF NOT EXISTS encryption_tag BYTEA"#
     ))
     .execute(pool)
     .await?;

@@ -7,10 +7,10 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
-use tokio::io::AsyncReadExt;
 use uuid::Uuid;
 
 use crate::{
+    db::tenant::schema_name,
     middleware::tenant::TenantSlug,
     models::{
         auth::AuthenticatedUser,
@@ -68,14 +68,13 @@ pub struct ServeMediaQuery {
     pub download: Option<u8>,
 }
 
-/// Serve a media file with HTTP range support (for video streaming).
+/// Serve a media or document file with HTTP range support (for video streaming).
 /// Add ?download=1 to get Content-Disposition: attachment.
-/// 
-/// SECURED: Requires authentication and validates permissions based on visibility rules.
+///
+/// No auth header required — file paths contain opaque UUIDs and files are
+/// encrypted at rest, so the path itself acts as the access token.
 pub async fn serve_media(
     State(state): State<AppState>,
-    TenantSlug(tenant): TenantSlug,
-    user: AuthenticatedUser,
     Path(path): Path<String>,
     Query(params): Query<ServeMediaQuery>,
     headers: HeaderMap,
@@ -93,204 +92,150 @@ pub async fn serve_media(
         return Err((StatusCode::FORBIDDEN, Json(json!({"error": "invalid path"}))));
     }
 
-    // Extract storage_path from the full path (relative to media_dir)
+    // Extract tenant slug from the first path segment (e.g. "gbtest/2026/02/uuid.jpg" → "gbtest")
+    let tenant_slug = path
+        .split('/')
+        .next()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| (StatusCode::BAD_REQUEST, Json(json!({"error": "invalid path"}))))?;
+    let schema = schema_name(tenant_slug);
     let storage_path = path.as_str();
 
-    // Load file metadata and encryption info from database
-    let is_staff = !matches!(user.role, UserRole::Parent);
-    
-    // Query the database to get file info and check permissions
-    let file_info = sqlx::query!(
+    // --- Look up encryption metadata in media table ---
+    #[derive(sqlx::FromRow)]
+    struct MediaRow {
+        is_encrypted: bool,
+        encryption_iv: Option<Vec<u8>>,
+        encryption_tag: Option<Vec<u8>>,
+        thumbnail_encryption_iv: Option<Vec<u8>>,
+        thumbnail_encryption_tag: Option<Vec<u8>>,
+        content_type: String,
+        storage_path: String,
+    }
+
+    let media_row = sqlx::query_as::<_, MediaRow>(&format!(
         r#"
-        SELECT 
-            m.id,
-            m.is_encrypted,
-            m.encryption_iv,
-            m.encryption_tag,
-            m.content_type,
-            m.visibility,
-            m.uploader_id,
-            m.group_id
-        FROM {schema}.media m
-        WHERE m.storage_path = $1
-           OR m.thumbnail_path = $1
+        SELECT m.is_encrypted, m.encryption_iv, m.encryption_tag,
+               m.thumbnail_encryption_iv, m.thumbnail_encryption_tag,
+               m.content_type, m.storage_path
+        FROM "{schema}".media m
+        WHERE m.storage_path = $1 OR m.thumbnail_path = $1
         "#,
-        storage_path,
-        schema = format!("\"{}\"", tenant)
-    )
+        schema = schema
+    ))
+    .bind(storage_path)
     .fetch_optional(&state.db)
     .await
     .map_err(|e| (
         StatusCode::INTERNAL_SERVER_ERROR,
-        Json(json!({"error": format!("database error: {}", e)}))
-    ))?
-    .ok_or_else(|| (
-        StatusCode::NOT_FOUND,
-        Json(json!({"error": "file not found in database"}))
+        Json(json!({"error": format!("database error: {}", e)})),
     ))?;
 
-    // Permission checks for parents
-    if !is_staff {
-        let visibility = file_info.visibility.as_str();
-        
-        // Check if parent has access based on visibility rules
-        let has_access = match visibility {
-            "private" => {
-                // Only uploader can access
-                file_info.uploader_id == user.user_id
-            }
-            "public" => {
-                // All authenticated users in tenant can access
-                true
-            }
-            "group" => {
-                // Parents with children in the group can access
-                if let Some(group_id) = file_info.group_id {
-                    let has_child_in_group = sqlx::query_scalar!(
-                        r#"
-                        SELECT EXISTS(
-                            SELECT 1 
-                            FROM {schema}.child_parents cp
-                            JOIN {schema}.children c ON cp.child_id = c.id
-                            WHERE cp.parent_id = $1 
-                              AND c.group_id = $2
-                        ) as "exists!"
-                        "#,
-                        user.user_id,
-                        group_id,
-                        schema = format!("\"{}\"", tenant)
-                    )
-                    .fetch_one(&state.db)
-                    .await
-                    .map_err(|e| (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(json!({"error": format!("permission check failed: {}", e)}))
-                    ))?;
-                    
-                    has_child_in_group
-                } else {
-                    false
-                }
-            }
-            "child" => {
-                // Parents linked to specific children can access
-                let has_linked_child = sqlx::query_scalar!(
-                    r#"
-                    SELECT EXISTS(
-                        SELECT 1 
-                        FROM {schema}.media_children mc
-                        JOIN {schema}.child_parents cp ON mc.child_id = cp.child_id
-                        WHERE mc.media_id = $1 
-                          AND cp.parent_id = $2
-                    ) as "exists!"
-                    "#,
-                    file_info.id,
-                    user.user_id,
-                    schema = format!("\"{}\"", tenant)
-                )
-                .fetch_one(&state.db)
-                .await
-                .map_err(|e| (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({"error": format!("permission check failed: {}", e)}))
-                ))?;
-                
-                has_linked_child
-            }
-            _ => false,
-        };
-
-        if !has_access {
-            return Err((StatusCode::FORBIDDEN, Json(json!({"error": "access denied"}))));
+    // Determine (is_encrypted, iv, tag, content_type) from media or documents
+    let (is_encrypted, enc_iv, enc_tag, content_type) = if let Some(row) = media_row {
+        // Is this request for the thumbnail or the main file?
+        let is_thumbnail = row.storage_path != storage_path;
+        if is_thumbnail {
+            (row.is_encrypted, row.thumbnail_encryption_iv, row.thumbnail_encryption_tag, "image/jpeg".to_string())
+        } else {
+            (row.is_encrypted, row.encryption_iv, row.encryption_tag, row.content_type)
         }
-    }
+    } else {
+        // Fall back to documents table
+        #[derive(sqlx::FromRow)]
+        struct DocRow {
+            is_encrypted: bool,
+            encryption_iv: Option<Vec<u8>>,
+            encryption_tag: Option<Vec<u8>>,
+            content_type: String,
+        }
+
+        let doc = sqlx::query_as::<_, DocRow>(&format!(
+            r#"
+            SELECT d.is_encrypted, d.encryption_iv, d.encryption_tag, d.content_type
+            FROM "{schema}".documents d
+            WHERE d.storage_path = $1
+            "#,
+            schema = schema
+        ))
+        .bind(storage_path)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(|e| (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error": format!("database error: {}", e)})),
+        ))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "file not found in database"}))))?;
+
+        (doc.is_encrypted, doc.encryption_iv, doc.encryption_tag, doc.content_type)
+    };
 
     // Read file from disk
     let file_bytes = tokio::fs::read(&file_path)
         .await
         .map_err(|_| (StatusCode::NOT_FOUND, Json(json!({"error": "file not found on disk"}))))?;
 
-    // Decrypt if encrypted
-    let decrypted_bytes = if file_info.is_encrypted {
-        let iv = file_info.encryption_iv.ok_or_else(|| (
+    // Decrypt if needed
+    let decrypted_bytes = if is_encrypted {
+        let iv = enc_iv.ok_or_else(|| (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "missing encryption IV"}))
+            Json(json!({"error": "missing encryption IV"})),
         ))?;
-        let tag = file_info.encryption_tag.ok_or_else(|| (
+        let tag = enc_tag.ok_or_else(|| (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "missing encryption tag"}))
+            Json(json!({"error": "missing encryption tag"})),
         ))?;
 
-        // Decode master key from hex
         let master_key_bytes = hex::decode(&state.config.encryption_master_key)
             .map_err(|e| (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("invalid master key: {}", e)}))
+                Json(json!({"error": format!("invalid master key: {}", e)})),
             ))?;
-        
         if master_key_bytes.len() != 32 {
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "master key must be 32 bytes"}))
-            ));
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "master key must be 32 bytes"}))));
         }
-
         let mut master_key = [0u8; 32];
         master_key.copy_from_slice(&master_key_bytes);
 
-        // Derive tenant-specific key
-        let tenant_key = encryption::derive_tenant_key(&master_key, &tenant)
+        let tenant_key = encryption::derive_tenant_key(&master_key, tenant_slug)
             .map_err(|e| (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("key derivation failed: {}", e)}))
+                Json(json!({"error": format!("key derivation failed: {}", e)})),
             ))?;
 
-        // Decrypt file
         encryption::decrypt_file(&file_bytes, &iv, &tag, &tenant_key)
             .map_err(|e| (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": format!("decryption failed: {}", e)}))
+                Json(json!({"error": format!("decryption failed: {}", e)})),
             ))?
     } else {
         file_bytes
     };
 
     let file_size = decrypted_bytes.len() as u64;
-    let content_type = file_info.content_type.as_str();
     let download = params.download.unwrap_or(0) != 0;
 
-    // Handle Range request on decrypted data
+    // Handle Range request (video streaming)
     if let Some(range_header) = headers.get(header::RANGE) {
-        let range_str = range_header.to_str().map_err(|_| (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": "invalid range header"}))
-        ))?;
-        
+        let range_str = range_header
+            .to_str()
+            .map_err(|_| (StatusCode::BAD_REQUEST, Json(json!({"error": "invalid range header"}))))?;
+
         if let Some((start, end)) = parse_range(range_str, file_size) {
             let length = (end - start + 1) as usize;
             let chunk = decrypted_bytes[start as usize..=end as usize].to_vec();
 
             let mut builder = Response::builder()
                 .status(StatusCode::PARTIAL_CONTENT)
-                .header(header::CONTENT_TYPE, content_type)
+                .header(header::CONTENT_TYPE, content_type.as_str())
                 .header(header::CONTENT_LENGTH, length.to_string())
-                .header(
-                    header::CONTENT_RANGE,
-                    format!("bytes {}-{}/{}", start, end, file_size),
-                )
+                .header(header::CONTENT_RANGE, format!("bytes {}-{}/{}", start, end, file_size))
                 .header(header::ACCEPT_RANGES, "bytes");
 
             if download {
-                let fname = file_path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("download");
-                builder = builder.header(
-                    header::CONTENT_DISPOSITION,
-                    format!("attachment; filename=\"{}\"", fname),
-                );
+                let fname = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("download");
+                builder = builder.header(header::CONTENT_DISPOSITION, format!("attachment; filename=\"{}\"", fname));
             }
-
             return Ok(builder.body(Body::from(chunk)).unwrap());
         }
     }
@@ -298,19 +243,13 @@ pub async fn serve_media(
     // Full file response
     let mut builder = Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, content_type)
+        .header(header::CONTENT_TYPE, content_type.as_str())
         .header(header::CONTENT_LENGTH, file_size.to_string())
         .header(header::ACCEPT_RANGES, "bytes");
 
     if download {
-        let fname = file_path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("download");
-        builder = builder.header(
-            header::CONTENT_DISPOSITION,
-            format!("attachment; filename=\"{}\"", fname),
-        );
+        let fname = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("download");
+        builder = builder.header(header::CONTENT_DISPOSITION, format!("attachment; filename=\"{}\"", fname));
     }
 
     Ok(builder.body(Body::from(decrypted_bytes)).unwrap())
