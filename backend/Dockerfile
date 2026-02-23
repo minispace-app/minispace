@@ -8,7 +8,7 @@ COPY Cargo.toml Cargo.lock* ./
 # Cache dependencies - create dummy lib and binary files
 RUN mkdir src && \
     mkdir -p src/bin && \
-    echo "pub mod config; pub mod db; pub mod middleware; pub mod models; pub mod routes; pub mod services;" > src/lib.rs && \
+    echo "" > src/lib.rs && \
     echo "fn main() {}" > src/main.rs && \
     echo "fn main() {}" > src/bin/encrypt-existing-files.rs && \
     cargo build --release && \

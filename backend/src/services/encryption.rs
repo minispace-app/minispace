@@ -21,7 +21,7 @@ pub fn derive_tenant_key(master_key: &[u8], tenant: &str) -> Result<[u8; 32]> {
     let info = format!("minispace-tenant-{}", tenant);
     let mut tenant_key = [0u8; 32];
     hk.expand(info.as_bytes(), &mut tenant_key)
-        .context("Failed to derive tenant key")?;
+        .map_err(|_| anyhow::anyhow!("Failed to derive tenant key"))?;
 
     Ok(tenant_key)
 }
