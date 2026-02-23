@@ -68,8 +68,6 @@ jobs:
       - name: Extract metadata for ${{ matrix.service.name }}
         id: meta
         uses: docker/metadata-action@v5
-        env:
-          GITHUB_REF: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/v{0}', github.event.inputs.version) || github.ref }}
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service.name }}
           tags: |
@@ -77,6 +75,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=sha-
             type=raw,value=latest
+            type=raw,value=${{ github.event.inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
 
       - name: Build and push ${{ matrix.service.name }}
         uses: docker/build-push-action@v5
