@@ -27,7 +27,7 @@ pub async fn upload_media(
     user: AuthenticatedUser,
     multipart: Multipart,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
-    MediaService::upload(
+    let media = MediaService::upload(
         &state.db,
         &tenant,
         user.user_id,
@@ -36,13 +36,125 @@ pub async fn upload_media(
         multipart,
     )
     .await
-    .map(|media| (StatusCode::CREATED, Json(serde_json::to_value(media).unwrap())))
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": e.to_string() })),
-        )
-    })
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    // Email notifications aux parents concernés (async, non-bloquant, cooldown 1h par parent)
+    if let Some(email_svc) = state.email.clone() {
+        if media.visibility != "private" {
+            let pool = state.db.clone();
+            let tenant_c = tenant.clone();
+            let visibility = media.visibility.clone();
+            let group_id = media.group_id;
+            let child_ids = media.child_ids.clone();
+            let media_type_str = media.media_type.clone();
+            let uploader_id = user.user_id;
+            let mut redis = state.redis.clone();
+            let base = state.config.app_base_url.clone();
+
+            tokio::spawn(async move {
+                let s = schema_name(&tenant_c);
+
+                let garderie_name: String = sqlx::query_scalar(
+                    "SELECT name FROM public.garderies WHERE slug = $1",
+                )
+                .bind(&tenant_c)
+                .fetch_optional(&pool)
+                .await
+                .unwrap_or_default()
+                .unwrap_or_else(|| tenant_c.clone());
+
+                let uploader_name: String = sqlx::query_scalar(&format!(
+                    "SELECT CONCAT(first_name, ' ', last_name) FROM {s}.users WHERE id = $1"
+                ))
+                .bind(uploader_id)
+                .fetch_optional(&pool)
+                .await
+                .unwrap_or_default()
+                .unwrap_or_else(|| "Un éducateur".to_string());
+
+                let app_url = if let Some(idx) = base.find("://") {
+                    let scheme = &base[..idx];
+                    let domain = &base[idx + 3..];
+                    format!("{scheme}://{tenant_c}.{domain}/fr/parent/media")
+                } else {
+                    format!("https://{tenant_c}.{base}/fr/parent/media")
+                };
+
+                let recipients: Vec<(Uuid, String, String)> = match visibility.as_str() {
+                    "public" => sqlx::query_as(&format!(
+                        "SELECT id, email, CONCAT(first_name, ' ', last_name)
+                         FROM {s}.users WHERE role::text = 'parent' AND is_active = TRUE"
+                    ))
+                    .fetch_all(&pool)
+                    .await
+                    .unwrap_or_default(),
+
+                    "group" => match group_id {
+                        Some(gid) => sqlx::query_as(&format!(
+                            "SELECT DISTINCT u.id, u.email, CONCAT(u.first_name, ' ', u.last_name)
+                             FROM {s}.users u
+                             JOIN {s}.child_parents cp ON cp.user_id = u.id
+                             JOIN {s}.children c ON c.id = cp.child_id
+                             WHERE c.group_id = $1 AND u.is_active = TRUE"
+                        ))
+                        .bind(gid)
+                        .fetch_all(&pool)
+                        .await
+                        .unwrap_or_default(),
+                        None => vec![],
+                    },
+
+                    "child" if !child_ids.is_empty() => sqlx::query_as(&format!(
+                        "SELECT DISTINCT u.id, u.email, CONCAT(u.first_name, ' ', u.last_name)
+                         FROM {s}.users u
+                         JOIN {s}.child_parents cp ON cp.user_id = u.id
+                         WHERE cp.child_id = ANY($1) AND u.is_active = TRUE"
+                    ))
+                    .bind(child_ids.as_slice())
+                    .fetch_all(&pool)
+                    .await
+                    .unwrap_or_default(),
+
+                    _ => vec![],
+                };
+
+                let content_kind = if media_type_str == "video" {
+                    "une vidéo"
+                } else {
+                    "de nouvelles photos"
+                };
+
+                for (parent_id, email, name) in recipients {
+                    let cooldown_key =
+                        format!("notif_cooldown:{tenant_c}:media_upload:{parent_id}");
+                    let newly_set: Option<String> = redis::cmd("SET")
+                        .arg(&cooldown_key)
+                        .arg("1")
+                        .arg("NX")
+                        .arg("EX")
+                        .arg(3600u64) // 1 heure
+                        .query_async(&mut redis)
+                        .await
+                        .unwrap_or(None);
+
+                    if newly_set.is_some() {
+                        let _ = email_svc
+                            .send_media_notification(
+                                &email,
+                                &name,
+                                &uploader_name,
+                                content_kind,
+                                &app_url,
+                                &garderie_name,
+                            )
+                            .await;
+                    }
+                }
+            });
+        }
+    }
+
+    Ok((StatusCode::CREATED, Json(serde_json::to_value(media).unwrap())))
 }
 
 pub async fn list_media(
