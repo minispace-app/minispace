@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::{
     db::tenant::schema_name,
     models::media::{BulkMediaRequest, Media, MediaQuery, MediaType, UpdateMediaRequest},
+    services::encryption,
 };
 
 /// Explicit column list for Media — casts enums to TEXT, includes child_ids subquery.
@@ -19,7 +20,8 @@ fn media_cols(schema: &str) -> String {
          m.thumbnail_path, m.content_type, m.size_bytes, m.width, m.height, m.duration_secs,
          m.group_id, m.child_id, m.caption, m.visibility::TEXT as visibility,
          ARRAY(SELECT mc.child_id FROM \"{schema}\".media_children mc WHERE mc.media_id = m.id) as child_ids,
-         m.created_at"
+         m.created_at, m.is_encrypted, m.encryption_iv, m.encryption_tag,
+         m.thumbnail_encryption_iv, m.thumbnail_encryption_tag"
     )
 }
 
@@ -31,6 +33,7 @@ impl MediaService {
         tenant: &str,
         uploader_id: Uuid,
         media_dir: &str,
+        encryption_master_key: &str,
         mut multipart: Multipart,
     ) -> anyhow::Result<Media> {
         let now = Utc::now();
@@ -99,14 +102,27 @@ impl MediaService {
         let storage_path_full = tenant_dir.join(&storage_filename);
         let storage_path_rel = format!("{}/{}/{}/{}", tenant, year, month, storage_filename);
 
-        tokio::fs::write(&storage_path_full, &bytes).await?;
+        // Decode master key and derive tenant key
+        let master_key_bytes = hex::decode(encryption_master_key)?;
+        if master_key_bytes.len() != 32 {
+            anyhow::bail!("Master key must be 32 bytes");
+        }
+        let mut master_key = [0u8; 32];
+        master_key.copy_from_slice(&master_key_bytes);
+        let tenant_key = encryption::derive_tenant_key(&master_key, tenant)?;
 
-        let (width, height, thumbnail_path) = if media_type == MediaType::Photo {
-            Self::process_image(&bytes, &tenant_dir, file_id, &storage_path_rel)
+        // Encrypt file data
+        let (encrypted_bytes, iv, tag) = encryption::encrypt_file(&bytes, &tenant_key)?;
+
+        // Write encrypted file to disk
+        tokio::fs::write(&storage_path_full, &encrypted_bytes).await?;
+
+        let (width, height, thumbnail_path, thumb_iv, thumb_tag) = if media_type == MediaType::Photo {
+            Self::process_image(&bytes, &tenant_dir, file_id, &storage_path_rel, &tenant_key)
                 .await
-                .unwrap_or((None, None, None))
+                .unwrap_or((None, None, None, None, None))
         } else {
-            (None, None, None)
+            (None, None, None, None, None)
         };
 
         // Resolve group_id based on visibility
@@ -115,27 +131,33 @@ impl MediaService {
         let schema = schema_name(tenant);
         let cols = media_cols(&schema);
 
-        // INSERT returns only the id (RETURNING with alias `m.` is invalid in INSERT)
+        // INSERT with encryption metadata
         let (inserted_id,): (Uuid,) = sqlx::query_as(&format!(
             "INSERT INTO \"{schema}\".media
              (uploader_id, media_type, original_filename, storage_path, thumbnail_path,
-              content_type, size_bytes, width, height, group_id, child_id, caption, visibility)
-             VALUES ($1, $2::\"{schema}\".media_type, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::\"{schema}\".media_visibility)
+              content_type, size_bytes, width, height, group_id, child_id, caption, visibility,
+              is_encrypted, encryption_iv, encryption_tag, thumbnail_encryption_iv, thumbnail_encryption_tag)
+             VALUES ($1, $2::\"{schema}\".media_type, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::\"{schema}\".media_visibility, $14, $15, $16, $17, $18)
              RETURNING id"
         ))
         .bind(uploader_id)
         .bind(media_type.to_string())
         .bind(&original_filename)
         .bind(&storage_path_rel)
-        .bind(thumbnail_path)
+        .bind(&thumbnail_path)
         .bind(&content_type)
-        .bind(bytes.len() as i64)
+        .bind(encrypted_bytes.len() as i64) // Size of encrypted data
         .bind(width)
         .bind(height)
         .bind(db_group_id)
         .bind(Option::<Uuid>::None) // child_id legacy column unused
         .bind(caption)
         .bind(&visibility)
+        .bind(true) // is_encrypted
+        .bind(&iv)
+        .bind(&tag)
+        .bind(&thumb_iv)
+        .bind(&thumb_tag)
         .fetch_one(pool)
         .await?;
 
@@ -167,14 +189,24 @@ impl MediaService {
         dir: &Path,
         file_id: Uuid,
         storage_path_rel: &str,
-    ) -> anyhow::Result<(Option<i32>, Option<i32>, Option<String>)> {
+        tenant_key: &[u8; 32],
+    ) -> anyhow::Result<(Option<i32>, Option<i32>, Option<String>, Option<Vec<u8>>, Option<Vec<u8>>)> {
         let img = image::load_from_memory(bytes)?;
         let (width, height) = (img.width() as i32, img.height() as i32);
 
         let thumb = img.resize(400, 400, FilterType::Lanczos3);
         let thumb_filename = format!("{}_thumb.jpg", file_id);
         let thumb_path = dir.join(&thumb_filename);
-        thumb.save_with_format(&thumb_path, image::ImageFormat::Jpeg)?;
+        
+        // Save thumbnail to memory buffer first
+        let mut thumb_bytes = Vec::new();
+        thumb.write_to(&mut std::io::Cursor::new(&mut thumb_bytes), image::ImageFormat::Jpeg)?;
+        
+        // Encrypt thumbnail
+        let (encrypted_thumb, thumb_iv, thumb_tag) = encryption::encrypt_file(&thumb_bytes, tenant_key)?;
+        
+        // Write encrypted thumbnail to disk
+        tokio::fs::write(&thumb_path, &encrypted_thumb).await?;
 
         let parts: Vec<&str> = storage_path_rel.rsplitn(2, '/').collect();
         let thumb_rel = if parts.len() == 2 {
@@ -183,7 +215,7 @@ impl MediaService {
             thumb_filename
         };
 
-        Ok((Some(width), Some(height), Some(thumb_rel)))
+        Ok((Some(width), Some(height), Some(thumb_rel), Some(thumb_iv), Some(thumb_tag)))
     }
 
     /// Parse a period + date into (date_from, date_to) as ISO strings for SQL.

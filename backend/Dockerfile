@@ -5,8 +5,14 @@ RUN apk add --no-cache musl-dev openssl-dev pkgconfig
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock* ./
-# Cache dependencies
-RUN mkdir src && echo "fn main() {}" > src/main.rs && cargo build --release && rm -rf src
+# Cache dependencies - create dummy lib and binary files
+RUN mkdir src && \
+    mkdir -p src/bin && \
+    echo "" > src/lib.rs && \
+    echo "fn main() {}" > src/main.rs && \
+    echo "fn main() {}" > src/bin/encrypt-existing-files.rs && \
+    cargo build --release && \
+    rm -rf src
 
 COPY . .
 RUN touch src/main.rs && cargo build --release

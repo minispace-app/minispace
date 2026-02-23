@@ -2,6 +2,7 @@ pub mod auth;
 pub mod children;
 pub mod documents;
 pub mod email;
+pub mod encryption;
 pub mod groups;
 pub mod journal;
 pub mod media;
