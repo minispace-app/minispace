@@ -4,9 +4,11 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
+import useSWR from "swr";
 import { useAuth } from "../../../hooks/useAuth";
 import { getGarderieName } from "../../../lib/auth";
 import { useTenantInfo } from "../../../hooks/useTenantInfo";
+import { messagesApi } from "../../../lib/api";
 import {
   MessageSquare, Image, FileText, Users, BookOpen,
   LogOut, User, Menu, X,
@@ -32,6 +34,12 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
   const locale = params.locale as string;
   const garderieName = getGarderieName() || tc("appName");
   const { logo_url: tenantLogoUrl } = useTenantInfo();
+  const { data: conversations } = useSWR(
+    "conversations",
+    () => messagesApi.getConversations().then((r) => r.data as { unread_count: number }[]),
+    { refreshInterval: 30000 }
+  );
+  const totalUnread = (conversations ?? []).reduce((sum, c) => sum + (c.unread_count || 0), 0);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => (
@@ -52,7 +60,12 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
               }`}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
-              {t(key as Parameters<typeof t>[0])}
+              <span className="flex-1">{t(key as Parameters<typeof t>[0])}</span>
+              {key === "messages" && totalUnread > 0 && (
+                <span className="flex-shrink-0 min-w-[1.25rem] h-5 px-1 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                  {totalUnread > 99 ? "99+" : totalUnread}
+                </span>
+              )}
             </Link>
           );
         })}
