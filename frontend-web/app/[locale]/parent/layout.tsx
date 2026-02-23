@@ -74,7 +74,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
   );
 
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="flex h-screen bg-slate-50" style={{ height: "100dvh" }}>
       {/* ── Desktop sidebar ── */}
       <aside className="hidden md:flex w-60 bg-white border-r border-slate-200 flex-col flex-shrink-0">
         <div className="px-5 py-5 border-b border-slate-100 flex flex-col items-center">
