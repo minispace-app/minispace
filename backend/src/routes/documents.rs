@@ -115,7 +115,7 @@ pub async fn upload_document(
 
                 for (parent_id, email, name) in recipients {
                     let cooldown_key =
-                        format!("notif_cooldown:{tenant_c}:media_upload:{parent_id}");
+                        format!("notif_cooldown:{tenant_c}:doc_upload:{parent_id}");
                     let newly_set: Option<String> = redis::cmd("SET")
                         .arg(&cooldown_key)
                         .arg("1")

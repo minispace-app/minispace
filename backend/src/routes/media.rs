@@ -45,7 +45,7 @@ pub async fn upload_media(
             let tenant_c = tenant.clone();
             let visibility = media.visibility.clone();
             let group_id = media.group_id;
-            let child_ids = media.child_ids.clone();
+            let media_id = media.id;
             let media_type_str = media.media_type.clone();
             let uploader_id = user.user_id;
             let mut redis = state.redis.clone();
@@ -104,13 +104,14 @@ pub async fn upload_media(
                         None => vec![],
                     },
 
-                    "child" if !child_ids.is_empty() => sqlx::query_as(&format!(
+                    "child" => sqlx::query_as(&format!(
                         "SELECT DISTINCT u.id, u.email, CONCAT(u.first_name, ' ', u.last_name)
                          FROM {s}.users u
                          JOIN {s}.child_parents cp ON cp.user_id = u.id
-                         WHERE cp.child_id = ANY($1) AND u.is_active = TRUE"
+                         JOIN {s}.media_children mc ON mc.child_id = cp.child_id
+                         WHERE mc.media_id = $1 AND u.is_active = TRUE"
                     ))
-                    .bind(child_ids.as_slice())
+                    .bind(media_id)
                     .fetch_all(&pool)
                     .await
                     .unwrap_or_default(),
