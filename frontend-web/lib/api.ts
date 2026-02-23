@@ -267,6 +267,12 @@ export const superAdminApi = {
     superAdminClient.get(`/super-admin/backups`),
   triggerRestore: (db_file: string, media_file?: string) =>
     superAdminClient.post(`/super-admin/restore`, { db_file, media_file }),
+  getAnnouncement: () =>
+    superAdminClient.get("/announcement"),
+  setAnnouncement: (message: string, color: "yellow" | "red") =>
+    superAdminClient.put("/super-admin/announcement", { message, color }),
+  deleteAnnouncement: () =>
+    superAdminClient.delete("/super-admin/announcement"),
 };
 
 export const userApi = {

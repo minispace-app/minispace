@@ -125,6 +125,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/health", get(routes::health::health_check))
         .route("/contact", post(routes::contact::submit_contact))
         .route("/tenant/info", get(routes::tenant_info::get_tenant_info))
+        // Announcements
+        .route("/announcement", get(routes::announcements::get_announcement))
+        .route("/super-admin/announcement", put(routes::announcements::set_announcement).delete(routes::announcements::delete_announcement))
         // Auth
         .route("/auth/login", post(routes::auth::login))
         .route("/auth/refresh", post(routes::auth::refresh_token))
