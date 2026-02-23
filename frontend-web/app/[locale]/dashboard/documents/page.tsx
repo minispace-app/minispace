@@ -399,40 +399,44 @@ function DocRow({
   const sizeKb = (doc.size_bytes / 1024).toFixed(0);
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-4">
-      <FileText className="w-8 h-8 text-slate-400 flex-shrink-0" />
+    <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center gap-3">
+      <FileText className="w-7 h-7 text-slate-400 flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-slate-800 truncate">{doc.title}</p>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {new Date(doc.created_at).toLocaleDateString()} · {sizeKb} KB
-        </p>
+        <p className="font-medium text-slate-800 break-words leading-snug">{doc.title}</p>
+        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+          <span className="text-xs text-slate-400">
+            {new Date(doc.created_at).toLocaleDateString()} · {sizeKb} KB
+          </span>
+          <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${categoryColor[doc.category] || categoryColor.autre}`}>
+            {t(`categories.${doc.category}` as keyof ReturnType<typeof useTranslations>)}
+          </span>
+          <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${visibilityBadge.color}`}>
+            {visibilityBadge.label}
+          </span>
+        </div>
       </div>
-      <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${categoryColor[doc.category] || categoryColor.autre}`}>
-        {t(`categories.${doc.category}` as keyof ReturnType<typeof useTranslations>)}
-      </span>
-      <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${visibilityBadge.color}`}>
-        {visibilityBadge.label}
-      </span>
-      <a
-        href={`${API_URL}/media/files/${doc.storage_path}`}
-        target="_blank"
-        rel="noreferrer"
-        className="p-2 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition"
-      >
-        <Download className="w-4 h-4" />
-      </a>
-      <button
-        onClick={onEdit}
-        className="p-2 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition"
-      >
-        <Pencil className="w-4 h-4" />
-      </button>
-      <button
-        onClick={onDelete}
-        className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <a
+          href={`${API_URL}/media/files/${doc.storage_path}`}
+          target="_blank"
+          rel="noreferrer"
+          className="p-2 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition"
+        >
+          <Download className="w-4 h-4" />
+        </a>
+        <button
+          onClick={onEdit}
+          className="p-2 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition"
+        >
+          <Pencil className="w-4 h-4" />
+        </button>
+        <button
+          onClick={onDelete}
+          className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
