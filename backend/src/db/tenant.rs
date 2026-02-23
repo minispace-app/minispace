@@ -277,6 +277,22 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     .execute(pool)
     .await?;
 
+    // --- Enum: doc_visibility ---
+    sqlx::raw_sql(&format!(
+        "DO $$ BEGIN
+           IF NOT EXISTS (
+             SELECT 1 FROM pg_type t
+             JOIN pg_namespace n ON n.oid = t.typnamespace
+             WHERE t.typname = 'doc_visibility' AND n.nspname = '{schema}'
+           ) THEN
+             CREATE TYPE \"{schema}\".doc_visibility AS ENUM
+               ('private','public','group','child');
+           END IF;
+         END $$"
+    ))
+    .execute(pool)
+    .await?;
+
     // --- Media ---
     sqlx::raw_sql(&format!(
         r#"CREATE TABLE IF NOT EXISTS "{schema}".media (
@@ -357,6 +373,7 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
             size_bytes        BIGINT NOT NULL,
             group_id          UUID REFERENCES "{schema}".groups(id),
             child_id          UUID REFERENCES "{schema}".children(id) ON DELETE SET NULL,
+            visibility        "{schema}".doc_visibility NOT NULL DEFAULT 'private',
             is_encrypted      BOOLEAN NOT NULL DEFAULT false,
             encryption_iv     BYTEA,
             encryption_tag    BYTEA,
@@ -367,12 +384,27 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     .execute(pool)
     .await?;
 
-    // Idempotent: add encryption columns for existing schemas
+    // Idempotent: add columns for existing schemas
     sqlx::raw_sql(&format!(
         r#"ALTER TABLE "{schema}".documents
+           ADD COLUMN IF NOT EXISTS visibility "{schema}".doc_visibility NOT NULL DEFAULT 'public',
            ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN NOT NULL DEFAULT false,
            ADD COLUMN IF NOT EXISTS encryption_iv BYTEA,
            ADD COLUMN IF NOT EXISTS encryption_tag BYTEA"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // Idempotent: fix visibility for existing rows based on group_id/child_id
+    sqlx::raw_sql(&format!(
+        r#"UPDATE "{schema}".documents
+           SET visibility = CASE
+             WHEN child_id IS NOT NULL THEN 'child'::"{schema}".doc_visibility
+             WHEN group_id IS NOT NULL THEN 'group'::"{schema}".doc_visibility
+             ELSE 'public'::"{schema}".doc_visibility
+           END
+           WHERE visibility = 'public'
+             AND (child_id IS NOT NULL OR group_id IS NOT NULL)"#
     ))
     .execute(pool)
     .await?;

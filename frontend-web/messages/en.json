@@ -22,6 +22,7 @@
     "saving": "Saving...",
     "deleting": "Deleting...",
     "visibility": "Visibility",
+    "visPrivate": "Private",
     "visPublic": "Public",
     "visGroup": "Group",
     "visChild": "Child"

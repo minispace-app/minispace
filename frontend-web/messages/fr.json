@@ -22,6 +22,7 @@
     "saving": "Enregistrement...",
     "deleting": "Suppression...",
     "visibility": "Visibilité",
+    "visPrivate": "Privé",
     "visPublic": "Public",
     "visGroup": "Groupe",
     "visChild": "Enfant"
