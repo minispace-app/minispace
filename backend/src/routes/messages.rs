@@ -354,7 +354,7 @@ pub async fn get_conversations(
     let result = if matches!(user.role, UserRole::Parent) {
         MessageService::get_conversations_parent(&state.db, &tenant, user.user_id).await
     } else {
-        MessageService::get_conversations_admin(&state.db, &tenant).await
+        MessageService::get_conversations_admin(&state.db, &tenant, user.user_id).await
     };
 
     result
