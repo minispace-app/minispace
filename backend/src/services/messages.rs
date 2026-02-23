@@ -141,17 +141,31 @@ impl MessageService {
             }
             "individual" => {
                 if let Some(other_id) = thread_id {
-                    // Mark messages sent by the other party as read
-                    sqlx::query(&format!(
-                        "UPDATE {schema}.messages SET is_read = TRUE
-                         WHERE message_type::text = 'individual'
-                           AND sender_id = $1 AND is_read = FALSE
-                           AND (recipient_id = $2 OR recipient_id IS NULL)"
-                    ))
-                    .bind(other_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
+                    if other_id == user_id {
+                        // Parent viewing their "Garderie" thread: the conversation id is
+                        // their own user_id. Mark all unread individual messages received
+                        // by this user as read.
+                        sqlx::query(&format!(
+                            "UPDATE {schema}.messages SET is_read = TRUE
+                             WHERE message_type::text = 'individual'
+                               AND recipient_id = $1 AND is_read = FALSE"
+                        ))
+                        .bind(user_id)
+                        .execute(pool)
+                        .await?;
+                    } else {
+                        // Staff marking a conversation with a specific parent as read
+                        sqlx::query(&format!(
+                            "UPDATE {schema}.messages SET is_read = TRUE
+                             WHERE message_type::text = 'individual'
+                               AND sender_id = $1 AND is_read = FALSE
+                               AND (recipient_id = $2 OR recipient_id IS NULL)"
+                        ))
+                        .bind(other_id)
+                        .bind(user_id)
+                        .execute(pool)
+                        .await?;
+                    }
                 }
             }
             _ => {}

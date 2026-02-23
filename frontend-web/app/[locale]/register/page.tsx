@@ -7,6 +7,7 @@ import { authApi } from "../../../lib/api";
 import { useTenantInfo } from "../../../hooks/useTenantInfo";
 import { TenantNotFound } from "../../../components/TenantNotFound";
 import { LanguageSwitcher } from "../../../components/LanguageSwitcher";
+import { AnnouncementBanner } from "../../../components/AnnouncementBanner";
 
 export default function RegisterPage() {
   const t = useTranslations("auth");
@@ -15,7 +16,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const locale = params.locale as string;
-  const { name: tenantName, notFound } = useTenantInfo();
+  const { name: tenantName, logo_url: tenantLogoUrl, notFound } = useTenantInfo();
 
   const token = searchParams.get("token") || "";
 
@@ -80,14 +81,16 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="absolute top-4 right-4">
+    <div className="min-h-screen flex flex-col bg-slate-50">
+      <AnnouncementBanner />
+      <div className="flex justify-end px-4 py-2">
         <LanguageSwitcher />
       </div>
+      <div className="flex-1 flex items-center justify-center">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
         <div className="text-center mb-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="minispace.app" className="w-40 mx-auto mb-3" />
+          <img src={tenantLogoUrl || "/logo.png"} alt="minispace.app" className="w-40 mx-auto mb-3" />
           <h1 className="text-2xl font-bold text-slate-800">{tenantName || tc("appName")}</h1>
           <p className="text-slate-500 mt-1">{t("registerTitle")}</p>
         </div>
@@ -160,6 +163,7 @@ export default function RegisterPage() {
             {t("backToLogin")}
           </a>
         </div>
+      </div>
       </div>
     </div>
   );
