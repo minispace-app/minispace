@@ -1,3 +1,4 @@
+pub mod announcement;
 pub mod auth;
 pub mod child;
 pub mod document;
