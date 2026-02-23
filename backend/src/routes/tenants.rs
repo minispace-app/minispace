@@ -183,7 +183,7 @@ pub struct CreateGarderieUserRequest {
 
 /// Create a user directly in a garderie's tenant schema (no invitation needed).
 pub async fn create_garderie_user(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     _auth: SuperAdminAuth,
     Path(slug): Path<String>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {

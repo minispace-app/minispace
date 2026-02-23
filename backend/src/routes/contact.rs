@@ -35,16 +35,7 @@ pub async fn submit_contact(
 
     let rate_limit_key = format!("contact:form:{}", ip);
 
-    let mut redis = state
-        .redis
-        .get_multiplexed_tokio_connection()
-        .await
-        .map_err(|_| {
-            (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({"error": "Service temporarily unavailable"})),
-            )
-        })?;
+    let mut redis = state.redis.clone();
 
     check_rate_limit(&mut redis, &rate_limit_key, 5, 3600).await?;
 

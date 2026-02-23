@@ -101,7 +101,7 @@ services:
       - "${NGINX_HTTP_PORT:-8762}:80"
       - "${NGINX_HTTPS_PORT:-9506}:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.${NGINX_ENV:-dev}.conf:/etc/nginx/nginx.conf:ro
       - ${SSL_CERTS_DIR:-./nginx/ssl}:/etc/nginx/ssl:ro
     depends_on:
       - api
