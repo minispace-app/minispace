@@ -54,14 +54,15 @@ pub async fn upload_media(
             tokio::spawn(async move {
                 let s = schema_name(&tenant_c);
 
-                let garderie_name: String = sqlx::query_scalar(
-                    "SELECT name FROM public.garderies WHERE slug = $1",
+                let (garderie_name, logo_url): (String, Option<String>) = sqlx::query_as(
+                    "SELECT name, logo_url FROM public.garderies WHERE slug = $1",
                 )
                 .bind(&tenant_c)
                 .fetch_optional(&pool)
                 .await
                 .unwrap_or_default()
-                .unwrap_or_else(|| tenant_c.clone());
+                .unwrap_or_else(|| (tenant_c.clone(), None));
+                let logo_url = logo_url.unwrap_or_default();
 
                 let uploader_name: String = sqlx::query_scalar(&format!(
                     "SELECT CONCAT(first_name, ' ', last_name) FROM {s}.users WHERE id = $1"
@@ -147,6 +148,7 @@ pub async fn upload_media(
                                 content_kind,
                                 &app_url,
                                 &garderie_name,
+                                &logo_url,
                             )
                             .await;
                     }
@@ -398,14 +400,15 @@ pub async fn update_media(
             tokio::spawn(async move {
                 let s = schema_name(&tenant_c);
 
-                let garderie_name: String = sqlx::query_scalar(
-                    "SELECT name FROM public.garderies WHERE slug = $1",
+                let (garderie_name, logo_url): (String, Option<String>) = sqlx::query_as(
+                    "SELECT name, logo_url FROM public.garderies WHERE slug = $1",
                 )
                 .bind(&tenant_c)
                 .fetch_optional(&pool)
                 .await
                 .unwrap_or_default()
-                .unwrap_or_else(|| tenant_c.clone());
+                .unwrap_or_else(|| (tenant_c.clone(), None));
+                let logo_url = logo_url.unwrap_or_default();
 
                 let uploader_name: String = sqlx::query_scalar(&format!(
                     "SELECT CONCAT(first_name, ' ', last_name) FROM {s}.users WHERE id = $1"
@@ -491,6 +494,7 @@ pub async fn update_media(
                                 content_kind,
                                 &app_url,
                                 &garderie_name,
+                                &logo_url,
                             )
                             .await;
                     }
