@@ -166,19 +166,19 @@ impl AuthService {
         .execute(pool)
         .await?;
 
-        let garderie_name: String = sqlx::query_scalar(
-            "SELECT name FROM public.garderies WHERE slug = $1"
+        let (garderie_name, logo_url): (String, Option<String>) = sqlx::query_as(
+            "SELECT name, logo_url FROM public.garderies WHERE slug = $1"
         )
         .bind(tenant)
         .fetch_optional(pool)
         .await
         .ok()
         .flatten()
-        .unwrap_or_else(|| tenant.to_string());
+        .unwrap_or_else(|| (tenant.to_string(), None));
 
         // Send the code — not a graceful degradation here; 2FA is mandatory
         email_svc
-            .send_2fa_code(email, &code_str, &garderie_name)
+            .send_2fa_code(email, &code_str, &garderie_name, logo_url.as_deref().unwrap_or(""))
             .await
             .map_err(|e| anyhow::anyhow!("Impossible d'envoyer le code 2FA : {e}"))?;
 
@@ -576,20 +576,20 @@ impl AuthService {
         .execute(pool)
         .await?;
 
-        let garderie_name: String = sqlx::query_scalar(
-            "SELECT name FROM public.garderies WHERE slug = $1"
+        let (garderie_name, logo_url): (String, Option<String>) = sqlx::query_as(
+            "SELECT name, logo_url FROM public.garderies WHERE slug = $1"
         )
         .bind(tenant)
         .fetch_optional(pool)
         .await
         .ok()
         .flatten()
-        .unwrap_or_else(|| tenant.to_string());
+        .unwrap_or_else(|| (tenant.to_string(), None));
 
         let invite_url = build_tenant_invite_url(base_url, tenant, &token);
 
         email_svc
-            .send_invitation(email, &invite_url, &garderie_name, &role.to_string())
+            .send_invitation(email, &invite_url, &garderie_name, &role.to_string(), logo_url.as_deref().unwrap_or(""))
             .await
             .map_err(|e| anyhow::anyhow!("Impossible d'envoyer l'invitation : {e}"))?;
 
@@ -635,21 +635,21 @@ impl AuthService {
             .await?;
 
             if let Some(svc) = email_svc {
-                let garderie_name: String = sqlx::query_scalar(
-                    "SELECT name FROM public.garderies WHERE slug = $1"
+                let (garderie_name, logo_url): (String, Option<String>) = sqlx::query_as(
+                    "SELECT name, logo_url FROM public.garderies WHERE slug = $1"
                 )
                 .bind(tenant)
                 .fetch_optional(pool)
                 .await
                 .ok()
                 .flatten()
-                .unwrap_or_else(|| tenant.to_string());
+                .unwrap_or_else(|| (tenant.to_string(), None));
 
                 let reset_url = build_tenant_reset_url(base_url, tenant, &token);
                 let display_name = format!("{first_name} {last_name}");
                 // Ignore send errors — graceful degradation
                 let _ = svc
-                    .send_password_reset(email, &display_name, &reset_url, &garderie_name)
+                    .send_password_reset(email, &display_name, &reset_url, &garderie_name, logo_url.as_deref().unwrap_or(""))
                     .await;
             }
         }
@@ -835,21 +835,21 @@ impl AuthService {
             .await?;
 
             if let Some(svc) = email_svc {
-                let garderie_name: String = sqlx::query_scalar(
-                    "SELECT name FROM public.garderies WHERE slug = $1"
+                let (garderie_name, logo_url): (String, Option<String>) = sqlx::query_as(
+                    "SELECT name, logo_url FROM public.garderies WHERE slug = $1"
                 )
                 .bind(tenant)
                 .fetch_optional(pool)
                 .await
                 .ok()
                 .flatten()
-                .unwrap_or_else(|| tenant.to_string());
+                .unwrap_or_else(|| (tenant.to_string(), None));
 
                 let reset_url = build_tenant_reset_url(base_url, tenant, &token);
                 let display_name = format!("{first_name} {last_name}");
                 // Ignore send errors — graceful degradation
                 let _ = svc
-                    .send_password_reset(&email, &display_name, &reset_url, &garderie_name)
+                    .send_password_reset(&email, &display_name, &reset_url, &garderie_name, logo_url.as_deref().unwrap_or(""))
                     .await;
             }
 
