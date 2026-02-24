@@ -222,6 +222,7 @@ pub async fn send_message(
                                     &group_name,
                                     &app_url,
                                     &garderie_name,
+                                    &logo_url,
                                 )
                                 .await;
                         }
@@ -248,6 +249,7 @@ pub async fn send_message(
                                     "Message privé",
                                     &app_url,
                                     &garderie_name,
+                                    &logo_url,
                                 )
                                 .await;
                         }
@@ -271,6 +273,7 @@ pub async fn send_message(
                                     "Message privé",
                                     &app_url,
                                     &garderie_name,
+                                    &logo_url,
                                 )
                                 .await;
                         }

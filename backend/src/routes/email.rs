@@ -68,19 +68,19 @@ pub async fn send_to_parents(
         return Ok(Json(json!({ "message": "Aucun destinataire trouvé" })));
     }
 
-    // Get garderie name for the from display
-    let garderie_name: String = sqlx::query_scalar(
-        "SELECT name FROM public.garderies WHERE slug = $1"
+    let (garderie_name, logo_url): (String, Option<String>) = sqlx::query_as(
+        "SELECT name, logo_url FROM public.garderies WHERE slug = $1"
     )
     .bind(&tenant)
     .fetch_optional(&state.db)
     .await
     .ok()
     .flatten()
-    .unwrap_or_else(|| tenant.clone());
+    .unwrap_or_else(|| (tenant.clone(), None));
+    let logo_url = logo_url.unwrap_or_default();
 
     email_svc
-        .send_to_parents(recipients, &body.subject, &body.body, &garderie_name)
+        .send_to_parents(recipients, &body.subject, &body.body, &garderie_name, &logo_url)
         .await
         .map(|_| Json(json!({ "message": "Emails envoyés avec succès" })))
         .map_err(|e| {
