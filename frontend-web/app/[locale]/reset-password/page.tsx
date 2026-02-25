@@ -136,6 +136,10 @@ export default function ResetPasswordPage() {
         <div className="text-center mb-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="minispace.app" className="w-40 mx-auto mb-3" />
+          <div className="mb-3 text-center">
+            <span className="text-sm font-semibold" style={{ color: '#001F3F' }}>minispace</span>
+            <span className="text-sm font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
+          </div>
           <h1 className="text-2xl font-bold text-slate-800">{tenantName || tc("appName")}</h1>
           <p className="text-slate-500 mt-1">{t("resetPassword")}</p>
         </div>
