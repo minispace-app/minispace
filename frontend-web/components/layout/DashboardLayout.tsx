@@ -99,6 +99,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <LogOut className="w-4 h-4" />
           {tc("logout")}
         </button>
+        <a
+          href="https://docs.minispace.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-blue-500 transition-colors group"
+        >
+          <BookOpen className="w-3 h-3" />
+          <span className="group-hover:underline underline-offset-2">Documentation</span>
+        </a>
         {process.env.NEXT_PUBLIC_APP_VERSION && (
           <p className="text-center text-xs text-slate-400 pt-1">
             v{process.env.NEXT_PUBLIC_APP_VERSION}

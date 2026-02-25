@@ -9,6 +9,7 @@ import { LanguageSwitcher } from "../../../components/LanguageSwitcher";
 import { authApi } from "../../../lib/api";
 import { storeAuthData } from "../../../lib/auth";
 import { AnnouncementBanner } from "../../../components/AnnouncementBanner";
+import { BookOpen } from "lucide-react";
 
 export default function LoginPage() {
   const t = useTranslations("auth");
@@ -203,6 +204,17 @@ export default function LoginPage() {
           </form>
         )}
 
+        <div className="mt-6 pt-4 border-t border-slate-100 text-center">
+          <a
+            href="https://docs.minispace.app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors group"
+          >
+            <BookOpen className="w-3 h-3 group-hover:text-blue-500 transition-colors" />
+            <span className="group-hover:underline underline-offset-2">Documentation</span>
+          </a>
+        </div>
       </div>
       </div>
     </div>
