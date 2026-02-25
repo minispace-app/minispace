@@ -100,7 +100,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           {tc("logout")}
         </button>
         <a
-          href="https://docs.minispace.app"
+          href={locale === "fr" ? "https://docs.minispace.app/fr/" : "https://docs.minispace.app"}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-blue-500 transition-colors group"
