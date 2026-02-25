@@ -93,6 +93,12 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
         <div className="px-5 py-5 border-b border-slate-100 flex flex-col items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={tenantLogoUrl || "/logo.png"} alt="minispace.app" className="w-28 mb-2" />
+          {!tenantLogoUrl && (
+            <div className="mb-3 text-center">
+              <span className="text-sm font-semibold" style={{ color: '#001F3F' }}>minispace</span>
+              <span className="text-sm font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
+            </div>
+          )}
           <h1 className="font-bold text-slate-800 text-center">{garderieName}</h1>
           {user && (
             <p className="text-sm text-slate-500 mt-0.5">
@@ -121,6 +127,12 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
           <div className="flex flex-col items-center flex-1 min-w-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={tenantLogoUrl || "/logo.png"} alt="GarderieConnect" className="w-24 mb-1" />
+            {!tenantLogoUrl && (
+              <div className="mb-2 text-center">
+                <span className="text-xs font-semibold" style={{ color: '#001F3F' }}>minispace</span>
+                <span className="text-xs font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
+              </div>
+            )}
             <h1 className="font-bold text-slate-800 text-center text-sm truncate w-full">
               {garderieName}
             </h1>

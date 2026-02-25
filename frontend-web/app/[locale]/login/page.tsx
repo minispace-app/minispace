@@ -9,6 +9,7 @@ import { LanguageSwitcher } from "../../../components/LanguageSwitcher";
 import { authApi } from "../../../lib/api";
 import { storeAuthData } from "../../../lib/auth";
 import { AnnouncementBanner } from "../../../components/AnnouncementBanner";
+import { BookOpen } from "lucide-react";
 
 export default function LoginPage() {
   const t = useTranslations("auth");
@@ -104,6 +105,12 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={tenantLogoUrl || "/logo.png"} alt="minispace.app" className="w-40 mx-auto mb-3" />
+          {!tenantLogoUrl && (
+            <div className="mb-3 text-center">
+              <span className="text-sm font-semibold" style={{ color: '#001F3F' }}>minispace</span>
+              <span className="text-sm font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
+            </div>
+          )}
           <h1 className="text-2xl font-bold text-slate-800">{tenantName || tc("appName")}</h1>
           <p className="text-slate-500 mt-1">
             {step === 1 ? t("login") : t("twoFaTitle")}
@@ -203,6 +210,17 @@ export default function LoginPage() {
           </form>
         )}
 
+        <div className="mt-6 pt-4 border-t border-slate-100 text-center">
+          <a
+            href={locale === "fr" ? "https://docs.minispace.app/fr/" : "https://docs.minispace.app"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors group"
+          >
+            <BookOpen className="w-3 h-3 group-hover:text-blue-500 transition-colors" />
+            <span className="group-hover:underline underline-offset-2">Documentation</span>
+          </a>
+        </div>
       </div>
       </div>
     </div>

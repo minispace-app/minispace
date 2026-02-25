@@ -99,6 +99,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <LogOut className="w-4 h-4" />
           {tc("logout")}
         </button>
+        <a
+          href={locale === "fr" ? "https://docs.minispace.app/fr/" : "https://docs.minispace.app"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-blue-500 transition-colors group"
+        >
+          <BookOpen className="w-3 h-3" />
+          <span className="group-hover:underline underline-offset-2">Documentation</span>
+        </a>
         {process.env.NEXT_PUBLIC_APP_VERSION && (
           <p className="text-center text-xs text-slate-400 pt-1">
             v{process.env.NEXT_PUBLIC_APP_VERSION}
@@ -115,6 +124,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <div className="px-6 py-5 border-b border-slate-100 flex flex-col items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={tenantLogoUrl || "/logo.png"} alt="minispace.app" className="w-28 mb-2" />
+          {!tenantLogoUrl && (
+            <div className="mb-3 text-center">
+              <span className="text-sm font-semibold" style={{ color: '#001F3F' }}>minispace</span>
+              <span className="text-sm font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
+            </div>
+          )}
           <h1 className="font-bold text-lg text-slate-800 text-center">{garderieName}</h1>
           {user && (
             <p className="text-sm text-slate-500 mt-0.5">
@@ -143,6 +158,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col items-center flex-1 min-w-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={tenantLogoUrl || "/logo.png"} alt="GarderieConnect" className="w-24 mb-1" />
+            {!tenantLogoUrl && (
+              <div className="mb-2 text-center">
+                <span className="text-xs font-semibold" style={{ color: '#001F3F' }}>minispace</span>
+                <span className="text-xs font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
+              </div>
+            )}
             <h1 className="font-bold text-slate-800 text-center text-sm truncate w-full">
               {garderieName}
             </h1>
