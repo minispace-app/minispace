@@ -152,7 +152,7 @@ async fn encrypt_media_files(
     
     let mut encrypted_count = 0;
     
-    for media in unencrypted {
+    for media in &unencrypted {
         // Encrypt main file
         let main_path = PathBuf::from(media_dir).join(&media.storage_path);
         
@@ -262,7 +262,7 @@ async fn encrypt_document_files(
     
     let mut encrypted_count = 0;
     
-    for doc in unencrypted {
+    for doc in &unencrypted {
         let file_path = PathBuf::from(media_dir).join(&doc.storage_path);
         
         if !file_path.exists() {
