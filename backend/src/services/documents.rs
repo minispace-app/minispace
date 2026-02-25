@@ -10,11 +10,11 @@ use crate::{
     services::encryption,
 };
 
-/// Explicit column list for Document — casts category enum to TEXT.
+/// Explicit column list for Document — casts category and visibility enums to TEXT.
 const DOC_COLS: &str =
     "id, uploader_id, title, category::TEXT as category, original_filename,
-     storage_path, content_type, size_bytes, group_id, child_id, created_at, updated_at,
-     is_encrypted, encryption_iv, encryption_tag";
+     storage_path, content_type, size_bytes, group_id, child_id, visibility::TEXT as visibility,
+     created_at, updated_at, is_encrypted, encryption_iv, encryption_tag";
 
 pub struct DocumentService;
 
@@ -33,6 +33,7 @@ impl DocumentService {
         let mut file_data: Option<(Vec<u8>, String, String)> = None;
         let mut title: Option<String> = None;
         let mut category = "autre".to_string();
+        let mut visibility = "private".to_string();
         let mut group_id: Option<Uuid> = None;
         let mut child_id: Option<Uuid> = None;
 
@@ -58,6 +59,9 @@ impl DocumentService {
                         "formulaire" | "menu" | "politique" | "bulletin" | "autre" => cat_str,
                         _ => "autre".to_string(),
                     };
+                }
+                "visibility" => {
+                    visibility = field.text().await?;
                 }
                 "group_id" => {
                     group_id = field.text().await?.parse().ok();
@@ -97,12 +101,16 @@ impl DocumentService {
         // Write encrypted file to disk
         tokio::fs::write(&storage_path_full, &encrypted_bytes).await?;
 
+        // Resolve group_id/child_id based on visibility
+        let db_group_id = if visibility == "group" { group_id } else { None };
+        let db_child_id = if visibility == "child" { child_id } else { None };
+
         let schema = schema_name(tenant);
         let doc = sqlx::query_as::<_, Document>(&format!(
             "INSERT INTO {schema}.documents
              (uploader_id, title, category, original_filename, storage_path, content_type, size_bytes, group_id, child_id,
-              is_encrypted, encryption_iv, encryption_tag)
-             VALUES ($1, $2, $3::\"{schema}\".doc_category, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+              visibility, is_encrypted, encryption_iv, encryption_tag)
+             VALUES ($1, $2, $3::\"{schema}\".doc_category, $4, $5, $6, $7, $8, $9, $10::\"{schema}\".doc_visibility, $11, $12, $13)
              RETURNING {DOC_COLS}"
         ))
         .bind(uploader_id)
@@ -112,8 +120,9 @@ impl DocumentService {
         .bind(&storage_path_rel)
         .bind(&content_type)
         .bind(encrypted_bytes.len() as i64)
-        .bind(group_id)
-        .bind(child_id)
+        .bind(db_group_id)
+        .bind(db_child_id)
+        .bind(&visibility)
         .bind(true) // is_encrypted
         .bind(&iv)
         .bind(&tag)
@@ -153,21 +162,27 @@ impl DocumentService {
         } else {
             sqlx::query_as::<_, Document>(&format!(
                 "SELECT {DOC_COLS} FROM {schema}.documents d
-                 WHERE (
-                   (d.child_id IS NULL AND d.group_id IS NULL)
-                   OR (d.child_id IS NULL AND d.group_id IS NOT NULL AND d.group_id IN (
-                       SELECT DISTINCT c.group_id
-                       FROM {schema}.child_parents cp
-                       JOIN {schema}.children c ON c.id = cp.child_id
-                       WHERE cp.user_id = $1 AND c.group_id IS NOT NULL
-                   ))
-                   OR (d.child_id IS NOT NULL AND d.child_id IN (
-                       SELECT cp.child_id FROM {schema}.child_parents cp WHERE cp.user_id = $1
-                   ))
-                 )
-                 AND ($2::text IS NULL OR d.category::text = $2)
-                 AND ($3::uuid IS NULL OR d.group_id = $3)
-                 AND ($4::uuid IS NULL OR d.child_id = $4)
+                 WHERE d.visibility != 'private'
+                   AND (
+                     -- Public: visible to all parents
+                     d.visibility = 'public'
+                     OR
+                     -- Group: parent has a child in this group
+                     (d.visibility = 'group' AND d.group_id IN (
+                         SELECT DISTINCT c.group_id
+                         FROM {schema}.child_parents cp
+                         JOIN {schema}.children c ON c.id = cp.child_id
+                         WHERE cp.user_id = $1 AND c.group_id IS NOT NULL
+                     ))
+                     OR
+                     -- Child: parent linked to this child
+                     (d.visibility = 'child' AND d.child_id IN (
+                         SELECT cp.child_id FROM {schema}.child_parents cp WHERE cp.user_id = $1
+                     ))
+                   )
+                   AND ($2::text IS NULL OR d.category::text = $2)
+                   AND ($3::uuid IS NULL OR d.group_id = $3)
+                   AND ($4::uuid IS NULL OR d.child_id = $4)
                  ORDER BY d.created_at DESC
                  LIMIT $5 OFFSET $6"
             ))
@@ -209,7 +224,8 @@ impl DocumentService {
             sqlx::query_as::<_, Document>(&format!(
                 "UPDATE {schema}.documents
                  SET title = $2, category = $3::\"{schema}\".doc_category,
-                     group_id = $4, child_id = $5
+                     group_id = $4, child_id = $5,
+                     visibility = $6::\"{schema}\".doc_visibility
                  WHERE id = $1
                  RETURNING {DOC_COLS}"
             ))
@@ -218,14 +234,16 @@ impl DocumentService {
             .bind(category)
             .bind(new_group_id)
             .bind(new_child_id)
+            .bind(&req.visibility)
             .fetch_optional(pool)
             .await?
         } else {
             sqlx::query_as::<_, Document>(&format!(
                 "UPDATE {schema}.documents
                  SET title = $2, category = $3::\"{schema}\".doc_category,
-                     group_id = $4, child_id = $5
-                 WHERE id = $1 AND uploader_id = $6
+                     group_id = $4, child_id = $5,
+                     visibility = $6::\"{schema}\".doc_visibility
+                 WHERE id = $1 AND uploader_id = $7
                  RETURNING {DOC_COLS}"
             ))
             .bind(doc_id)
@@ -233,6 +251,7 @@ impl DocumentService {
             .bind(category)
             .bind(new_group_id)
             .bind(new_child_id)
+            .bind(&req.visibility)
             .bind(user_id)
             .fetch_optional(pool)
             .await?

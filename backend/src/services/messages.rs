@@ -141,17 +141,31 @@ impl MessageService {
             }
             "individual" => {
                 if let Some(other_id) = thread_id {
-                    // Mark messages sent by the other party as read
-                    sqlx::query(&format!(
-                        "UPDATE {schema}.messages SET is_read = TRUE
-                         WHERE message_type::text = 'individual'
-                           AND sender_id = $1 AND is_read = FALSE
-                           AND (recipient_id = $2 OR recipient_id IS NULL)"
-                    ))
-                    .bind(other_id)
-                    .bind(user_id)
-                    .execute(pool)
-                    .await?;
+                    if other_id == user_id {
+                        // Parent viewing their "Garderie" thread: the conversation id is
+                        // their own user_id. Mark all unread individual messages received
+                        // by this user as read.
+                        sqlx::query(&format!(
+                            "UPDATE {schema}.messages SET is_read = TRUE
+                             WHERE message_type::text = 'individual'
+                               AND recipient_id = $1 AND is_read = FALSE"
+                        ))
+                        .bind(user_id)
+                        .execute(pool)
+                        .await?;
+                    } else {
+                        // Staff marking a conversation with a specific parent as read
+                        sqlx::query(&format!(
+                            "UPDATE {schema}.messages SET is_read = TRUE
+                             WHERE message_type::text = 'individual'
+                               AND sender_id = $1 AND is_read = FALSE
+                               AND (recipient_id = $2 OR recipient_id IS NULL)"
+                        ))
+                        .bind(other_id)
+                        .bind(user_id)
+                        .execute(pool)
+                        .await?;
+                    }
                 }
             }
             _ => {}
@@ -189,6 +203,7 @@ impl MessageService {
     pub async fn get_conversations_admin(
         pool: &PgPool,
         tenant: &str,
+        user_id: Uuid,
     ) -> anyhow::Result<Vec<ConversationItem>> {
         let schema = schema_name(tenant);
         let mut items = Vec::new();
@@ -207,6 +222,16 @@ impl MessageService {
             Some((c, a)) => (Some(c), Some(a)),
             None => (None, None),
         };
+
+        let broadcast_unread: i64 = sqlx::query_scalar(&format!(
+            "SELECT COUNT(*) FROM {schema}.messages
+             WHERE message_type::text = 'broadcast'
+               AND is_read = FALSE AND sender_id != $1"
+        ))
+        .bind(user_id)
+        .fetch_one(pool)
+        .await?;
+
         items.push(ConversationItem {
             kind: "broadcast".to_string(),
             id: None,
@@ -214,11 +239,11 @@ impl MessageService {
             color: None,
             last_message: last_msg,
             last_at,
-            unread_count: 0,
+            unread_count: broadcast_unread,
         });
 
         // 2. Tous les groupes avec dernier message
-        let groups: Vec<(Uuid, String, Option<String>, Option<String>, Option<chrono::DateTime<chrono::Utc>>)> =
+        let groups: Vec<(Uuid, String, Option<String>, Option<String>, Option<chrono::DateTime<chrono::Utc>>, i64)> =
             sqlx::query_as(&format!(
                 "SELECT g.id, g.name, g.color,
                    (SELECT m.content FROM {schema}.messages m
@@ -226,14 +251,18 @@ impl MessageService {
                     ORDER BY m.created_at DESC LIMIT 1) AS last_message,
                    (SELECT m.created_at FROM {schema}.messages m
                     WHERE m.message_type::text = 'group' AND m.group_id = g.id
-                    ORDER BY m.created_at DESC LIMIT 1) AS last_at
+                    ORDER BY m.created_at DESC LIMIT 1) AS last_at,
+                   (SELECT COUNT(*) FROM {schema}.messages m
+                    WHERE m.message_type::text = 'group' AND m.group_id = g.id
+                      AND m.is_read = FALSE AND m.sender_id != $1) AS unread_count
                  FROM {schema}.groups g
                  ORDER BY g.name"
             ))
+            .bind(user_id)
             .fetch_all(pool)
             .await?;
 
-        for (id, name, color, last_msg, last_at) in groups {
+        for (id, name, color, last_msg, last_at, unread) in groups {
             items.push(ConversationItem {
                 kind: "group".to_string(),
                 id: Some(id.to_string()),
@@ -241,7 +270,7 @@ impl MessageService {
                 color,
                 last_message: last_msg,
                 last_at,
-                unread_count: 0,
+                unread_count: unread,
             });
         }
 
@@ -310,6 +339,16 @@ impl MessageService {
             Some((c, a)) => (Some(c), Some(a)),
             None => (None, None),
         };
+
+        let broadcast_unread: i64 = sqlx::query_scalar(&format!(
+            "SELECT COUNT(*) FROM {schema}.messages
+             WHERE message_type::text = 'broadcast'
+               AND is_read = FALSE AND sender_id != $1"
+        ))
+        .bind(user_id)
+        .fetch_one(pool)
+        .await?;
+
         items.push(ConversationItem {
             kind: "broadcast".to_string(),
             id: None,
@@ -317,11 +356,11 @@ impl MessageService {
             color: None,
             last_message: last_msg,
             last_at,
-            unread_count: 0,
+            unread_count: broadcast_unread,
         });
 
         // 2. Groupes des enfants du parent
-        let groups: Vec<(Uuid, String, Option<String>, Option<String>, Option<chrono::DateTime<chrono::Utc>>)> =
+        let groups: Vec<(Uuid, String, Option<String>, Option<String>, Option<chrono::DateTime<chrono::Utc>>, i64)> =
             sqlx::query_as(&format!(
                 "SELECT DISTINCT g.id, g.name, g.color,
                    (SELECT m.content FROM {schema}.messages m
@@ -329,7 +368,10 @@ impl MessageService {
                     ORDER BY m.created_at DESC LIMIT 1) AS last_message,
                    (SELECT m.created_at FROM {schema}.messages m
                     WHERE m.message_type::text = 'group' AND m.group_id = g.id
-                    ORDER BY m.created_at DESC LIMIT 1) AS last_at
+                    ORDER BY m.created_at DESC LIMIT 1) AS last_at,
+                   (SELECT COUNT(*) FROM {schema}.messages m
+                    WHERE m.message_type::text = 'group' AND m.group_id = g.id
+                      AND m.is_read = FALSE AND m.sender_id != $1) AS unread_count
                  FROM {schema}.groups g
                  JOIN {schema}.children c ON c.group_id = g.id
                  JOIN {schema}.child_parents cp ON cp.child_id = c.id
@@ -340,7 +382,7 @@ impl MessageService {
             .fetch_all(pool)
             .await?;
 
-        for (id, name, color, last_msg, last_at) in groups {
+        for (id, name, color, last_msg, last_at, unread) in groups {
             items.push(ConversationItem {
                 kind: "group".to_string(),
                 id: Some(id.to_string()),
@@ -348,7 +390,7 @@ impl MessageService {
                 color,
                 last_message: last_msg,
                 last_at,
-                unread_count: 0,
+                unread_count: unread,
             });
         }
 

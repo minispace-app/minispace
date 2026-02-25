@@ -8,6 +8,7 @@ import { TenantNotFound } from "../../../components/TenantNotFound";
 import { LanguageSwitcher } from "../../../components/LanguageSwitcher";
 import { authApi } from "../../../lib/api";
 import { storeAuthData } from "../../../lib/auth";
+import { AnnouncementBanner } from "../../../components/AnnouncementBanner";
 
 export default function LoginPage() {
   const t = useTranslations("auth");
@@ -15,7 +16,7 @@ export default function LoginPage() {
   const router = useRouter();
   const params = useParams();
   const locale = params.locale as string;
-  const { name: tenantName, notFound } = useTenantInfo();
+  const { name: tenantName, logo_url: tenantLogoUrl, notFound } = useTenantInfo();
 
   // Step 1 state
   const [email, setEmail] = useState("");
@@ -93,14 +94,16 @@ export default function LoginPage() {
   if (notFound) return <TenantNotFound />;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="absolute top-4 right-4">
+    <div className="min-h-screen flex flex-col bg-slate-50">
+      <AnnouncementBanner />
+      <div className="flex justify-end px-4 py-2">
         <LanguageSwitcher />
       </div>
+      <div className="flex-1 flex items-center justify-center">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
         <div className="text-center mb-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="minispace.app" className="w-40 mx-auto mb-3" />
+          <img src={tenantLogoUrl || "/logo.png"} alt="minispace.app" className="w-40 mx-auto mb-3" />
           <h1 className="text-2xl font-bold text-slate-800">{tenantName || tc("appName")}</h1>
           <p className="text-slate-500 mt-1">
             {step === 1 ? t("login") : t("twoFaTitle")}
@@ -200,6 +203,7 @@ export default function LoginPage() {
           </form>
         )}
 
+      </div>
       </div>
     </div>
   );

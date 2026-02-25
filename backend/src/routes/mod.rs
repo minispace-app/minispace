@@ -1,4 +1,6 @@
+pub mod announcements;
 pub mod auth;
+pub mod logo;
 pub mod children;
 pub mod contact;
 pub mod documents;

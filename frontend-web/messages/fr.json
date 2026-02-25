@@ -22,6 +22,7 @@
     "saving": "Enregistrement...",
     "deleting": "Suppression...",
     "visibility": "Visibilité",
+    "visPrivate": "Privé",
     "visPublic": "Public",
     "visGroup": "Groupe",
     "visChild": "Enfant"
@@ -102,7 +103,13 @@
     "passwordMismatch": "Les nouveaux mots de passe ne correspondent pas",
     "passwordTooShort": "Le mot de passe doit contenir au moins 8 caractères",
     "invalidEmail": "Courriel invalide",
-    "updateError": "Erreur lors de la modification"
+    "updateError": "Erreur lors de la modification",
+    "logoSection": "Logo de la garderie",
+    "logoHint": "PNG, JPG, WebP ou GIF — max 5 Mo",
+    "logoUploadButton": "Télécharger",
+    "logoUpdated": "Logo mis à jour avec succès",
+    "logoDeleted": "Logo supprimé",
+    "logoDelete": "Supprimer le logo"
   },
   "messages": {
     "title": "Messages",

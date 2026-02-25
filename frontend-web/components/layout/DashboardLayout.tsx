@@ -4,8 +4,11 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
+import useSWR from "swr";
 import { useAuth } from "../../hooks/useAuth";
 import { getGarderieName } from "../../lib/auth";
+import { useTenantInfo } from "../../hooks/useTenantInfo";
+import { messagesApi } from "../../lib/api";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -21,6 +24,7 @@ import {
   User,
 } from "lucide-react";
 import { LanguageSwitcher } from "../LanguageSwitcher";
+import { AnnouncementBanner } from "../AnnouncementBanner";
 
 const navItems = [
   { key: "dashboard", icon: LayoutDashboard, href: "/dashboard", roles: null },
@@ -42,6 +46,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const locale = params.locale as string;
   const garderieName = getGarderieName() || tc("appName");
+  const { logo_url: tenantLogoUrl } = useTenantInfo();
+  const { data: conversations } = useSWR(
+    "conversations",
+    () => messagesApi.getConversations().then((r) => r.data as { unread_count: number }[]),
+    { refreshInterval: 30000 }
+  );
+  const totalUnread = (conversations ?? []).reduce((sum, c) => sum + (c.unread_count || 0), 0);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const filteredItems = navItems.filter(
@@ -66,7 +77,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               }`}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
-              {t(key as Parameters<typeof t>[0])}
+              <span className="flex-1">{t(key as Parameters<typeof t>[0])}</span>
+              {key === "messages" && totalUnread > 0 && (
+                <span className="flex-shrink-0 min-w-[1.25rem] h-5 px-1 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                  {totalUnread > 99 ? "99+" : totalUnread}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -93,12 +109,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="flex h-screen bg-slate-50" style={{ height: "100dvh" }}>
       {/* ── Desktop sidebar ── */}
       <aside className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col flex-shrink-0">
         <div className="px-6 py-5 border-b border-slate-100 flex flex-col items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="minispace.app" className="w-28 mb-2" />
+          <img src={tenantLogoUrl || "/logo.png"} alt="minispace.app" className="w-28 mb-2" />
           <h1 className="font-bold text-lg text-slate-800 text-center">{garderieName}</h1>
           {user && (
             <p className="text-sm text-slate-500 mt-0.5">
@@ -126,7 +142,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
           <div className="flex flex-col items-center flex-1 min-w-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="GarderieConnect" className="w-24 mb-1" />
+            <img src={tenantLogoUrl || "/logo.png"} alt="GarderieConnect" className="w-24 mb-1" />
             <h1 className="font-bold text-slate-800 text-center text-sm truncate w-full">
               {garderieName}
             </h1>
@@ -159,6 +175,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <span className="font-semibold text-slate-800 truncate">{garderieName}</span>
         </header>
 
+        <AnnouncementBanner />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>

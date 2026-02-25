@@ -136,6 +136,22 @@ export default function MediaPage() {
     if (e.key === "ArrowLeft") setLightboxIndex((i) => i !== null ? Math.max(i - 1, 0) : null);
   }, [lightboxIndex, mediaItems.length]);
 
+  // Swipe navigation for lightbox (mobile)
+  const touchStartX = useRef<number>(0);
+  const handleLightboxTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const handleLightboxTouchEnd = (e: React.TouchEvent) => {
+    const diff = touchStartX.current - e.changedTouches[0].clientX;
+    if (Math.abs(diff) < 50) return;
+    e.preventDefault();
+    if (diff > 0) {
+      setLightboxIndex((i) => i !== null ? Math.min(i + 1, mediaItems.length - 1) : null);
+    } else {
+      setLightboxIndex((i) => i !== null ? Math.max(i - 1, 0) : null);
+    }
+  };
+
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -473,6 +489,8 @@ export default function MediaPage() {
         <div
           className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
           onClick={() => { setLightboxIndex(null); setLightboxEditOpen(false); }}
+          onTouchStart={handleLightboxTouchStart}
+          onTouchEnd={handleLightboxTouchEnd}
         >
           {/* Prev */}
           {lightboxIndex > 0 && (

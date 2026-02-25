@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { superAdminApi } from "../../../lib/api";
-import { Plus, Users, ChevronRight, Eye, EyeOff, Building2, UserPlus, Mail, Pencil, X, Trash2, AlertTriangle, Save, RotateCcw } from "lucide-react";
+import { Plus, Users, ChevronRight, Eye, EyeOff, Building2, UserPlus, Mail, Pencil, X, Trash2, AlertTriangle, Save, RotateCcw, Megaphone } from "lucide-react";
 
 interface Garderie {
   id: string;
@@ -83,6 +83,13 @@ export default function SuperAdminPage() {
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  // Announcement
+  interface AnnouncementData { message: string; color: string; }
+  const [currentAnnouncement, setCurrentAnnouncement] = useState<AnnouncementData | null>(null);
+  const [announcementMsg, setAnnouncementMsg] = useState("");
+  const [announcementColor, setAnnouncementColor] = useState<"yellow" | "red">("yellow");
+  const [announcementSaving, setAnnouncementSaving] = useState(false);
+
   // Check stored key on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -90,10 +97,44 @@ export default function SuperAdminPage() {
       if (stored) {
         setAuthenticated(true);
         loadGarderies();
+        loadAnnouncement();
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const loadAnnouncement = async () => {
+    try {
+      const res = await superAdminApi.getAnnouncement();
+      setCurrentAnnouncement(res.data || null);
+      if (res.data) {
+        setAnnouncementMsg(res.data.message);
+        setAnnouncementColor(res.data.color as "yellow" | "red");
+      }
+    } catch {
+      setCurrentAnnouncement(null);
+    }
+  };
+
+  const handleSetAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!announcementMsg.trim()) return;
+    setAnnouncementSaving(true);
+    try {
+      await superAdminApi.setAnnouncement(announcementMsg.trim(), announcementColor);
+      await loadAnnouncement();
+    } finally {
+      setAnnouncementSaving(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async () => {
+    if (!confirm("Retirer l'annonce en cours ?")) return;
+    await superAdminApi.deleteAnnouncement();
+    setCurrentAnnouncement(null);
+    setAnnouncementMsg("");
+    setAnnouncementColor("yellow");
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,6 +436,91 @@ export default function SuperAdminPage() {
           </button>
         </div>
       </header>
+
+      {/* ── Announcement banner ── */}
+      <div className="max-w-7xl mx-auto px-6 pt-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Megaphone className="w-4 h-4 text-purple-600" />
+            <h2 className="font-semibold text-slate-800">Annonce globale</h2>
+            {currentAnnouncement && (
+              <span className={`ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                currentAnnouncement.color === "red"
+                  ? "bg-red-100 text-red-700"
+                  : "bg-yellow-100 text-yellow-700"
+              }`}>
+                Active
+              </span>
+            )}
+          </div>
+
+          {currentAnnouncement && (
+            <div className={`mb-4 px-4 py-3 rounded-lg border text-sm flex items-start gap-2 ${
+              currentAnnouncement.color === "red"
+                ? "bg-red-50 border-red-200 text-red-800"
+                : "bg-yellow-50 border-yellow-200 text-yellow-800"
+            }`}>
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <p className="flex-1">{currentAnnouncement.message}</p>
+              <button
+                onClick={handleDeleteAnnouncement}
+                className="flex-shrink-0 text-slate-400 hover:text-red-500 transition"
+                title="Retirer l'annonce"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={handleSetAnnouncement} className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="text-xs font-medium text-slate-500 mb-1 block">
+                {currentAnnouncement ? "Remplacer l'annonce" : "Nouvelle annonce"}
+              </label>
+              <input
+                value={announcementMsg}
+                onChange={(e) => setAnnouncementMsg(e.target.value)}
+                placeholder="Ex : Maintenance planifiée ce dimanche de 8h à 12h."
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Couleur</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAnnouncementColor("yellow")}
+                  className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
+                    announcementColor === "yellow"
+                      ? "bg-yellow-400 border-yellow-400 text-white"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Jaune
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAnnouncementColor("red")}
+                  className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
+                    announcementColor === "red"
+                      ? "bg-red-500 border-red-500 text-white"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Rouge
+                </button>
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={announcementSaving || !announcementMsg.trim()}
+              className="px-4 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 transition"
+            >
+              {announcementSaving ? "Envoi..." : "Publier"}
+            </button>
+          </form>
+        </div>
+      </div>
 
       <div className="max-w-7xl mx-auto p-6 flex gap-6">
 

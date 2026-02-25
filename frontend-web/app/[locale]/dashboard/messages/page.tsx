@@ -308,7 +308,7 @@ export default function MessagesPage() {
                     value={newMsg}
                     onChange={(e) => setNewMsg(e.target.value)}
                     placeholder={t("placeholder")}
-                    rows={2}
+                    rows={1}
                     className="flex-1 px-4 py-3 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
