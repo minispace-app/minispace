@@ -127,7 +127,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           {!tenantLogoUrl && (
             <div className="mb-3 text-center">
               <span className="text-sm font-semibold" style={{ color: '#001F3F' }}>minispace</span>
-              <span className="text-sm font-semibold" style={{ color: '#FF1744' }}>.app</span>
+              <span className="text-sm font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
             </div>
           )}
           <h1 className="font-bold text-lg text-slate-800 text-center">{garderieName}</h1>
@@ -161,7 +161,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             {!tenantLogoUrl && (
               <div className="mb-2 text-center">
                 <span className="text-xs font-semibold" style={{ color: '#001F3F' }}>minispace</span>
-                <span className="text-xs font-semibold" style={{ color: '#FF1744' }}>.app</span>
+                <span className="text-xs font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
               </div>
             )}
             <h1 className="font-bold text-slate-800 text-center text-sm truncate w-full">
