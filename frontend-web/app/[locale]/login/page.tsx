@@ -206,7 +206,7 @@ export default function LoginPage() {
 
         <div className="mt-6 pt-4 border-t border-slate-100 text-center">
           <a
-            href="https://docs.minispace.app"
+            href={locale === "fr" ? "https://docs.minispace.app/fr/" : "https://docs.minispace.app"}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors group"
