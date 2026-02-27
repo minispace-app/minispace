@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { LanguageSwitcher } from "../../../components/LanguageSwitcher";
 import { AnnouncementBanner } from "../../../components/AnnouncementBanner";
+import { DemoBanner } from "../../../components/DemoBanner";
 
 const navItems = [
   { key: "children", icon: Users, href: "/parent/children" },
@@ -165,6 +166,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
           <span className="font-semibold text-slate-800 truncate">{garderieName}</span>
         </header>
 
+        <DemoBanner />
         <AnnouncementBanner />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>

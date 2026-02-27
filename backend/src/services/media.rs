@@ -14,6 +14,14 @@ use crate::{
 
 /// Explicit column list for Media — casts enums to TEXT, includes child_ids subquery.
 /// All queries must alias the media table as `m`.
+/// Generate a cryptographically random 32-char hex filename (no extension).
+/// Decouples storage paths from DB UUIDs and hides file types.
+fn random_storage_name() -> String {
+    use rand::Rng;
+    let bytes: [u8; 16] = rand::thread_rng().gen();
+    hex::encode(bytes)
+}
+
 fn media_cols(schema: &str) -> String {
     format!(
         "m.id, m.uploader_id, m.media_type::TEXT as media_type, m.original_filename, m.storage_path,
@@ -98,7 +106,7 @@ impl MediaService {
             .unwrap_or("bin");
 
         let file_id = Uuid::new_v4();
-        let storage_filename = format!("{}.{}", file_id, ext);
+        let storage_filename = random_storage_name();
         let storage_path_full = tenant_dir.join(&storage_filename);
         let storage_path_rel = format!("{}/{}/{}/{}", tenant, year, month, storage_filename);
 
@@ -118,7 +126,7 @@ impl MediaService {
         tokio::fs::write(&storage_path_full, &encrypted_bytes).await?;
 
         let (width, height, thumbnail_path, thumb_iv, thumb_tag) = if media_type == MediaType::Photo {
-            Self::process_image(&bytes, &tenant_dir, file_id, &storage_path_rel, &tenant_key)
+            Self::process_image(&bytes, &tenant_dir, &storage_path_rel, &tenant_key)
                 .await
                 .unwrap_or((None, None, None, None, None))
         } else {
@@ -187,7 +195,6 @@ impl MediaService {
     async fn process_image(
         bytes: &[u8],
         dir: &Path,
-        file_id: Uuid,
         storage_path_rel: &str,
         tenant_key: &[u8; 32],
     ) -> anyhow::Result<(Option<i32>, Option<i32>, Option<String>, Option<Vec<u8>>, Option<Vec<u8>>)> {
@@ -195,7 +202,7 @@ impl MediaService {
         let (width, height) = (img.width() as i32, img.height() as i32);
 
         let thumb = img.resize(400, 400, FilterType::Lanczos3);
-        let thumb_filename = format!("{}_thumb.jpg", file_id);
+        let thumb_filename = random_storage_name();
         let thumb_path = dir.join(&thumb_filename);
         
         // Save thumbnail to memory buffer first

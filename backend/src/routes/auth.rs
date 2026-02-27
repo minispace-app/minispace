@@ -191,6 +191,7 @@ pub async fn invite_user(
     user: AuthenticatedUser,
     Json(body): Json<InviteUserRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    crate::routes::demo::deny_if_demo(&tenant)?;
     AuthService::create_invitation(
         &state.db,
         state.email.as_deref(),
@@ -266,6 +267,7 @@ pub async fn forgot_password(
     TenantSlug(tenant): TenantSlug,
     Json(body): Json<ForgotPasswordRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    crate::routes::demo::deny_if_demo(&tenant)?;
     // Rate limit: 3 attempts per 30 min per email+tenant
     let rate_key = format!("rate:forgot:{}:{}", tenant, body.email.to_lowercase());
     let mut redis = state.redis.clone();
