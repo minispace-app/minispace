@@ -72,7 +72,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
         })}
       </nav>
 
-      <div className="px-3 py-4 border-t border-slate-100 space-y-2">
+<div className="px-3 py-4 border-t border-slate-100 space-y-2">
         <div className="flex justify-center">
           <LanguageSwitcher />
         </div>
@@ -166,7 +166,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
           <span className="font-semibold text-slate-800 truncate">{garderieName}</span>
         </header>
 
-        <DemoBanner />
+<DemoBanner />
         <AnnouncementBanner />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
