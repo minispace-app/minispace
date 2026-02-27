@@ -113,6 +113,24 @@ services:
     networks:
       - internal
 
+  demo-reset:
+    image: ghcr.io/${GHCR_REPO:-minispace-app/minispace}/api:${API_VERSION:-latest}
+    container_name: minispace_demo_reset
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    volumes:
+      - media_files:/data/media
+    environment:
+      - TZ=${TZ:-UTC}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-garderie}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-garderieconnect}
+      - DEMO_PASSWORD=${DEMO_PASSWORD:-Demo2024!}
+      - MEDIA_DIR=/data/media
+    command: "sh -c 'sleep 30 && /app/seed-demo && while true; do sleep 1800 && /app/seed-demo; done'"
+
   backup:
     image: alpine:3.20
     container_name: minispace_backup

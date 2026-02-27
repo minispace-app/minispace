@@ -32,6 +32,7 @@ pub async fn upload_document(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
 
     // Email notifications aux parents concernés (async, non-bloquant, cooldown 1h par parent)
+    if tenant != "demo" {
     if let Some(email_svc) = state.email.clone() {
         if doc.visibility != "private" {
             let pool = state.db.clone();
@@ -144,6 +145,7 @@ pub async fn upload_document(
             });
         }
     }
+    } // end if tenant != "demo"
 
     Ok((StatusCode::CREATED, Json(serde_json::to_value(doc).unwrap())))
 }
@@ -163,6 +165,7 @@ pub async fn update_document(
     };
 
     // Notify parents when document becomes visible (visibility != private)
+    if tenant != "demo" {
     if let Some(email_svc) = state.email.clone() {
         if doc.visibility != "private" {
             let pool = state.db.clone();
@@ -275,6 +278,7 @@ pub async fn update_document(
             });
         }
     }
+    } // end if tenant != "demo"
 
     Ok(Json(serde_json::to_value(doc).unwrap()))
 }

@@ -3,7 +3,7 @@ import Cookies from "js-cookie";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost/api";
 
-function getTenantSlug(): string {
+export function getTenantSlug(): string {
   if (typeof window === "undefined") return "";
   const parts = window.location.hostname.split(".");
   return parts.length >= 2 ? parts[0] : "";
@@ -107,6 +107,8 @@ export const authApi = {
     apiClient.post("/auth/verify-2fa", { email, code }, {
       headers: { "X-Tenant": getTenantSlug() },
     }),
+  demoLogin: (role: "admin" | "educateur" | "parent") =>
+    apiClient.post("/demo/login", { role }),
 };
 
 // Messages

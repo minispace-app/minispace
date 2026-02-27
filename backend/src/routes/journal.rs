@@ -93,6 +93,7 @@ pub async fn send_all_to_parents(
     user: AuthenticatedUser,
     Json(body): Json<SendJournalRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    crate::routes::demo::deny_if_demo(&tenant)?;
     if let UserRole::Parent = user.role {
         return Err((StatusCode::FORBIDDEN, Json(json!({ "error": "Accès refusé" }))));
     }
@@ -121,6 +122,7 @@ pub async fn send_to_parents(
     Path(child_id): Path<Uuid>,
     Json(body): Json<SendJournalRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    crate::routes::demo::deny_if_demo(&tenant)?;
     // Only educators and admins can send journals
     if let UserRole::Parent = user.role {
         return Err((

@@ -15,6 +15,10 @@ path = "src/main.rs"
 name = "encrypt-existing-files"
 path = "src/bin/encrypt-existing-files.rs"
 
+[[bin]]
+name = "seed-demo"
+path = "src/bin/seed-demo.rs"
+
 [dependencies]
 axum = { version = "0.8", features = ["ws", "multipart"] }
 tokio = { version = "1", features = ["full"] }
