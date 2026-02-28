@@ -156,6 +156,37 @@ services:
     depends_on:
       - api
 
+  loki:
+    image: grafana/loki:latest
+    container_name: minispace_loki
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yml
+    networks:
+      - internal
+    expose:
+      - "3100"
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: minispace_promtail
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - internal
+    depends_on:
+      - loki
+
   grafana:
     image: grafana/grafana:latest
     container_name: minispace_grafana
@@ -180,6 +211,7 @@ services:
       - internal
     depends_on:
       - prometheus
+      - loki
 
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
@@ -242,6 +274,7 @@ volumes:
   media_files:
   prometheus_data:
   grafana_data:
+  loki_data:
 
 networks:
   internal:
