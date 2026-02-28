@@ -7,6 +7,7 @@ pub mod encryption;
 pub mod groups;
 pub mod journal;
 pub mod journal_scheduler;
+pub mod trial_scheduler;
 pub mod menu;
 pub mod media;
 pub mod messages;
