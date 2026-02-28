@@ -451,6 +451,125 @@ impl EmailService {
         self.send_email(from, to, &subject, &text, &html).await
     }
 
+    /// Notifie contact@minispace.app qu'une nouvelle garderie vient d'être créée via inscription libre.
+    pub async fn send_new_signup_notification(
+        &self,
+        slug: &str,
+        name: &str,
+        email: &str,
+        first_name: &str,
+        last_name: &str,
+        trial_expires_at: &str,
+    ) -> anyhow::Result<()> {
+        let to = self.from.clone();
+        let subject = format!("🎉 Nouvelle garderie — {name} ({slug})");
+
+        let text = format!(
+            "Nouvelle garderie créée via inscription libre\n\n\
+            Identifiant : {slug}\n\
+            Nom : {name}\n\
+            Admin : {first_name} {last_name}\n\
+            Courriel : {email}\n\
+            URL : https://{slug}.minispace.app\n\
+            Essai expire : {trial_expires_at}"
+        );
+
+        let content = format!(
+            r#"<h1 style="margin:0 0 20px 0;font-size:20px;font-weight:700;color:#0f172a">🎉 Nouvelle garderie créée</h1>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b;width:130px">Identifiant</td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#0f172a;font-weight:700;font-family:monospace">{slug}</td></tr>
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b">Nom</td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#0f172a;font-weight:600">{name}</td></tr>
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b">Admin</td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#0f172a">{first_name} {last_name}</td></tr>
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b">Courriel</td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#0f172a"><a href="mailto:{email}" style="color:#2563eb">{email}</a></td></tr>
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b">URL</td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#0f172a"><a href="https://{slug}.minispace.app/fr/login" style="color:#2563eb">{slug}.minispace.app</a></td></tr>
+  <tr><td style="padding:10px 12px;font-size:14px;color:#64748b">Essai expire</td><td style="padding:10px 12px;font-size:14px;color:#0f172a">{trial_expires_at}</td></tr>
+</table>"#
+        );
+
+        let html = Self::wrap_html("", "minispace.app", &content);
+        let from = Mailbox::new(Some("minispace.app".to_string()), self.from.email.clone());
+        self.send_email(from, to, &subject, &text, &html).await
+    }
+
+    /// Envoie un rappel d'expiration d'essai à contact@minispace.app et à l'admin de la garderie.
+    pub async fn send_trial_expiry_warning(
+        &self,
+        admin_email: &str,
+        admin_name: &str,
+        slug: &str,
+        garderie_name: &str,
+        days_left: i64,
+        login_url: &str,
+    ) -> anyhow::Result<()> {
+        let (urgency_color, days_label) = if days_left <= 1 {
+            ("#dc2626", "demain".to_string())
+        } else {
+            ("#d97706", format!("dans {days_left} jours"))
+        };
+
+        // 1. Email à l'admin de la garderie
+        let to_admin: Mailbox = format!("{admin_name} <{admin_email}>")
+            .parse()
+            .unwrap_or_else(|_| admin_email.parse().expect("valid email"));
+
+        let subject_admin = if days_left <= 1 {
+            format!("⚠️ Dernier jour — Votre essai minispace.app expire demain")
+        } else {
+            format!("Rappel — Votre essai minispace.app expire dans {days_left} jours")
+        };
+
+        let text_admin = format!(
+            "Bonjour {admin_name},\n\n\
+            Votre période d'essai gratuit pour {garderie_name} expire {days_label}.\n\n\
+            Pour continuer à utiliser minispace.app, contactez-nous à contact@minispace.app.\n\n\
+            Accéder au tableau de bord : {login_url}"
+        );
+
+        let content_admin = format!(
+            r#"<h1 style="margin:0 0 16px 0;font-size:20px;font-weight:700;color:#0f172a">Votre essai expire {days_label}</h1>
+<p style="margin:0 0 20px 0;font-size:15px;color:#374151">Bonjour <strong>{admin_name}</strong>,</p>
+<p style="margin:0 0 20px 0;font-size:15px;color:#374151">
+  Votre période d'essai gratuit pour <strong>{garderie_name}</strong> expire <strong style="color:{urgency_color}">{days_label}</strong>.
+</p>
+<p style="margin:0 0 24px 0;font-size:15px;color:#374151">
+  Pour continuer à utiliser minispace.app, contactez-nous à
+  <a href="mailto:contact@minispace.app" style="color:#2563eb">contact@minispace.app</a>.
+</p>
+<div style="text-align:center;margin-bottom:8px">
+  <a href="{login_url}" style="display:inline-block;padding:12px 28px;background:#6366f1;color:#fff;font-weight:600;font-size:15px;border-radius:10px;text-decoration:none">
+    Accéder au tableau de bord
+  </a>
+</div>"#
+        );
+
+        let html_admin = Self::wrap_html("", garderie_name, &content_admin);
+        let from = Mailbox::new(Some("minispace.app".to_string()), self.from.email.clone());
+        self.send_email(from.clone(), to_admin, &subject_admin, &text_admin, &html_admin).await?;
+
+        // 2. Copie interne à contact@minispace.app
+        let to_internal = self.from.clone();
+        let subject_internal = format!(
+            "⏳ Essai {garderie_name} ({slug}) expire {days_label}"
+        );
+        let text_internal = format!(
+            "Rappel d'expiration d'essai\n\n\
+            Garderie : {garderie_name} ({slug})\n\
+            Admin : {admin_name} <{admin_email}>\n\
+            Expire : {days_label}\n\
+            URL : https://{slug}.minispace.app"
+        );
+        let content_internal = format!(
+            r#"<h1 style="margin:0 0 20px 0;font-size:20px;font-weight:700;color:#0f172a">⏳ Essai sur le point d'expirer</h1>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b;width:130px">Garderie</td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#0f172a;font-weight:600">{garderie_name} <span style="font-family:monospace;font-weight:400;color:#64748b">({slug})</span></td></tr>
+  <tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b">Admin</td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#0f172a">{admin_name} — <a href="mailto:{admin_email}" style="color:#2563eb">{admin_email}</a></td></tr>
+  <tr><td style="padding:10px 12px;font-size:14px;color:#64748b">Expire</td><td style="padding:10px 12px;font-size:14px;font-weight:700;color:{urgency_color}">{days_label}</td></tr>
+</table>"#
+        );
+        let html_internal = Self::wrap_html("", "minispace.app", &content_internal);
+        self.send_email(from, to_internal, &subject_internal, &text_internal, &html_internal).await
+    }
+
     pub async fn send_journal(
         &self,
         to_email: &str,

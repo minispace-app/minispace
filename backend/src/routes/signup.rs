@@ -212,6 +212,25 @@ pub async fn signup(
         }
     };
 
+    // Notifier contact@minispace.app (fire-and-forget — n'échoue pas le signup)
+    if let Some(email_svc) = &state.email {
+        let expires_str = expires_at.format("%Y-%m-%d").to_string();
+        let svc = email_svc.clone();
+        let slug_c = created_slug.clone();
+        let name_c = body.name.trim().to_string();
+        let email_c = body.email.clone();
+        let first_c = body.first_name.trim().to_string();
+        let last_c = body.last_name.trim().to_string();
+        tokio::spawn(async move {
+            if let Err(e) = svc
+                .send_new_signup_notification(&slug_c, &name_c, &email_c, &first_c, &last_c, &expires_str)
+                .await
+            {
+                tracing::warn!("signup notification email failed for '{slug_c}': {e}");
+            }
+        });
+    }
+
     Ok((
         StatusCode::CREATED,
         Json(json!({
