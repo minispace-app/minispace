@@ -287,6 +287,7 @@ pub async fn send_message(
     }
     } // end if tenant != "demo"
 
+    crate::services::metrics::MESSAGES_COUNTER.with_label_values(&[&tenant]).inc();
     Ok((
         StatusCode::CREATED,
         Json(serde_json::to_value(msg).unwrap()),

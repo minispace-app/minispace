@@ -83,15 +83,20 @@ pub async fn login(
     .await
     {
         Ok(LoginOutcome::TwoFactorRequired(step1)) => {
+            crate::services::metrics::TWO_FA_COUNTER.with_label_values(&[&tenant]).inc();
             Ok(json_response_with_cookie(&serde_json::to_value(step1).unwrap(), None))
         }
         Ok(LoginOutcome::Authenticated { response, device_token }) => {
+            crate::services::metrics::LOGINS_COUNTER.with_label_values(&[&tenant, "success"]).inc();
             Ok(json_response_with_cookie(
                 &serde_json::to_value(response).unwrap(),
                 Some(&device_token),
             ))
         }
-        Err(e) => Err((StatusCode::UNAUTHORIZED, Json(json!({ "error": e.to_string() })))),
+        Err(e) => {
+            crate::services::metrics::LOGINS_COUNTER.with_label_values(&[&tenant, "failed"]).inc();
+            Err((StatusCode::UNAUTHORIZED, Json(json!({ "error": e.to_string() }))))
+        }
     }
 }
 
@@ -202,7 +207,10 @@ pub async fn invite_user(
         &state.config.app_base_url,
     )
     .await
-    .map(|_| Json(json!({ "message": format!("Invitation envoyée à {}", body.email) })))
+    .map(|_| {
+        crate::services::metrics::INVITATIONS_COUNTER.with_label_values(&[&tenant]).inc();
+        Json(json!({ "message": format!("Invitation envoyée à {}", body.email) }))
+    })
     .map_err(|e| {
         (
             StatusCode::BAD_REQUEST,
@@ -281,7 +289,10 @@ pub async fn forgot_password(
         &state.config.app_base_url,
     )
     .await
-    .map(|_| Json(json!({ "message": "Si un compte existe, un email a été envoyé." })))
+    .map(|_| {
+        crate::services::metrics::PASSWORD_RESETS_COUNTER.with_label_values(&[&tenant]).inc();
+        Json(json!({ "message": "Si un compte existe, un email a été envoyé." }))
+    })
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -389,6 +400,27 @@ pub async fn list_pending_invitations(
                 Json(json!({ "error": e.to_string() })),
             )
         })
+}
+
+pub async fn resend_invitation(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    match AuthService::resend_invitation(&state.db, state.email.as_deref(), &tenant, id, &state.config.app_base_url).await {
+        Ok(()) => Ok(Json(json!({ "success": true, "message": "Invitation renvoyée avec succès" }))),
+        Err(e) => {
+            let status = if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else if e.to_string().contains("email non configuré") {
+                StatusCode::SERVICE_UNAVAILABLE
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            Err((status, Json(json!({ "error": e.to_string() }))))
+        }
+    }
 }
 
 pub async fn delete_invitation(

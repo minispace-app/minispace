@@ -147,6 +147,7 @@ pub async fn upload_document(
     }
     } // end if tenant != "demo"
 
+    crate::services::metrics::DOCUMENT_UPLOADS_COUNTER.with_label_values(&[&tenant]).inc();
     Ok((StatusCode::CREATED, Json(serde_json::to_value(doc).unwrap())))
 }
 

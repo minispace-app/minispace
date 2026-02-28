@@ -185,6 +185,121 @@
     },
 
     {
+      "id": 50,
+      "title": "Activité",
+      "type": "row",
+      "gridPos": { "x": 0, "y": 35, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 51,
+      "title": "Logins (24h)",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 36, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "green" } } },
+      "targets": [{ "expr": "increase(api_logins_total{status=\"success\"}[24h])", "legendFormat": "Succès", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 52,
+      "title": "Logins échoués (24h)",
+      "type": "stat",
+      "gridPos": { "x": 4, "y": 36, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "red" } } },
+      "targets": [{ "expr": "increase(api_logins_total{status=\"failed\"}[24h])", "legendFormat": "Échecs", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 53,
+      "title": "Emails 2FA (24h)",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 36, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "blue" } } },
+      "targets": [{ "expr": "increase(api_2fa_emails_total[24h])", "legendFormat": "2FA", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 54,
+      "title": "Invitations (24h)",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 36, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "purple" } } },
+      "targets": [{ "expr": "increase(api_invitations_total[24h])", "legendFormat": "Invitations", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 55,
+      "title": "Médias uploadés (24h)",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 36, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "orange" } } },
+      "targets": [{ "expr": "increase(api_media_uploads_total[24h])", "legendFormat": "Médias", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 56,
+      "title": "Documents uploadés (24h)",
+      "type": "stat",
+      "gridPos": { "x": 20, "y": 36, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "text" } } },
+      "targets": [{ "expr": "increase(api_document_uploads_total[24h])", "legendFormat": "Documents", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 57,
+      "title": "Logins dans le temps",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 40, "w": 12, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0, "custom": { "fillOpacity": 10 } } },
+      "targets": [
+        { "expr": "rate(api_logins_total{status=\"success\"}[5m])", "legendFormat": "{{tenant}} — succès", "refId": "A" },
+        { "expr": "rate(api_logins_total{status=\"failed\"}[5m])", "legendFormat": "{{tenant}} — échec", "refId": "B" }
+      ],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 58,
+      "title": "Emails & uploads dans le temps",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 40, "w": 12, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0, "custom": { "fillOpacity": 10 } } },
+      "targets": [
+        { "expr": "rate(api_2fa_emails_total[5m])", "legendFormat": "{{tenant}} — 2FA", "refId": "A" },
+        { "expr": "rate(api_media_uploads_total[5m])", "legendFormat": "{{tenant}} — médias", "refId": "B" },
+        { "expr": "rate(api_messages_sent_total[5m])", "legendFormat": "{{tenant}} — messages", "refId": "C" }
+      ],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 59,
+      "title": "Messages envoyés (24h) par tenant",
+      "type": "bargauge",
+      "gridPos": { "x": 0, "y": 48, "w": 12, "h": 6 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "displayMode": "gradient" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "color": { "mode": "palette-classic" } } },
+      "targets": [{ "expr": "increase(api_messages_sent_total[24h])", "legendFormat": "{{tenant}}", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 60,
+      "title": "Réinitialisations mot de passe (24h) par tenant",
+      "type": "bargauge",
+      "gridPos": { "x": 12, "y": 48, "w": 12, "h": 6 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "displayMode": "gradient" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "color": { "mode": "palette-classic" } } },
+      "targets": [{ "expr": "increase(api_password_resets_total[24h])", "legendFormat": "{{tenant}}", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+
+    {
       "id": 40,
       "title": "Connexions DB actives",
       "type": "timeseries",
