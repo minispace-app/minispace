@@ -137,6 +137,82 @@ services:
     # Wait 30 s for the API to apply migrations, then seed every 30 min
     command: "sh -c 'sleep 30 && /app/seed-demo && while true; do sleep 1800 && /app/seed-demo; done'"
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: minispace_prometheus
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    networks:
+      - internal
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: minispace_grafana
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_AUTH_PROXY_ENABLED=true
+      - GF_AUTH_PROXY_HEADER_NAME=X-WEBAUTH-USER
+      - GF_AUTH_PROXY_AUTO_SIGN_UP=true
+      - GF_AUTH_PROXY_WHITELIST=
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_USERS_AUTO_ASSIGN_ORG=true
+      - GF_USERS_AUTO_ASSIGN_ORG_ROLE=Admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - internal
+    depends_on:
+      - prometheus
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: minispace_postgres_exporter
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-garderie}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-garderieconnect}?sslmode=disable
+    networks:
+      - internal
+    depends_on:
+      db:
+        condition: service_healthy
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: minispace_node_exporter
+    restart: unless-stopped
+    pid: host
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    networks:
+      - internal
+
   backup:
     image: alpine:3.20
     container_name: minispace_backup
@@ -164,6 +240,8 @@ volumes:
   postgres_data:
   redis_data:
   media_files:
+  prometheus_data:
+  grafana_data:
 
 networks:
   internal:

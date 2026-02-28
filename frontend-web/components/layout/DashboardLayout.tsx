@@ -22,6 +22,8 @@ import {
   Menu,
   X,
   User,
+  UtensilsCrossed,
+  BarChart2,
 } from "lucide-react";
 import { LanguageSwitcher } from "../LanguageSwitcher";
 import { AnnouncementBanner } from "../AnnouncementBanner";
@@ -34,10 +36,24 @@ const navItems = [
   { key: "documents", icon: FileText, href: "/dashboard/documents", roles: null },
   { key: "children", icon: Users, href: "/dashboard/children", roles: null },
   { key: "groups", icon: FolderOpen, href: "/dashboard/groups", roles: null },
+  { key: "menus", icon: UtensilsCrossed, href: "/dashboard/menus", roles: null },
   { key: "journal", icon: BookOpen, href: "/dashboard/journal", roles: null },
   { key: "users", icon: Settings, href: "/dashboard/users", roles: ["admin_garderie", "super_admin"] },
   { key: "myProfile", icon: User, href: "/dashboard/profile", roles: null },
 ];
+
+async function openGrafana() {
+  try {
+    await fetch("/api/super-admin/grafana-access", {
+      method: "POST",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${localStorage.getItem("access_token") || ""}` },
+    });
+  } catch {
+    // ignore — cookie may already be valid
+  }
+  window.open("/grafana/", "_blank");
+}
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const t = useTranslations("nav");
@@ -90,6 +106,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       <div className="px-3 py-4 border-t border-slate-100 space-y-2">
+        {(user?.role === "super_admin") && (
+          <button
+            onClick={openGrafana}
+            className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-600 hover:bg-violet-50 hover:text-violet-700 transition"
+          >
+            <BarChart2 className="w-4 h-4" />
+            Monitoring
+          </button>
+        )}
         <div className="flex justify-center">
           <LanguageSwitcher />
         </div>

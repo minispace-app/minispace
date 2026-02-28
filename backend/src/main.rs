@@ -69,13 +69,19 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let state = AppState {
-        db: pool,
+        db: pool.clone(),
         redis: redis_conn,
         redis_client: redis_client.clone(),
         config: config.clone(),
         notifications,
-        email,
+        email: email.clone(),
     };
+
+    // Start journal auto-send scheduler
+    services::journal_scheduler::start(pool.clone(), email.clone());
+
+    // Start Prometheus business metrics collector
+    services::metrics::start(pool.clone());
 
     // Build CORS: allow the app base domain and its subdomains (tenant subdomains).
     // In development (localhost), all origins are allowed.
@@ -138,6 +144,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/invite", post(routes::auth::invite_user))
         .route("/auth/invitations", get(routes::auth::list_pending_invitations))
         .route("/auth/invitations/{id}", delete(routes::auth::delete_invitation))
+        .route("/auth/invitations/{id}/resend", post(routes::auth::resend_invitation))
         .route("/auth/register", post(routes::auth::register_from_invite))
         .route("/auth/me", get(routes::auth::me))
         .route("/auth/change-password", post(routes::auth::change_password))
@@ -170,10 +177,14 @@ async fn main() -> anyhow::Result<()> {
         .route("/groups", get(routes::groups::list_groups).post(routes::groups::create_group))
         .route("/groups/{id}", put(routes::groups::update_group).delete(routes::groups::delete_group))
         .route("/groups/{id}/children", put(routes::groups::set_group_children))
+        // Menus de la garderie
+        .route("/menus", get(routes::menu::get_week).put(routes::menu::upsert_menu))
         // Journal de bord
         .route("/journals", get(routes::journal::get_week).put(routes::journal::upsert_entry))
         .route("/journals/send-all-to-parents", post(routes::journal::send_all_to_parents))
         .route("/journals/{child_id}/send-to-parents", post(routes::journal::send_to_parents))
+        // Settings
+        .route("/settings", get(routes::settings::get_settings).put(routes::settings::update_settings))
         // Children
         .route("/children", get(routes::children::list_children).post(routes::children::create_child))
         .route("/children/{id}", put(routes::children::update_child).delete(routes::children::delete_child))
@@ -194,6 +205,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/super-admin/backup", post(routes::tenants::trigger_backup_all))
         .route("/super-admin/backups", get(routes::tenants::list_backups))
         .route("/super-admin/restore", post(routes::tenants::trigger_restore))
+        // Grafana SSO
+        .route("/super-admin/grafana-access", post(routes::grafana_auth::grafana_access))
+        .route("/super-admin/grafana-auth", get(routes::grafana_auth::grafana_auth))
+        // Prometheus metrics (internal — protected by nginx)
+        .route("/metrics", get(routes::metrics::metrics_handler))
         .layer(axum::Extension(jwt_secret))
         .layer(TraceLayer::new_for_http())
         .layer(cors)
