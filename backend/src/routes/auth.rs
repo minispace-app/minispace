@@ -122,10 +122,12 @@ pub async fn verify_2fa(
     )
     .await
     .map(|(res, device_token)| {
+        crate::services::metrics::LOGINS_COUNTER.with_label_values(&[&tenant, "success"]).inc();
         let cookie_ref: Option<&str> = if device_token.is_empty() { None } else { Some(&device_token) };
         json_response_with_cookie(&serde_json::to_value(res).unwrap(), cookie_ref)
     })
     .map_err(|e| {
+        crate::services::metrics::LOGINS_COUNTER.with_label_values(&[&tenant, "failed"]).inc();
         (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "error": e.to_string() })),
