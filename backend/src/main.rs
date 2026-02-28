@@ -80,6 +80,9 @@ async fn main() -> anyhow::Result<()> {
     // Start journal auto-send scheduler
     services::journal_scheduler::start(pool.clone(), email.clone());
 
+    // Start trial expiry warning scheduler (daily at 9 AM)
+    services::trial_scheduler::start(pool.clone(), email.clone(), redis_client.clone());
+
     // Start Prometheus business metrics collector
     services::metrics::start(pool.clone());
 
