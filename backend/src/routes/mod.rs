@@ -1,4 +1,7 @@
 pub mod announcements;
+pub mod grafana_auth;
+pub mod metrics;
+pub mod settings;
 pub mod auth;
 pub mod demo;
 pub mod logo;
@@ -10,6 +13,7 @@ pub mod groups;
 pub mod health;
 pub mod journal;
 pub mod media;
+pub mod menu;
 pub mod messages;
 pub mod tenant_info;
 pub mod tenants;
