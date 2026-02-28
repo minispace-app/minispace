@@ -9,22 +9,47 @@ use redis::AsyncCommands;
 use serde_json::json;
 
 use crate::{
-    models::{auth::AuthenticatedUser, user::UserRole},
+    middleware::auth::decode_access_token,
+    models::user::UserRole,
     AppState,
 };
 
+fn is_authorized(headers: &HeaderMap, state: &AppState) -> bool {
+    // Accept X-Super-Admin-Key (platform super-admin without JWT)
+    if headers
+        .get("x-super-admin-key")
+        .and_then(|v| v.to_str().ok())
+        .map(|k| k == state.config.super_admin_key)
+        .unwrap_or(false)
+    {
+        return true;
+    }
+
+    // Accept JWT with admin_garderie or super_admin role
+    if let Some(bearer) = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+    {
+        if let Ok(user) = decode_access_token(bearer, &state.config.jwt_secret) {
+            return user.role == UserRole::SuperAdmin || user.role == UserRole::AdminGarderie;
+        }
+    }
+
+    false
+}
+
 /// POST /super-admin/grafana-access
-/// Requires valid JWT with super_admin role.
-/// Generates a short-lived cookie token stored in Redis (30 min TTL),
-/// then sets it as an HttpOnly cookie so the browser sends it on /grafana/ navigation.
+/// Accepts either X-Super-Admin-Key header or JWT (admin_garderie / super_admin).
+/// Sets a short-lived HttpOnly cookie used by nginx auth_request for Grafana SSO.
 pub async fn grafana_access(
     State(state): State<AppState>,
-    user: AuthenticatedUser,
+    headers: HeaderMap,
 ) -> impl IntoResponse {
-    if user.role != UserRole::SuperAdmin {
+    if !is_authorized(&headers, &state) {
         return (
             StatusCode::FORBIDDEN,
-            Json(json!({ "error": "Super-admin requis" })),
+            Json(json!({ "error": "Accès refusé" })),
         )
             .into_response();
     }

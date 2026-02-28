@@ -106,7 +106,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       <div className="px-3 py-4 border-t border-slate-100 space-y-2">
-        {(user?.role === "super_admin") && (
+        {(user?.role === "super_admin" || user?.role === "admin_garderie") && (
           <button
             onClick={openGrafana}
             className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-600 hover:bg-violet-50 hover:text-violet-700 transition"
