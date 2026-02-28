@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { superAdminApi } from "../../../lib/api";
-import { Plus, Users, ChevronRight, Eye, EyeOff, Building2, UserPlus, Mail, Pencil, X, Trash2, AlertTriangle, Save, RotateCcw, Megaphone } from "lucide-react";
+import { Plus, Users, ChevronRight, Eye, EyeOff, Building2, UserPlus, Mail, Pencil, X, Trash2, AlertTriangle, Save, RotateCcw, Megaphone, BarChart2 } from "lucide-react";
 
 interface Garderie {
   id: string;
@@ -413,6 +413,23 @@ export default function SuperAdminPage() {
           <h1 className="font-bold text-slate-800">minispace.app — Super-Admin</h1>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={async () => {
+              const key = typeof window !== "undefined" ? localStorage.getItem("super_admin_key") || "" : "";
+              try {
+                await fetch("/api/super-admin/grafana-access", {
+                  method: "POST",
+                  credentials: "include",
+                  headers: { "X-Super-Admin-Key": key },
+                });
+              } catch { /* ignore */ }
+              window.open("/grafana/", "_blank");
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 transition"
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            Monitoring
+          </button>
           <button
             onClick={handleBackup}
             disabled={backupLoading}
