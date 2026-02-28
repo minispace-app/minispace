@@ -146,12 +146,14 @@ pub async fn signup(
     let trial_expires_at = Utc::now() + chrono::Duration::days(30);
 
     let garderie_result = sqlx::query_as::<_, (uuid::Uuid, String, chrono::DateTime<Utc>)>(
-        "INSERT INTO public.garderies (slug, name, email, plan, trial_expires_at)
-         VALUES ($1, $2, $3, 'free', $4)
+        "INSERT INTO public.garderies (slug, name, phone, address, email, plan, trial_expires_at)
+         VALUES ($1, $2, $3, $4, $5, 'free', $6)
          RETURNING id, slug, trial_expires_at",
     )
     .bind(&slug)
     .bind(body.name.trim())
+    .bind(body.phone.as_deref().filter(|s| !s.trim().is_empty()))
+    .bind(body.address.as_deref().filter(|s| !s.trim().is_empty()))
     .bind(&body.email)
     .bind(trial_expires_at)
     .fetch_one(&state.db)
@@ -212,21 +214,32 @@ pub async fn signup(
         }
     };
 
-    // Notifier contact@minispace.app (fire-and-forget — n'échoue pas le signup)
+    // Emails fire-and-forget — n'échouent pas le signup si SMTP down
     if let Some(email_svc) = &state.email {
-        let expires_str = expires_at.format("%Y-%m-%d").to_string();
+        let expires_str = expires_at.format("%d %B %Y").to_string();
         let svc = email_svc.clone();
         let slug_c = created_slug.clone();
         let name_c = body.name.trim().to_string();
         let email_c = body.email.clone();
         let first_c = body.first_name.trim().to_string();
         let last_c = body.last_name.trim().to_string();
+        let phone_c = body.phone.clone().unwrap_or_default();
+        let address_c = body.address.clone().unwrap_or_default();
+        let login_url_c = login_url.clone();
         tokio::spawn(async move {
+            // 1. Notification interne à contact@minispace.app
             if let Err(e) = svc
-                .send_new_signup_notification(&slug_c, &name_c, &email_c, &first_c, &last_c, &expires_str)
+                .send_new_signup_notification(&slug_c, &name_c, &email_c, &first_c, &last_c, &phone_c, &address_c, &expires_str)
                 .await
             {
-                tracing::warn!("signup notification email failed for '{slug_c}': {e}");
+                tracing::warn!("signup admin notification failed for '{slug_c}': {e}");
+            }
+            // 2. Email de bienvenue à l'admin de la nouvelle garderie
+            if let Err(e) = svc
+                .send_welcome_email(&email_c, &format!("{first_c} {last_c}"), &name_c, &slug_c, &login_url_c, &expires_str)
+                .await
+            {
+                tracing::warn!("signup welcome email failed for '{slug_c}': {e}");
             }
         });
     }
