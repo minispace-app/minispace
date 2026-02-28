@@ -35,11 +35,20 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Auto-refresh on 401
+// Auto-refresh on 401, redirect on 402 (trial expired)
 apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
+
+    if (error.response?.status === 402) {
+      const locale = window.location.pathname.split('/')[1] || 'fr';
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = `/${locale}/login?reason=trial_expired`;
+      }
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
       try {
@@ -273,7 +282,7 @@ export const superAdminApi = {
   listGarderies: () => superAdminClient.get("/super-admin/garderies"),
   createGarderie: (data: { slug: string; name: string; address?: string; phone?: string; email?: string; plan?: string }) =>
     superAdminClient.post("/super-admin/garderies", data),
-  updateGarderie: (slug: string, data: { name?: string; address?: string; phone?: string; email?: string; is_active?: boolean }) =>
+  updateGarderie: (slug: string, data: { name?: string; address?: string; phone?: string; email?: string; is_active?: boolean; trial_expires_at?: string | null; remove_trial_expires?: boolean }) =>
     superAdminClient.put(`/super-admin/garderies/${slug}`, data),
   listGarderieUsers: (slug: string) =>
     superAdminClient.get(`/super-admin/garderies/${slug}/users`),
