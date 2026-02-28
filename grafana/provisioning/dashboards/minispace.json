@@ -2,7 +2,7 @@
   "title": "minispace.app — Vue d'ensemble",
   "uid": "minispace-overview",
   "schemaVersion": 38,
-  "version": 2,
+  "version": 3,
   "refresh": "1m",
   "time": { "from": "now-24h", "to": "now" },
   "timezone": "browser",
@@ -253,28 +253,28 @@
     },
     {
       "id": 57,
-      "title": "Logins dans le temps",
+      "title": "Logins par heure",
       "type": "timeseries",
       "gridPos": { "x": 0, "y": 40, "w": 12, "h": 8 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
-      "fieldConfig": { "defaults": { "unit": "ops", "min": 0, "custom": { "fillOpacity": 10 } } },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "decimals": 0, "custom": { "fillOpacity": 10 } } },
       "targets": [
-        { "expr": "rate(api_logins_total{status=\"success\"}[5m])", "legendFormat": "{{tenant}} — succès", "refId": "A" },
-        { "expr": "rate(api_logins_total{status=\"failed\"}[5m])", "legendFormat": "{{tenant}} — échec", "refId": "B" }
+        { "expr": "increase(api_logins_total{status=\"success\"}[1h])", "legendFormat": "{{tenant}} — succès", "refId": "A" },
+        { "expr": "increase(api_logins_total{status=\"failed\"}[1h])", "legendFormat": "{{tenant}} — échec", "refId": "B" }
       ],
       "datasource": { "type": "prometheus", "uid": "prometheus" }
     },
     {
       "id": 58,
-      "title": "Emails & uploads dans le temps",
+      "title": "Emails & uploads par heure",
       "type": "timeseries",
       "gridPos": { "x": 12, "y": 40, "w": 12, "h": 8 },
       "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
-      "fieldConfig": { "defaults": { "unit": "ops", "min": 0, "custom": { "fillOpacity": 10 } } },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "decimals": 0, "custom": { "fillOpacity": 10 } } },
       "targets": [
-        { "expr": "rate(api_2fa_emails_total[5m])", "legendFormat": "{{tenant}} — 2FA", "refId": "A" },
-        { "expr": "rate(api_media_uploads_total[5m])", "legendFormat": "{{tenant}} — médias", "refId": "B" },
-        { "expr": "rate(api_messages_sent_total[5m])", "legendFormat": "{{tenant}} — messages", "refId": "C" }
+        { "expr": "increase(api_2fa_emails_total[1h])", "legendFormat": "{{tenant}} — 2FA", "refId": "A" },
+        { "expr": "increase(api_media_uploads_total[1h])", "legendFormat": "{{tenant}} — médias", "refId": "B" },
+        { "expr": "increase(api_messages_sent_total[1h])", "legendFormat": "{{tenant}} — messages", "refId": "C" }
       ],
       "datasource": { "type": "prometheus", "uid": "prometheus" }
     },
