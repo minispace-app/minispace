@@ -113,6 +113,24 @@ services:
     networks:
       - internal
 
+  demo-reset:
+    image: ghcr.io/${GHCR_REPO:-minispace-app/minispace}/api:${API_VERSION:-latest}
+    container_name: minispace_demo_reset
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    volumes:
+      - media_files:/data/media
+    environment:
+      - TZ=${TZ:-UTC}
+      - DATABASE_URL=postgres://${POSTGRES_USER:-garderie}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-garderieconnect}
+      - DEMO_PASSWORD=${DEMO_PASSWORD:-Demo2024!}
+      - MEDIA_DIR=/data/media
+    command: "sh -c 'sleep 30 && /app/seed-demo && while true; do sleep 1800 && /app/seed-demo; done'"
+
   backup:
     image: alpine:3.20
     container_name: minispace_backup
@@ -136,10 +154,121 @@ services:
       - ENCRYPTION_PASSWORD=${BACKUP_ENCRYPT_PASSWORD:-}
     command: "sh -c 'apk add --no-cache postgresql-client tzdata && cp /scripts/backup-entrypoint.sh /entrypoint.sh && chmod 755 /entrypoint.sh && /entrypoint.sh'"
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: minispace_prometheus
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    networks:
+      - internal
+    depends_on:
+      - api
+
+  loki:
+    image: grafana/loki:latest
+    container_name: minispace_loki
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yml
+    networks:
+      - internal
+    expose:
+      - "3100"
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: minispace_promtail
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - internal
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: minispace_grafana
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_AUTH_PROXY_ENABLED=true
+      - GF_AUTH_PROXY_HEADER_NAME=X-WEBAUTH-USER
+      - GF_AUTH_PROXY_AUTO_SIGN_UP=true
+      - GF_AUTH_PROXY_WHITELIST=
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_USERS_AUTO_ASSIGN_ORG=true
+      - GF_USERS_AUTO_ASSIGN_ORG_ROLE=Admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - internal
+    depends_on:
+      - prometheus
+      - loki
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: minispace_postgres_exporter
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-garderie}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-garderieconnect}?sslmode=disable
+    networks:
+      - internal
+    depends_on:
+      db:
+        condition: service_healthy
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: minispace_node_exporter
+    restart: unless-stopped
+    pid: host
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    networks:
+      - internal
+
 volumes:
   postgres_data:
   redis_data:
   media_files:
+  prometheus_data:
+  grafana_data:
+  loki_data:
 
 networks:
   internal:

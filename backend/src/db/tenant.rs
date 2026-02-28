@@ -524,14 +524,30 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
             appetit            "{schema}".appetit_level,
             humeur             "{schema}".humeur_level,
             sommeil_minutes    SMALLINT CHECK (sommeil_minutes >= 0 AND sommeil_minutes <= 180),
+            absent             BOOLEAN NOT NULL DEFAULT FALSE,
             sante              TEXT,
             medicaments        TEXT,
             message_educatrice TEXT,
             observations       TEXT,
+            sent_at            TIMESTAMPTZ,
             created_by         UUID NOT NULL REFERENCES "{schema}".users(id),
             created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             UNIQUE (child_id, date)
+        )"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // --- Daily menus (garderie-level, one entry per date) ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE TABLE IF NOT EXISTS "{schema}".daily_menus (
+            id         UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            date       DATE NOT NULL UNIQUE,
+            menu       TEXT NOT NULL,
+            created_by UUID NOT NULL REFERENCES "{schema}".users(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )"#
     ))
     .execute(pool)
@@ -548,7 +564,7 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     .await?;
 
     // --- Triggers (one per table, idempotent via DROP IF EXISTS + CREATE) ---
-    for table in &["users", "children", "groups", "messages", "documents", "daily_journals"] {
+    for table in &["users", "children", "groups", "messages", "documents", "daily_journals", "daily_menus"] {
         let trigger = format!("{table}_updated_at");
         sqlx::raw_sql(&format!(
             r#"DROP TRIGGER IF EXISTS "{trigger}" ON "{schema}"."{table}";

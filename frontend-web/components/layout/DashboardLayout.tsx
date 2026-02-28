@@ -22,9 +22,11 @@ import {
   Menu,
   X,
   User,
+  UtensilsCrossed,
 } from "lucide-react";
 import { LanguageSwitcher } from "../LanguageSwitcher";
 import { AnnouncementBanner } from "../AnnouncementBanner";
+import { DemoBanner } from "../DemoBanner";
 
 const navItems = [
   { key: "dashboard", icon: LayoutDashboard, href: "/dashboard", roles: null },
@@ -33,6 +35,7 @@ const navItems = [
   { key: "documents", icon: FileText, href: "/dashboard/documents", roles: null },
   { key: "children", icon: Users, href: "/dashboard/children", roles: null },
   { key: "groups", icon: FolderOpen, href: "/dashboard/groups", roles: null },
+  { key: "menus", icon: UtensilsCrossed, href: "/dashboard/menus", roles: null },
   { key: "journal", icon: BookOpen, href: "/dashboard/journal", roles: null },
   { key: "users", icon: Settings, href: "/dashboard/users", roles: ["admin_garderie", "super_admin"] },
   { key: "myProfile", icon: User, href: "/dashboard/profile", roles: null },
@@ -89,7 +92,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       <div className="px-3 py-4 border-t border-slate-100 space-y-2">
-        <div className="flex justify-center">
+<div className="flex justify-center">
           <LanguageSwitcher />
         </div>
         <button
@@ -196,6 +199,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <span className="font-semibold text-slate-800 truncate">{garderieName}</span>
         </header>
 
+        <DemoBanner />
         <AnnouncementBanner />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>

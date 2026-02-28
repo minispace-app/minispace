@@ -1,5 +1,12 @@
 use std::path::{Path, PathBuf};
 
+/// Generate a cryptographically random 32-char hex filename (no extension).
+fn random_storage_name() -> String {
+    use rand::Rng;
+    let bytes: [u8; 16] = rand::thread_rng().gen();
+    hex::encode(bytes)
+}
+
 use axum::extract::Multipart;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -82,7 +89,7 @@ impl DocumentService {
             .unwrap_or("bin");
 
         let file_id = Uuid::new_v4();
-        let storage_filename = format!("{}.{}", file_id, ext);
+        let storage_filename = random_storage_name();
         let storage_path_full = doc_dir.join(&storage_filename);
         let storage_path_rel = format!("{}/documents/{}", tenant, storage_filename);
 

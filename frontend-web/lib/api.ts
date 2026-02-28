@@ -3,7 +3,7 @@ import Cookies from "js-cookie";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost/api";
 
-function getTenantSlug(): string {
+export function getTenantSlug(): string {
   if (typeof window === "undefined") return "";
   const parts = window.location.hostname.split(".");
   return parts.length >= 2 ? parts[0] : "";
@@ -80,6 +80,8 @@ export const authApi = {
     }),
   listPendingInvitations: () =>
     apiClient.get("/auth/invitations"),
+  resendInvitation: (id: string) =>
+    apiClient.post(`/auth/invitations/${id}/resend`),
   deleteInvitation: (id: string) =>
     apiClient.delete(`/auth/invitations/${id}`),
   register: (data: {
@@ -107,6 +109,8 @@ export const authApi = {
     apiClient.post("/auth/verify-2fa", { email, code }, {
       headers: { "X-Tenant": getTenantSlug() },
     }),
+  demoLogin: (role: "admin" | "educateur" | "parent", locale?: string) =>
+    apiClient.post("/demo/login", { role, locale }),
 };
 
 // Messages
@@ -250,6 +254,14 @@ export const journalApi = {
     apiClient.post("/journals/send-all-to-parents", { week_start: weekStart }),
 };
 
+// Menus de la garderie (un menu par jour, partagé pour tous les enfants)
+export const menusApi = {
+  getWeek: (weekStart: string) =>
+    apiClient.get("/menus", { params: { week_start: weekStart } }),
+  upsert: (data: { date: string; menu: string }) =>
+    apiClient.put("/menus", data),
+};
+
 // Email (admin/educateur → parents)
 export const emailApi = {
   sendToParents: (data: { subject: string; body: string; recipient_id?: string }) =>
@@ -285,6 +297,11 @@ export const superAdminApi = {
     superAdminClient.put("/super-admin/announcement", { message, color }),
   deleteAnnouncement: () =>
     superAdminClient.delete("/super-admin/announcement"),
+};
+
+export const settingsApi = {
+  get: () => apiClient.get("/settings"),
+  update: (data: { journal_auto_send_time: string }) => apiClient.put("/settings", data),
 };
 
 export const userApi = {

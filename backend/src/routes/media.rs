@@ -39,6 +39,7 @@ pub async fn upload_media(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
 
     // Email notifications aux parents concernés (async, non-bloquant, cooldown 1h par parent)
+    if tenant != "demo" {
     if let Some(email_svc) = state.email.clone() {
         if media.visibility != "private" {
             let pool = state.db.clone();
@@ -156,7 +157,9 @@ pub async fn upload_media(
             });
         }
     }
+    } // end if tenant != "demo"
 
+    crate::services::metrics::MEDIA_UPLOADS_COUNTER.with_label_values(&[&tenant]).inc();
     Ok((StatusCode::CREATED, Json(serde_json::to_value(media).unwrap())))
 }
 
@@ -385,6 +388,7 @@ pub async fn update_media(
     };
 
     // Notify parents when media becomes visible (visibility != private)
+    if tenant != "demo" {
     if let Some(email_svc) = state.email.clone() {
         if media.visibility != "private" {
             let pool = state.db.clone();
@@ -502,6 +506,7 @@ pub async fn update_media(
             });
         }
     }
+    } // end if tenant != "demo"
 
     Ok(Json(serde_json::to_value(media).unwrap()))
 }

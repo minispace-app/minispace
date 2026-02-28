@@ -27,6 +27,7 @@ pub struct DailyJournal {
     pub appetit: Option<String>,
     pub humeur: Option<String>,
     pub sommeil_minutes: Option<i16>,
+    pub absent: bool,
     pub sante: Option<String>,
     pub medicaments: Option<String>,
     pub message_educatrice: Option<String>,
@@ -46,6 +47,8 @@ pub struct UpsertJournalRequest {
     pub appetit: Option<String>,
     pub humeur: Option<String>,
     pub sommeil_minutes: Option<i16>,
+    #[serde(default)]
+    pub absent: bool,
     pub sante: Option<String>,
     pub medicaments: Option<String>,
     pub message_educatrice: Option<String>,

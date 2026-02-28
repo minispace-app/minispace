@@ -2,14 +2,29 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import useSWR from "swr";
 import { useAuth } from "../../../../hooks/useAuth";
-import { authApi } from "../../../../lib/api";
+import { authApi, childrenApi } from "../../../../lib/api";
+import { childAvatarColor } from "../../../../components/ChildAvatar";
 import { Eye, EyeOff, Save, AlertCircle, Check } from "lucide-react";
+
+interface Child {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
 
 export default function ParentProfilePage() {
   const t = useTranslations("profile");
+  const tChildren = useTranslations("children");
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+
+  const { data: childrenData } = useSWR(
+    "parent-children",
+    () => childrenApi.list().then((r) => r.data as Child[])
+  );
+  const childrenList: Child[] = childrenData ?? [];
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showPasswords, setShowPasswords] = useState(false);
@@ -233,7 +248,29 @@ export default function ParentProfilePage() {
         </div>
       </div>
 
-      <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
+      {/* Mes enfants */}
+      <div className="mt-6 bg-white rounded-xl border border-slate-200 p-6">
+        <h2 className="text-xl font-bold text-slate-800 mb-4">{tChildren("myChildren")}</h2>
+        {childrenList.length === 0 ? (
+          <p className="text-sm text-slate-500">{tChildren("noChildrenParent")}</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {childrenList.map((child) => (
+              <div
+                key={child.id}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-sm font-medium"
+              >
+                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 ${childAvatarColor(child.id)}`}>
+                  {child.first_name[0]}
+                </span>
+                {child.first_name} {child.last_name}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-700">
           <strong>{t("securityNote")}</strong> {t("securityNoteDesc")}
         </p>

@@ -105,6 +105,8 @@ pub async fn send_message(
     let _ = state.redis.publish::<_, _, ()>(&channel, &payload).await;
 
     // Email notifications asynchrones avec cooldown par fil (15 min)
+    // Désactivé pour le tenant demo (adresses email fictives)
+    if tenant != "demo" {
     if let Some(email_svc) = state.email.clone() {
         let pool = state.db.clone();
         let tenant_c = tenant.clone();
@@ -283,7 +285,9 @@ pub async fn send_message(
             }
         });
     }
+    } // end if tenant != "demo"
 
+    crate::services::metrics::MESSAGES_COUNTER.with_label_values(&[&tenant]).inc();
     Ok((
         StatusCode::CREATED,
         Json(serde_json::to_value(msg).unwrap()),
@@ -452,6 +456,7 @@ pub async fn send_to_parents(
     user: AuthenticatedUser,
     Json(body): Json<SendToParentsRequest>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    crate::routes::demo::deny_if_demo(&tenant)?;
     // Only educators and admins can send messages to parents
     if let UserRole::Parent = user.role {
         return Err((StatusCode::FORBIDDEN, Json(json!({ "error": "Accès refusé" }))));
