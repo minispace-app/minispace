@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
-import { ChevronLeft, ChevronRight, Loader2, Check, BookOpen, Clock, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Check, BookOpen, Clock } from "lucide-react";
 import { childrenApi, journalApi, menusApi, settingsApi } from "../../../../lib/api";
 import { ChildAvatar, childAvatarColor } from "../../../../components/ChildAvatar";
 import { WeatherPicker } from "../../../../components/journal/WeatherPicker";
@@ -47,7 +47,6 @@ export default function JournalDashboardPage() {
   const [activeDayIndex, setActiveDayIndex] = useState(() => getDefaultActiveDayIndex(getMonday(new Date())));
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [sendStatus, setSendStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
   const weekDates = WEEK_DAYS.map((_, i) => addDays(weekStart, i));
   const weekStartStr = formatDate(weekStart);
@@ -144,42 +143,6 @@ export default function JournalDashboardPage() {
     setActiveDayIndex(getDefaultActiveDayIndex(newStart));
   };
 
-  const handleSendToParents = async () => {
-    if (!selectedChildId) return;
-    setSendStatus("sending");
-    try {
-      await journalApi.sendToParents(selectedChildId, weekStartStr);
-      setSendStatus("sent");
-      setTimeout(() => setSendStatus("idle"), 3000);
-    } catch {
-      setSendStatus("error");
-      setTimeout(() => setSendStatus("idle"), 3000);
-    }
-  };
-
-  const sendButton = selectedChildId ? (
-    <button
-      onClick={handleSendToParents}
-      disabled={sendStatus === "sending"}
-      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-        sendStatus === "sent"
-          ? "bg-green-50 text-green-700 border border-green-200"
-          : sendStatus === "error"
-          ? "bg-red-50 text-red-700 border border-red-200"
-          : "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
-      }`}
-    >
-      {sendStatus === "sending" ? (
-        <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Envoi...</>
-      ) : sendStatus === "sent" ? (
-        <><Check className="w-3.5 h-3.5" /> Envoyé</>
-      ) : sendStatus === "error" ? (
-        <>Erreur</>
-      ) : (
-        <><Send className="w-3.5 h-3.5" /> Envoyer aux parents</>
-      )}
-    </button>
-  ) : null;
 
   const saveIndicator =
     saveStatus === "saving" ? (
@@ -247,9 +210,8 @@ export default function JournalDashboardPage() {
           <Clock className="w-3.5 h-3.5 flex-shrink-0" />
           <span>Envoi automatique à <strong className="text-slate-600">{autoSendTime}</strong> en semaine</span>
         </div>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto">
           {saveIndicator}
-          {sendButton}
         </div>
       </div>
 
@@ -454,10 +416,9 @@ export default function JournalDashboardPage() {
                 }}
               />
             </div>
-            {/* Save indicator + send button — floating bottom */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3 flex items-center justify-between z-20">
-              <div>{saveIndicator}</div>
-              {sendButton}
+            {/* Save indicator — floating bottom */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-4 py-3 flex justify-center z-20">
+              {saveIndicator}
             </div>
           </>
         )}
