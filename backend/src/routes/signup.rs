@@ -1,6 +1,6 @@
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     Json,
 };
 use chrono::Utc;
@@ -28,6 +28,20 @@ fn is_valid_signup_slug(s: &str) -> bool {
         && !s.ends_with('-')
 }
 
+/// Extracts the real client IP from nginx-forwarded headers.
+/// Priority: X-Real-IP (set by nginx from CF-Connecting-IP) → first X-Forwarded-For.
+fn real_ip(headers: &HeaderMap) -> String {
+    if let Some(ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
+        return ip.to_string();
+    }
+    if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+        if let Some(first) = xff.split(',').next() {
+            return first.trim().to_string();
+        }
+    }
+    "unknown".to_string()
+}
+
 #[derive(Deserialize)]
 pub struct CheckSlugQuery {
     pub slug: String,
@@ -35,25 +49,34 @@ pub struct CheckSlugQuery {
 
 pub async fn check_slug(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Query(params): Query<CheckSlugQuery>,
-) -> (StatusCode, Json<Value>) {
+) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    // Rate limit: 30/min per IP (nginx already limits to 20/min, this is a backstop)
+    {
+        let ip = real_ip(&headers);
+        let key = format!("rate:check-slug:ip:{ip}");
+        let mut redis = state.redis.clone();
+        check_rate_limit(&mut redis, &key, 30, 60).await?;
+    }
+
     let slug = params.slug.to_lowercase();
 
     if !is_valid_signup_slug(&slug) {
-        return (
+        return Ok((
             StatusCode::OK,
             Json(json!({
                 "available": false,
                 "reason": "L'identifiant doit contenir entre 3 et 32 caractères (lettres, chiffres, tirets)."
             })),
-        );
+        ));
     }
 
     if RESERVED_SLUGS.contains(&slug.as_str()) {
-        return (
+        return Ok((
             StatusCode::OK,
             Json(json!({ "available": false, "reason": "Cet identifiant est réservé." })),
-        );
+        ));
     }
 
     let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM public.garderies WHERE slug = $1)")
@@ -63,21 +86,25 @@ pub async fn check_slug(
         .unwrap_or(true);
 
     if exists {
-        (StatusCode::OK, Json(json!({ "available": false, "reason": "Cet identifiant est déjà pris." })))
+        Ok((StatusCode::OK, Json(json!({ "available": false, "reason": "Cet identifiant est déjà pris." }))))
     } else {
-        (StatusCode::OK, Json(json!({ "available": true })))
+        Ok((StatusCode::OK, Json(json!({ "available": true }))))
     }
 }
 
 pub async fn signup(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Json(body): Json<SignupRequest>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
-    // Rate limit: 20 req/hour globally
-    {
-        let mut redis = state.redis.clone();
-        check_rate_limit(&mut redis, "rate:signup:global", 20, 3600).await?;
-    }
+    let ip = real_ip(&headers);
+    let mut redis = state.redis.clone();
+
+    // Rate limit 1: 5 signups/hour per IP (prevents one source from abusing)
+    check_rate_limit(&mut redis, &format!("rate:signup:ip:{ip}"), 5, 3600).await?;
+
+    // Rate limit 2: 20 signups/hour globally (total cap across all IPs)
+    check_rate_limit(&mut redis, "rate:signup:global", 20, 3600).await?;
 
     // Validate inputs
     let slug = body.slug.to_lowercase();
