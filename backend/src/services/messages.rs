@@ -154,15 +154,15 @@ impl MessageService {
                         .execute(pool)
                         .await?;
                     } else {
-                        // Staff marking a conversation with a specific parent as read
+                        // Staff/admin marking a conversation with a specific parent as read.
+                        // Mark all unread messages FROM this parent regardless of which staff
+                        // member is the original recipient (admin can view any conversation).
                         sqlx::query(&format!(
                             "UPDATE {schema}.messages SET is_read = TRUE
                              WHERE message_type::text = 'individual'
-                               AND sender_id = $1 AND is_read = FALSE
-                               AND (recipient_id = $2 OR recipient_id IS NULL)"
+                               AND sender_id = $1 AND is_read = FALSE"
                         ))
                         .bind(other_id)
-                        .bind(user_id)
                         .execute(pool)
                         .await?;
                     }

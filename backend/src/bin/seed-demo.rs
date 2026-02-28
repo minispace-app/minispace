@@ -1,14 +1,14 @@
 //! Demo tenant seed script
 //!
-//! Seeds the `demo` tenant with realistic French-language data:
+//! Seeds the `demo` tenant with bilingual (French & English) realistic data:
 //! - Garderie: Garderie Les Petits Explorateurs (Démo)
-//! - 4 users: 1 admin, 1 educateur, 2 parents
+//! - 6 users: 2 admin (1 FR + 1 EN), 2 educateur (1 FR + 1 EN), 2 parents (FR)
 //! - 3 groups: Poupons, Bambins, Explorateurs
 //! - 10 children distributed across groups with parent links
-//! - 10+ messages (1 broadcast, 2 group, 8 individual)
+//! - 16 messages (11 French + 5 English from both educators)
 //! - Journal entries for the last 5 business days for each child
-//! - 6 demo photos (JPEG generated programmatically)
-//! - 2 demo documents (PDF generated programmatically)
+//! - 6 demo photos (JPEG generated programmatically, French captions)
+//! - 6 demo documents (3 French + 3 English PDFs generated programmatically)
 //!
 //! Usage:
 //!   DATABASE_URL=... DEMO_PASSWORD=Demo2024! MEDIA_DIR=/data/media ./seed-demo
@@ -86,25 +86,33 @@ async fn main() -> Result<()> {
     let password_hash =
         bcrypt::hash(&demo_password, 10).context("Failed to hash demo password")?;
 
-    // 5. Insert users
+    // 5. Insert users (French and English)
     println!("Inserting users...");
     let admin_id = Uuid::new_v4();
     let educateur_id = Uuid::new_v4();
+    let admin_en_id = Uuid::new_v4();
+    let educateur_en_id = Uuid::new_v4();
     let parent1_id = Uuid::new_v4();
     let parent2_id = Uuid::new_v4();
+    let parent_en_id = Uuid::new_v4();
 
     let users = [
-        (admin_id,     "admin@demo.minispace.app",    "Marie",         "Tremblay", "admin_garderie"),
-        (educateur_id, "sophie@demo.minispace.app",   "Sophie",        "Gagnon",   "educateur"),
-        (parent1_id,   "jean@demo.minispace.app",     "Jean-François", "Leblanc",  "parent"),
-        (parent2_id,   "isabelle@demo.minispace.app", "Isabelle",      "Roy",      "parent"),
+        // French users
+        (admin_id,       "admin@demo.minispace.app",    "Marie",      "Tremblay",  "admin_garderie", "fr"),
+        (educateur_id,   "sophie@demo.minispace.app",   "Sophie",     "Gagnon",    "educateur",      "fr"),
+        (parent1_id,     "jean@demo.minispace.app",     "Jean",       "Leblanc",   "parent",         "fr"),
+        (parent2_id,     "isabelle@demo.minispace.app", "Isabelle",   "Roy",       "parent",         "fr"),
+        // English users
+        (admin_en_id,    "admin-en@demo.minispace.app", "John",       "Smith",     "admin_garderie", "en"),
+        (educateur_en_id,"emma-en@demo.minispace.app",  "Emma",       "Johnson",   "educateur",      "en"),
+        (parent_en_id,   "michael-en@demo.minispace.app", "Michael",  "Anderson",  "parent",         "en"),
     ];
 
-    for (id, email, first, last, role) in &users {
+    for (id, email, first, last, role, locale) in &users {
         sqlx::query(&format!(
             r#"INSERT INTO "{schema}".users
                (id, email, password_hash, first_name, last_name, role, preferred_locale)
-               VALUES ($1, $2, $3, $4, $5, $6::"{schema}".user_role, 'fr')"#
+               VALUES ($1, $2, $3, $4, $5, $6::"{schema}".user_role, $7)"#
         ))
         .bind(id)
         .bind(email)
@@ -112,6 +120,7 @@ async fn main() -> Result<()> {
         .bind(first)
         .bind(last)
         .bind(role)
+        .bind(locale)
         .execute(&pool)
         .await
         .with_context(|| format!("Failed to insert user {email}"))?;
@@ -185,12 +194,16 @@ async fn main() -> Result<()> {
     println!("Linking children to parents...");
     // Jean-François Leblanc: Léa [0], Noah [3], Chloé [8]
     // Isabelle Roy: Emma [1], Olivia [4]
+    // Michael Anderson (EN): Lucas [2], Théo [5], Nathan [9]
     let parent_links = [
         (child_ids[0], parent1_id), // Léa → Jean-François
         (child_ids[3], parent1_id), // Noah → Jean-François
         (child_ids[8], parent1_id), // Chloé → Jean-François
         (child_ids[1], parent2_id), // Emma → Isabelle
         (child_ids[4], parent2_id), // Olivia → Isabelle
+        (child_ids[2], parent_en_id), // Lucas → Michael
+        (child_ids[5], parent_en_id), // Théo → Michael
+        (child_ids[9], parent_en_id), // Nathan → Michael
     ];
 
     for (child_id, user_id) in &parent_links {
@@ -205,13 +218,14 @@ async fn main() -> Result<()> {
         .context("Failed to insert child_parent link")?;
     }
 
-    // 9. Insert messages (10+)
+    // 9. Insert messages (16 total — 11 French + 5 English)
     println!("Inserting messages...");
     let now = Utc::now();
 
     // (sender_id, message_type, group_id, recipient_id, content, subject, hours_ago)
     type MsgTuple<'a> = (Uuid, &'a str, Option<Uuid>, Option<Uuid>, &'a str, Option<&'a str>, i64);
     let messages: Vec<MsgTuple<'_>> = vec![
+        // ─── FRENCH MESSAGES (11) ───────────────────────────────────────────
         // 1 broadcast
         (
             educateur_id, "broadcast", None, None,
@@ -282,6 +296,60 @@ async fn main() -> Result<()> {
             None,
             2,
         ),
+
+        // ─── ENGLISH MESSAGES (9) from Emma Johnson ──────────────────────────
+        // 1 English broadcast
+        (
+            educateur_en_id, "broadcast", None, None,
+            "Hello to all families! Reminder: the daycare will be closed on Friday, February 28th for a professional development day. Have a great week everyone!",
+            Some("Reminder: Professional Development Day Friday"),
+            47,
+        ),
+        // 1 English group message
+        (
+            educateur_en_id, "group", Some(group_explorateurs_id), None,
+            "Hi everyone! The Explorers group had a wonderful time exploring nature this week. We learned about different insects and plants. The children were so curious!",
+            None,
+            20,
+        ),
+        // English messages between Emma and Michael (parent)
+        (
+            educateur_en_id, "individual", None, Some(parent_en_id),
+            "Hi Michael! Lucas had a wonderful day today. He made a beautiful painting during art time and loved playing with the blocks. Great energy!",
+            None,
+            24,
+        ),
+        (
+            parent_en_id, "individual", None, Some(educateur_en_id),
+            "Thanks so much for the update, Emma! He's been asking about the painting all day. We can't wait to see it!",
+            None,
+            22,
+        ),
+        (
+            educateur_en_id, "individual", None, Some(parent_en_id),
+            "Just a quick note: Théo had a great nap today, about 1 hour and 15 minutes. He was well-rested for the afternoon activities!",
+            None,
+            12,
+        ),
+        (
+            parent_en_id, "individual", None, Some(educateur_en_id),
+            "Perfect! He's been sleeping better lately. Really appreciate you keeping us updated on these details!",
+            None,
+            10,
+        ),
+        (
+            educateur_en_id, "individual", None, Some(parent_en_id),
+            "Nathan had a great day learning about letters. He's really engaged with the alphabet activities and loves singing the ABC song!",
+            None,
+            8,
+        ),
+        // 1 message to admin
+        (
+            educateur_en_id, "individual", None, Some(admin_en_id),
+            "Hi John! Everything is going smoothly with the English-speaking families. The children are adapting well to the bilingual environment!",
+            None,
+            18,
+        ),
     ];
 
     for (sender_id, msg_type, group_id, recipient_id, content, subject, hours_ago) in &messages {
@@ -310,13 +378,6 @@ async fn main() -> Result<()> {
     let appetits = ["comme_habitude", "peu", "beaucoup", "comme_habitude", "beaucoup"];
     let humeurs  = ["tres_bien", "bien", "tres_bien", "difficile", "bien"];
     let weather  = ["ensoleille", "nuageux", "ensoleille", "pluie", "ensoleille"];
-    let menus = [
-        "Soupe à la courge, poulet grillé, compote de pommes",
-        "Macaroni au fromage, salade de concombre, yogourt",
-        "Lasagne végétarienne, pain de blé, orange",
-        "Ragoût de légumes, riz basmati, banane",
-        "Spaghetti bolognaise, brocoli vapeur, pouding au riz",
-    ];
     let first_names = ["Léa", "Emma", "Lucas", "Noah", "Olivia", "Théo", "Juliette", "Liam", "Chloé", "Nathan"];
 
     for (day_idx, date) in business_days.iter().enumerate() {
@@ -324,7 +385,6 @@ async fn main() -> Result<()> {
             let appetit     = appetits[(day_idx + child_idx) % 5];
             let humeur      = humeurs[(day_idx + child_idx) % 5];
             let weather_val = weather[day_idx % 5];
-            let menu        = menus[day_idx % 5];
             let sommeil: i16 = 60 + ((child_idx as i16 + day_idx as i16) % 3) * 30;
             let first_name  = first_names[child_idx];
 
@@ -337,20 +397,18 @@ async fn main() -> Result<()> {
 
             sqlx::query(&format!(
                 r#"INSERT INTO "{schema}".daily_journals
-                   (child_id, date, temperature, menu, appetit, humeur,
+                   (child_id, date, temperature, appetit, humeur,
                     sommeil_minutes, message_educatrice, created_by)
                    VALUES ($1, $2,
                            $3::"{schema}".weather_condition,
-                           $4,
-                           $5::"{schema}".appetit_level,
-                           $6::"{schema}".humeur_level,
-                           $7, $8, $9)
+                           $4::"{schema}".appetit_level,
+                           $5::"{schema}".humeur_level,
+                           $6, $7, $8)
                    ON CONFLICT (child_id, date) DO NOTHING"#
             ))
             .bind(child_id)
             .bind(date)
             .bind(weather_val)
-            .bind(menu)
             .bind(appetit)
             .bind(humeur)
             .bind(sommeil)
@@ -360,6 +418,31 @@ async fn main() -> Result<()> {
             .await
             .with_context(|| format!("Failed to insert journal for {first_name} on {date}"))?;
         }
+    }
+
+    // 10b. Insert garderie-level daily menus
+    println!("Inserting daily menus...");
+    let daily_menus = [
+        "Soupe à la courge, poulet grillé, compote de pommes",
+        "Macaroni au fromage, salade de concombre, yogourt",
+        "Lasagne végétarienne, pain de blé, orange",
+        "Ragoût de légumes, riz basmati, banane",
+        "Spaghetti bolognaise, brocoli vapeur, pouding au riz",
+    ];
+
+    for (day_idx, date) in business_days.iter().enumerate() {
+        let menu = daily_menus[day_idx % daily_menus.len()];
+        sqlx::query(&format!(
+            r#"INSERT INTO "{schema}".daily_menus (date, menu, created_by)
+               VALUES ($1, $2, $3)
+               ON CONFLICT (date) DO NOTHING"#
+        ))
+        .bind(date)
+        .bind(menu)
+        .bind(educateur_id)
+        .execute(&pool)
+        .await
+        .with_context(|| format!("Failed to insert daily menu for {date}"))?;
     }
 
     // 11. Seed demo media files and documents
@@ -383,20 +466,27 @@ async fn main() -> Result<()> {
     println!("=== Demo tenant seeded successfully! ===");
     println!("  Garderie : Garderie Les Petits Explorateurs (Démo)");
     println!("  Schema   : {schema}");
+    println!("  Languages: French (FR) & English (EN)");
     println!("  Users    :");
-    for (_, email, first, last, role) in &users {
-        println!("             {email} ({first} {last}, {role})");
+    for (_, email, first, last, role, locale) in &users {
+        let lang = match *locale {
+            "en" => "(EN)",
+            _ => "(FR)",
+        };
+        println!("             {email} ({first} {last}, {role}) {lang}");
     }
     println!("  Password : {demo_password}");
     println!("  Groups   : Poupons (3), Bambins (4), Explorateurs (3)");
     println!("  Children : {} total", child_ids.len());
-    println!("  Messages : {} total", messages.len());
+    println!("  Messages : {} total (11 French + 9 English)", messages.len());
     println!(
         "  Journal  : {} entries ({} children × {} days)",
         child_ids.len() * business_days.len(),
         child_ids.len(),
         business_days.len()
     );
+    println!("  Menus    : {} entries (1 per business day)", business_days.len());
+    println!("  Documents: 6 total (3 French + 3 English)");
 
     Ok(())
 }
@@ -535,6 +625,7 @@ async fn seed_media_and_docs(
     }
 
     let docs = [
+        // ─── FRENCH DOCUMENTS ───────────────────────────────────────────────
         Doc {
             title:    "Menu de la semaine",
             category: "menu",
@@ -588,6 +679,62 @@ async fn seed_media_and_docs(
                 "",
                 "Journee pedagogique : vendredi 28 mars",
                 "La garderie sera fermee toute la journee.",
+            ],
+        },
+        // ─── ENGLISH DOCUMENTS ───────────────────────────────────────────────
+        Doc {
+            title:    "Weekly Menu",
+            category: "menu",
+            lines: &[
+                "Little Explorers Daycare",
+                "",
+                "Monday   : Squash soup, grilled chicken, applesauce",
+                "Tuesday  : Mac and cheese, cucumber salad, yogurt",
+                "Wednesday: Vegetarian lasagna, whole wheat bread, orange",
+                "Thursday : Vegetable stew, basmati rice, banana",
+                "Friday   : Spaghetti bolognaise, steamed broccoli, rice pudding",
+                "",
+                "Snacks: Fresh fruit, cheese, whole wheat crackers",
+                "Allergens: See posting at entrance",
+            ],
+        },
+        Doc {
+            title:    "Food Allergy Policy",
+            category: "politique",
+            lines: &[
+                "Little Explorers Daycare",
+                "Food Allergy Policy",
+                "",
+                "Our daycare is a peanut-free and nut-free environment.",
+                "",
+                "All food brought from home must be declared",
+                "and approved by management.",
+                "",
+                "In case of allergic reaction, we have an epinephrine",
+                "auto-injector on hand and will call 911 immediately.",
+                "",
+                "Parents must inform management of any known",
+                "or suspected allergies.",
+            ],
+        },
+        Doc {
+            title:    "Activity Calendar — March",
+            category: "bulletin",
+            lines: &[
+                "Little Explorers Daycare",
+                "Activity Calendar — March 2026",
+                "",
+                "Week 1: Theme — Farm Animals",
+                "  Monday   : Farm animal craft",
+                "  Wednesday: Mobile zoo visit",
+                "  Friday   : Animal costume parade",
+                "",
+                "Week 2: Theme — Spring",
+                "  Tuesday  : Seed planting",
+                "  Thursday : Park outing",
+                "",
+                "Professional development day: Friday, March 28",
+                "Daycare will be closed all day.",
             ],
         },
     ];

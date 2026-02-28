@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { authApi } from '@/lib/api';
 import { useTranslations } from 'next-intl';
-import { UserX } from 'lucide-react';
+import { UserX, Mail } from 'lucide-react';
 
 interface PendingInvitation {
   id: string;
@@ -22,6 +22,8 @@ export default function PendingInvitationsTable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     fetchInvitations();
@@ -38,6 +40,21 @@ export default function PendingInvitationsTable() {
       setError(t('errorLoadingInvitations'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async (id: string) => {
+    setResendingId(id);
+    setResendSuccess(null);
+    try {
+      await authApi.resendInvitation(id);
+      setResendSuccess(t('inviteSuccess'));
+      setTimeout(() => setResendSuccess(null), 3000);
+    } catch (err) {
+      console.error('Failed to resend invitation:', err);
+      setError(t('inviteError'));
+    } finally {
+      setResendingId(null);
     }
   };
 
@@ -96,8 +113,14 @@ export default function PendingInvitationsTable() {
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse">
+    <div className="space-y-4">
+      {resendSuccess && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-green-700 text-sm">
+          {resendSuccess}
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
         <thead>
           <tr className="bg-gray-100 border-b border-gray-300">
             <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
@@ -139,7 +162,15 @@ export default function PendingInvitationsTable() {
               <td className="px-4 py-3 text-sm text-gray-600">
                 {formatDate(invitation.expires_at)}
               </td>
-              <td className="px-4 py-3 text-right">
+              <td className="px-4 py-3 text-right flex items-center gap-1 justify-end">
+                <button
+                  onClick={() => handleResend(invitation.id)}
+                  disabled={resendingId === invitation.id}
+                  className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition disabled:opacity-40"
+                  title={t('inviteSend')}
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                </button>
                 <button
                   onClick={() => handleDelete(invitation.id)}
                   disabled={deletingId === invitation.id}
@@ -152,7 +183,8 @@ export default function PendingInvitationsTable() {
             </tr>
           ))}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   );
 }

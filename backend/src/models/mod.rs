@@ -5,6 +5,7 @@ pub mod document;
 pub mod group;
 pub mod journal;
 pub mod media;
+pub mod menu;
 pub mod message;
 pub mod tenant;
 pub mod user;

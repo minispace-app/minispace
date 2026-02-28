@@ -37,17 +37,17 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleDemoLogin = async (role: "admin" | "educateur" | "parent") => {
+  const handleDemoLogin = async (role: "admin" | "educateur" | "parent", demoLocale: string = locale) => {
     setError("");
     setLoading(true);
     try {
-      const res = await authApi.demoLogin(role);
+      const res = await authApi.demoLogin(role, demoLocale);
       storeAuthData(res.data);
       const userRole = res.data.user.role;
       router.push(userRole === "parent" ? `/${locale}/parent/messages` : `/${locale}/dashboard`);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
-      setError(axiosErr?.response?.data?.error || "Connexion démo échouée. Réessayez dans un instant.");
+      setError(axiosErr?.response?.data?.error || t("demoLoginError"));
     } finally {
       setLoading(false);
     }
@@ -143,39 +143,77 @@ export default function LoginPage() {
           <div className="mb-5 rounded-xl border border-orange-200 bg-orange-50 overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 text-white text-sm font-medium">
               <span aria-hidden="true">🎭</span>
-              <span>Mode Démo — réinitialisation toutes les 30 min</span>
+              <span>{t("demoMode")} — {t("demoReset")}</span>
             </div>
-            <div className="p-4 space-y-2">
+            <div className="p-4 space-y-3">
               <p className="text-xs text-orange-800 mb-3">
-                Connectez-vous rapidement avec un compte pré-configuré :
+                {t("demoQuickLogin")}
               </p>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => handleDemoLogin("admin")}
-                className="w-full flex items-center gap-2 px-4 py-2.5 bg-white border border-orange-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-orange-50 transition disabled:opacity-50"
-              >
-                <span>🔑</span>
-                <span>Admin — Marie Tremblay</span>
-              </button>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => handleDemoLogin("educateur")}
-                className="w-full flex items-center gap-2 px-4 py-2.5 bg-white border border-orange-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-orange-50 transition disabled:opacity-50"
-              >
-                <span>👩‍🏫</span>
-                <span>Éducatrice — Sophie Gagnon</span>
-              </button>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => handleDemoLogin("parent")}
-                className="w-full flex items-center gap-2 px-4 py-2.5 bg-white border border-orange-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-orange-50 transition disabled:opacity-50"
-              >
-                <span>👨‍👧</span>
-                <span>Parent — Jean-François Leblanc</span>
-              </button>
+
+              {/* Current language section */}
+              <div className="space-y-2">
+                {locale === "fr" ? (
+                  <>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => handleDemoLogin("admin", "fr")}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 bg-white border border-orange-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-orange-50 transition disabled:opacity-50"
+                    >
+                      <span>🔑</span>
+                      <span>{t("demoAdminFr")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => handleDemoLogin("educateur", "fr")}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 bg-white border border-orange-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-orange-50 transition disabled:opacity-50"
+                    >
+                      <span>👩‍🏫</span>
+                      <span>{t("demoEducatorFr")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => handleDemoLogin("parent", "fr")}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 bg-white border border-orange-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-orange-50 transition disabled:opacity-50"
+                    >
+                      <span>👨‍👧</span>
+                      <span>{t("demoParentFr")}</span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => handleDemoLogin("admin", "en")}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 bg-white border border-orange-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-orange-50 transition disabled:opacity-50"
+                    >
+                      <span>🔑</span>
+                      <span>{t("demoAdminEn")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => handleDemoLogin("educateur", "en")}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 bg-white border border-orange-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-orange-50 transition disabled:opacity-50"
+                    >
+                      <span>👩‍🏫</span>
+                      <span>{t("demoEducatorEn")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => handleDemoLogin("parent", "en")}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 bg-white border border-orange-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-orange-50 transition disabled:opacity-50"
+                    >
+                      <span>👨‍👧</span>
+                      <span>{t("demoParentEn")}</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}

@@ -60,7 +60,17 @@
     "twoFaInvalid": "Code invalide",
     "registerTitle": "Créer votre compte",
     "registerDesc": "Vous avez été invité(e) à rejoindre {name}.",
-    "registerNoToken": "Ce lien d'invitation est invalide ou a expiré. Contactez votre administrateur."
+    "registerNoToken": "Ce lien d'invitation est invalide ou a expiré. Contactez votre administrateur.",
+    "demoMode": "Mode Démo",
+    "demoReset": "réinitialisation toutes les 30 min",
+    "demoQuickLogin": "Connectez-vous rapidement avec un compte pré-configuré :",
+    "demoAdminFr": "Admin — Marie Tremblay",
+    "demoEducatorFr": "Éducatrice — Sophie Gagnon",
+    "demoParentFr": "Parent — Jean-François Leblanc",
+    "demoAdminEn": "Admin — John Smith",
+    "demoEducatorEn": "Éducatrice — Emma Johnson",
+    "demoParentEn": "Parent — Michael Anderson",
+    "demoLoginError": "Connexion démo échouée. Réessayez dans un instant."
   },
   "nav": {
     "dashboard": "Tableau de bord",
@@ -70,6 +80,7 @@
     "documents": "Documents",
     "children": "Enfants",
     "groups": "Groupes",
+    "menus": "Menus",
     "journal": "Journal de bord",
     "settings": "Paramètres",
     "users": "Utilisateurs",
@@ -109,7 +120,11 @@
     "logoUploadButton": "Télécharger",
     "logoUpdated": "Logo mis à jour avec succès",
     "logoDeleted": "Logo supprimé",
-    "logoDelete": "Supprimer le logo"
+    "logoDelete": "Supprimer le logo",
+    "journalAutoSend": "Envoi automatique du journal",
+    "journalAutoSendDesc": "Les journaux de bord sont envoyés automatiquement aux parents chaque jour de semaine à {time}.",
+    "journalAutoSendTime": "Heure d'envoi automatique",
+    "journalAutoSendSaved": "Heure d'envoi mise à jour"
   },
   "messages": {
     "title": "Messages",
@@ -201,6 +216,7 @@
     "birthDate": "Date de naissance",
     "group": "Groupe",
     "noChildren": "Aucun enfant enregistré",
+    "selectChild": "Choisir un enfant",
     "assignParent": "Associer un parent",
     "months": "mois",
     "years": "ans",
@@ -304,7 +320,7 @@
     "noChild": "Veuillez sélectionner un enfant",
     "sendSuccess": "Journal envoyé avec succès aux parents",
     "sendError": "Erreur lors de l'envoi",
-    "menuPlaceholder": "Menu du jour...",
+    "menuNotePlaceholder": "Exception pour cet enfant...",
     "healthPlaceholder": "Santé...",
     "medicationsPlaceholder": "Médicaments...",
     "messagePlaceholder": "Message...",
@@ -321,7 +337,7 @@
     },
     "fields": {
       "temperature": "Température",
-      "menu": "Menu",
+      "menu": "Note alimentaire",
       "appetit": "Appétit",
       "humeur": "Humeur",
       "sommeil": "Sommeil",
@@ -357,6 +373,14 @@
       "120": "2h",
       "150": "2h30",
       "180": "3h+"
-    }
+    },
+    "noEntryForDay": "Aucune saisie pour ce jour"
+  },
+  "menus": {
+    "title": "Menus de la semaine",
+    "prevWeek": "Semaine précédente",
+    "nextWeek": "Semaine suivante",
+    "placeholder": "Menu du jour...",
+    "menuOfDay": "Menu du jour"
   }
 }
