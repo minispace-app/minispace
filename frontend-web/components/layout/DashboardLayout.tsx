@@ -27,6 +27,7 @@ import {
 import { LanguageSwitcher } from "../LanguageSwitcher";
 import { AnnouncementBanner } from "../AnnouncementBanner";
 import { DemoBanner } from "../DemoBanner";
+import { TrialBanner } from "../TrialBanner";
 
 const navItems = [
   { key: "dashboard", icon: LayoutDashboard, href: "/dashboard", roles: null },
@@ -200,6 +201,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         <DemoBanner />
+        <TrialBanner />
         <AnnouncementBanner />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>

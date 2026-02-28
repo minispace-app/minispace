@@ -3,6 +3,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -106,6 +107,10 @@ pub async fn update_garderie(
            phone   = COALESCE($4, phone),
            email   = COALESCE($5, email),
            is_active = COALESCE($6, is_active),
+           trial_expires_at = CASE
+               WHEN $7 = TRUE THEN NULL::TIMESTAMPTZ
+               ELSE COALESCE($8, trial_expires_at)
+           END,
            updated_at = NOW()
          WHERE slug = $1
          RETURNING *",
@@ -116,6 +121,8 @@ pub async fn update_garderie(
     .bind(&body.phone)
     .bind(&body.email)
     .bind(body.is_active)
+    .bind(body.remove_trial_expires.unwrap_or(false))
+    .bind(body.trial_expires_at)
     .fetch_optional(&state.db)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?
@@ -130,6 +137,10 @@ pub struct UpdateGarderieRequest {
     pub phone: Option<String>,
     pub email: Option<String>,
     pub is_active: Option<bool>,
+    /// Set a new trial expiry date.
+    pub trial_expires_at: Option<DateTime<Utc>>,
+    /// If true, clears trial_expires_at to NULL (converts to permanent account).
+    pub remove_trial_expires: Option<bool>,
 }
 
 // ─── Garderie user management (super-admin) ───────────────────────────────────

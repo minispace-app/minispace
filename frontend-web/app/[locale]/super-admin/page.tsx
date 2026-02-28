@@ -13,6 +13,7 @@ interface Garderie {
   email: string | null;
   plan: string;
   is_active: boolean;
+  trial_expires_at: string | null;
   created_at: string;
 }
 
@@ -56,7 +57,7 @@ export default function SuperAdminPage() {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [editGarderie, setEditGarderie] = useState<Garderie | null>(null);
 
-  const [garderieForm, setGarderieForm] = useState({ slug: "", name: "", address: "", phone: "", email: "", plan: "free" });
+  const [garderieForm, setGarderieForm] = useState({ slug: "", name: "", address: "", phone: "", email: "", plan: "free", trial_expires_at: "", remove_trial_expires: false });
   const [userForm, setUserForm] = useState({ email: "", first_name: "", last_name: "", password: "", role: "admin_garderie", preferred_locale: "fr" });
    const [saving, setSaving] = useState(false);
    const [formError, setFormError] = useState("");
@@ -195,7 +196,7 @@ export default function SuperAdminPage() {
         plan: garderieForm.plan,
       });
       setShowCreateGarderie(false);
-      setGarderieForm({ slug: "", name: "", address: "", phone: "", email: "", plan: "free" });
+      setGarderieForm({ slug: "", name: "", address: "", phone: "", email: "", plan: "free", trial_expires_at: "", remove_trial_expires: false });
       loadGarderies();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -216,8 +217,11 @@ export default function SuperAdminPage() {
         address: garderieForm.address || undefined,
         phone: garderieForm.phone || undefined,
         email: garderieForm.email || undefined,
+        trial_expires_at: garderieForm.trial_expires_at ? new Date(garderieForm.trial_expires_at).toISOString() : undefined,
+        remove_trial_expires: garderieForm.remove_trial_expires || undefined,
       });
       setEditGarderie(null);
+      setGarderieForm({ slug: "", name: "", address: "", phone: "", email: "", plan: "free", trial_expires_at: "", remove_trial_expires: false });
       loadGarderies();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -640,6 +644,27 @@ export default function SuperAdminPage() {
                   <input value={garderieForm.address} onChange={e => setGarderieForm(f => ({...f, address: e.target.value}))}
                     className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
                 </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600">Fin d&apos;essai</label>
+                  <input
+                    type="datetime-local"
+                    value={garderieForm.remove_trial_expires ? "" : garderieForm.trial_expires_at}
+                    disabled={garderieForm.remove_trial_expires}
+                    onChange={e => setGarderieForm(f => ({...f, trial_expires_at: e.target.value}))}
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex items-end pb-0.5">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={garderieForm.remove_trial_expires}
+                      onChange={e => setGarderieForm(f => ({...f, remove_trial_expires: e.target.checked, trial_expires_at: e.target.checked ? "" : f.trial_expires_at}))}
+                      className="rounded"
+                    />
+                    Convertir en compte permanent (supprimer l&apos;essai)
+                  </label>
+                </div>
                 <div className="col-span-2 flex justify-end">
                   <button type="submit" disabled={saving}
                     className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition">
@@ -665,6 +690,7 @@ export default function SuperAdminPage() {
                     <th className="text-left px-4 py-3 font-medium text-slate-600">Slug</th>
                     <th className="text-left px-4 py-3 font-medium text-slate-600">Plan</th>
                     <th className="text-left px-4 py-3 font-medium text-slate-600">Statut</th>
+                    <th className="text-left px-4 py-3 font-medium text-slate-600">Essai</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
@@ -685,11 +711,27 @@ export default function SuperAdminPage() {
                           {g.is_active ? "Actif" : "Inactif"}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        {g.trial_expires_at === null ? null : (
+                          new Date(g.trial_expires_at) < new Date() ? (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                              Expiré
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                              Essai jusqu&apos;au {new Date(g.trial_expires_at).toLocaleDateString("fr-CA")}
+                            </span>
+                          )
+                        )}
+                      </td>
                       <td className="px-4 py-3 flex items-center gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => {
                             setEditGarderie(g);
-                            setGarderieForm({ slug: g.slug, name: g.name, address: g.address || "", phone: g.phone || "", email: g.email || "", plan: g.plan });
+                            const trialDate = g.trial_expires_at
+                              ? new Date(g.trial_expires_at).toISOString().slice(0, 16)
+                              : "";
+                            setGarderieForm({ slug: g.slug, name: g.name, address: g.address || "", phone: g.phone || "", email: g.email || "", plan: g.plan, trial_expires_at: trialDate, remove_trial_expires: false });
                             setShowCreateGarderie(false);
                             setFormError("");
                           }}

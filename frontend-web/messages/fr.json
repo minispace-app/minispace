@@ -70,7 +70,9 @@
     "demoAdminEn": "Admin — John Smith",
     "demoEducatorEn": "Éducatrice — Emma Johnson",
     "demoParentEn": "Parent — Michael Anderson",
-    "demoLoginError": "Connexion démo échouée. Réessayez dans un instant."
+    "demoLoginError": "Connexion démo échouée. Réessayez dans un instant.",
+    "trialExpiredTitle": "Période d'essai terminée",
+    "trialExpiredDesc": "Votre période d'essai de 30 jours est expirée. Contactez le support pour continuer à utiliser minispace.app."
   },
   "nav": {
     "dashboard": "Tableau de bord",
