@@ -21,7 +21,7 @@ RUN touch src/lib.rs src/main.rs src/bin/seed-demo.rs src/bin/encrypt-existing-f
 # Stage 2: Runtime
 FROM alpine:3.20
 
-RUN apk add --no-cache libgcc openssl ca-certificates postgresql-client busybox
+RUN apk add --no-cache libgcc openssl ca-certificates postgresql-client busybox tzdata
 
 WORKDIR /app
 COPY --from=builder /app/target/release/api /app/api
