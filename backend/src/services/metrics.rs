@@ -123,6 +123,18 @@ async fn collect(pool: &PgPool) -> anyhow::Result<()> {
     for slug in &tenants {
         let schema = format!("garderie_{}", slug);
 
+        // Pre-initialize event counters so they appear in /metrics even before first event.
+        // Calling with_label_values() creates the time series at 0 if not yet present.
+        let _ = LOGINS_COUNTER.with_label_values(&[slug, "success"]);
+        let _ = LOGINS_COUNTER.with_label_values(&[slug, "failed"]);
+        let _ = TWO_FA_COUNTER.with_label_values(&[slug]);
+        let _ = INVITATIONS_COUNTER.with_label_values(&[slug]);
+        let _ = PASSWORD_RESETS_COUNTER.with_label_values(&[slug]);
+        let _ = MEDIA_UPLOADS_COUNTER.with_label_values(&[slug]);
+        let _ = DOCUMENT_UPLOADS_COUNTER.with_label_values(&[slug]);
+        let _ = MESSAGES_COUNTER.with_label_values(&[slug]);
+        let _ = JOURNAL_EMAILS_COUNTER.with_label_values(&[slug]);
+
         // Users by role
         let user_counts: Vec<(String, i64)> = sqlx::query_as(&format!(
             r#"SELECT role::TEXT, COUNT(*)::BIGINT FROM "{schema}".users WHERE is_active = TRUE GROUP BY role"#
