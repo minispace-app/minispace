@@ -131,6 +131,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/demo/login", post(routes::demo::demo_login))
         .route("/health", get(routes::health::health_check))
         .route("/contact", post(routes::contact::submit_contact))
+        .route("/signup", post(routes::signup::signup))
+        .route("/signup/check-slug", get(routes::signup::check_slug))
         .route("/tenant/info", get(routes::tenant_info::get_tenant_info))
         .route("/tenant/logo", post(routes::logo::upload_logo).delete(routes::logo::delete_logo))
         .route("/logos/{slug}", get(routes::logo::serve_logo))

@@ -70,7 +70,9 @@
     "demoAdminEn": "Admin — John Smith",
     "demoEducatorEn": "Educator — Emma Johnson",
     "demoParentEn": "Parent — Michael Anderson",
-    "demoLoginError": "Demo login failed. Please try again in a moment."
+    "demoLoginError": "Demo login failed. Please try again in a moment.",
+    "trialExpiredTitle": "Trial period ended",
+    "trialExpiredDesc": "Your 30-day trial has expired. Contact support to continue using minispace.app."
   },
   "nav": {
     "dashboard": "Dashboard",

@@ -1,0 +1,197 @@
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+    Json,
+};
+use chrono::Utc;
+use serde::Deserialize;
+use serde_json::{json, Value};
+
+use crate::{
+    db::tenant::{provision_tenant_schema, schema_name},
+    middleware::rate_limit::check_rate_limit,
+    models::tenant::SignupRequest,
+    AppState,
+};
+
+const RESERVED_SLUGS: &[&str] = &[
+    "www", "api", "demo", "super-admin", "app", "admin", "login", "signup",
+    "register", "support", "billing", "status", "about", "contact", "docs",
+];
+
+fn is_valid_signup_slug(s: &str) -> bool {
+    let len = s.len();
+    len >= 3
+        && len <= 32
+        && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        && !s.starts_with('-')
+        && !s.ends_with('-')
+}
+
+#[derive(Deserialize)]
+pub struct CheckSlugQuery {
+    pub slug: String,
+}
+
+pub async fn check_slug(
+    State(state): State<AppState>,
+    Query(params): Query<CheckSlugQuery>,
+) -> (StatusCode, Json<Value>) {
+    let slug = params.slug.to_lowercase();
+
+    if !is_valid_signup_slug(&slug) {
+        return (
+            StatusCode::OK,
+            Json(json!({
+                "available": false,
+                "reason": "L'identifiant doit contenir entre 3 et 32 caractères (lettres, chiffres, tirets)."
+            })),
+        );
+    }
+
+    if RESERVED_SLUGS.contains(&slug.as_str()) {
+        return (
+            StatusCode::OK,
+            Json(json!({ "available": false, "reason": "Cet identifiant est réservé." })),
+        );
+    }
+
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM public.garderies WHERE slug = $1)")
+        .bind(&slug)
+        .fetch_one(&state.db)
+        .await
+        .unwrap_or(true);
+
+    if exists {
+        (StatusCode::OK, Json(json!({ "available": false, "reason": "Cet identifiant est déjà pris." })))
+    } else {
+        (StatusCode::OK, Json(json!({ "available": true })))
+    }
+}
+
+pub async fn signup(
+    State(state): State<AppState>,
+    Json(body): Json<SignupRequest>,
+) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    // Rate limit: 20 req/hour globally
+    {
+        let mut redis = state.redis.clone();
+        check_rate_limit(&mut redis, "rate:signup:global", 20, 3600).await?;
+    }
+
+    // Validate inputs
+    let slug = body.slug.to_lowercase();
+
+    if !is_valid_signup_slug(&slug) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "L'identifiant doit contenir entre 3 et 32 caractères (lettres minuscules, chiffres, tirets), sans commencer ni finir par un tiret." })),
+        ));
+    }
+
+    if RESERVED_SLUGS.contains(&slug.as_str()) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Cet identifiant est réservé." })),
+        ));
+    }
+
+    if !body.email.contains('@') {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": "Adresse courriel invalide." }))));
+    }
+
+    if body.password.len() < 8 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Le mot de passe doit contenir au moins 8 caractères." })),
+        ));
+    }
+
+    if body.name.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": "Le nom de la garderie est requis." }))));
+    }
+
+    if body.first_name.trim().is_empty() || body.last_name.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": "Le prénom et le nom sont requis." }))));
+    }
+
+    // 1. Insert garderie with 30-day trial
+    let trial_expires_at = Utc::now() + chrono::Duration::days(30);
+
+    let garderie_result = sqlx::query_as::<_, (uuid::Uuid, String, chrono::DateTime<Utc>)>(
+        "INSERT INTO public.garderies (slug, name, email, plan, trial_expires_at)
+         VALUES ($1, $2, $3, 'free', $4)
+         RETURNING id, slug, trial_expires_at",
+    )
+    .bind(&slug)
+    .bind(body.name.trim())
+    .bind(&body.email)
+    .bind(trial_expires_at)
+    .fetch_one(&state.db)
+    .await;
+
+    let (_id, created_slug, expires_at) = match garderie_result {
+        Ok(row) => row,
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("unique") || msg.contains("duplicate") || msg.contains("already exists") {
+                return Err((
+                    StatusCode::CONFLICT,
+                    Json(json!({ "error": "Cet identifiant est déjà pris. Choisissez-en un autre." })),
+                ));
+            }
+            return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": msg }))));
+        }
+    };
+
+    // 2. Provision tenant schema
+    provision_tenant_schema(&state.db, &created_slug)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": format!("Schema provisioning failed: {e}") })),
+            )
+        })?;
+
+    // 3. Create admin user
+    let schema = schema_name(&created_slug);
+    let password_hash = bcrypt::hash(&body.password, 12)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    sqlx::query(&format!(
+        r#"INSERT INTO "{schema}".users (email, password_hash, first_name, last_name, role)
+           VALUES ($1, $2, $3, $4, 'admin_garderie'::"{schema}".user_role)"#
+    ))
+    .bind(&body.email)
+    .bind(&password_hash)
+    .bind(body.first_name.trim())
+    .bind(body.last_name.trim())
+    .execute(&state.db)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    // Build login URL from base URL: https://minispace.app → https://{slug}.minispace.app/fr/login
+    let login_url = {
+        let base = &state.config.app_base_url;
+        if let Some(idx) = base.find("://") {
+            let scheme = &base[..idx + 3];
+            let rest = &base[idx + 3..];
+            let domain = rest.split('/').next().unwrap_or(rest);
+            let domain_clean = domain.split(':').next().unwrap_or(domain);
+            format!("{scheme}{created_slug}.{domain_clean}/fr/login")
+        } else {
+            format!("{base}/{created_slug}/fr/login")
+        }
+    };
+
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({
+            "slug": created_slug,
+            "name": body.name.trim(),
+            "trial_expires_at": expires_at,
+            "login_url": login_url,
+        })),
+    ))
+}

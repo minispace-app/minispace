@@ -23,6 +23,7 @@ pub struct Garderie {
     pub logo_url: Option<String>,
     pub plan: PlanType,
     pub is_active: bool,
+    pub trial_expires_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -35,4 +36,14 @@ pub struct CreateGarderieRequest {
     pub phone: Option<String>,
     pub email: Option<String>,
     pub plan: Option<PlanType>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SignupRequest {
+    pub slug: String,
+    pub name: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub email: String,
+    pub password: String,
 }

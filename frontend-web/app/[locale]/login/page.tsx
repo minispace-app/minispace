@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useTenantInfo } from "../../../hooks/useTenantInfo";
 import { TenantNotFound } from "../../../components/TenantNotFound";
 import { LanguageSwitcher } from "../../../components/LanguageSwitcher";
@@ -16,8 +16,11 @@ export default function LoginPage() {
   const tc = useTranslations("common");
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const locale = params.locale as string;
   const { name: tenantName, logo_url: tenantLogoUrl, notFound } = useTenantInfo();
+
+  const trialExpired = searchParams.get("reason") === "trial_expired";
 
   // Demo mode detection
   const [isDemo, setIsDemo] = useState(false);
@@ -114,7 +117,7 @@ export default function LoginPage() {
     }
   };
 
-  if (notFound) return <TenantNotFound />;
+  if (notFound && !trialExpired) return <TenantNotFound />;
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
@@ -138,6 +141,13 @@ export default function LoginPage() {
             {step === 1 ? t("login") : t("twoFaTitle")}
           </p>
         </div>
+
+        {trialExpired && (
+          <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <p className="text-sm font-semibold text-amber-800">{t("trialExpiredTitle")}</p>
+            <p className="text-xs text-amber-700 mt-1">{t("trialExpiredDesc")}</p>
+          </div>
+        )}
 
         {isDemo && step === 1 && (
           <div className="mb-5 rounded-xl border border-orange-200 bg-orange-50 overflow-hidden">

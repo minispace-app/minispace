@@ -15,6 +15,7 @@ pub mod journal;
 pub mod media;
 pub mod menu;
 pub mod messages;
+pub mod signup;
 pub mod tenant_info;
 pub mod tenants;
 pub mod users;
