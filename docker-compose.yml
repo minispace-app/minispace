@@ -227,7 +227,7 @@ services:
       - ./backups:/backup/host
     environment:
       - TZ=${TZ:-UTC}
-      - BACKUP_CRON_TIME=*/5 * * * *
+      - BACKUP_CRON_TIME=0 2 * * *
       - BACKUP_RETENTION_DAYS=30
       - POSTGRES_USER=${POSTGRES_USER:-garderie}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}

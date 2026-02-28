@@ -1024,6 +1024,80 @@ impl AuthService {
     }
 
     /// Delete a pending invitation by ID (only if not yet used).
+    /// Resend an invitation email with a new token.
+    pub async fn resend_invitation(
+        pool: &PgPool,
+        email_svc: Option<&EmailService>,
+        tenant: &str,
+        invitation_id: Uuid,
+        base_url: &str,
+    ) -> anyhow::Result<()> {
+        let email_svc = email_svc
+            .ok_or_else(|| anyhow::anyhow!("Service email non configuré (SMTP requis pour les invitations)"))?;
+
+        let schema = schema_name(tenant);
+
+        // Get the pending invitation
+        let invitation = sqlx::query(
+            &format!(
+                r#"
+                SELECT id, email, role::TEXT as role FROM {} . invitation_tokens
+                WHERE id = $1 AND used = FALSE AND expires_at > NOW()
+                "#,
+                &schema
+            )
+        )
+        .bind(invitation_id)
+        .fetch_optional(pool)
+        .await?;
+
+        let inv = invitation
+            .ok_or_else(|| anyhow::anyhow!("Invitation not found or already expired/used"))?;
+
+        let email: String = inv.get("email");
+        let role: String = inv.get("role");
+
+        // Generate new token
+        use rand::Rng;
+        let token: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(48)
+            .map(char::from)
+            .collect();
+
+        let expires_at = Utc::now() + chrono::Duration::days(7);
+
+        // Update invitation with new token and expiry
+        sqlx::query(&format!(
+            "UPDATE {schema}.invitation_tokens SET token = $1, expires_at = $2, created_at = $3 WHERE id = $4"
+        ))
+        .bind(&token)
+        .bind(expires_at)
+        .bind(Utc::now())
+        .bind(invitation_id)
+        .execute(pool)
+        .await?;
+
+        let (garderie_name, logo_url): (String, Option<String>) = sqlx::query_as(
+            "SELECT name, logo_url FROM public.garderies WHERE slug = $1"
+        )
+        .bind(tenant)
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| (tenant.to_string(), None));
+
+        let invite_url = build_tenant_invite_url(base_url, tenant, &token);
+
+        email_svc
+            .send_invitation(&email, &invite_url, &garderie_name, &role, logo_url.as_deref().unwrap_or(""))
+            .await
+            .map_err(|e| anyhow::anyhow!("Impossible d'envoyer l'invitation : {e}"))?;
+
+        Ok(())
+    }
+
     pub async fn delete_invitation(
         pool: &PgPool,
         tenant: &str,

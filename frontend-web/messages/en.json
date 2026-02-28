@@ -60,7 +60,17 @@
     "twoFaInvalid": "Invalid code",
     "registerTitle": "Create your account",
     "registerDesc": "You have been invited to join {name}.",
-    "registerNoToken": "This invitation link is invalid or has expired. Please contact your administrator."
+    "registerNoToken": "This invitation link is invalid or has expired. Please contact your administrator.",
+    "demoMode": "Demo Mode",
+    "demoReset": "reset every 30 minutes",
+    "demoQuickLogin": "Quick login with a pre-configured account:",
+    "demoAdminFr": "Admin — Marie Tremblay",
+    "demoEducatorFr": "Educator — Sophie Gagnon",
+    "demoParentFr": "Parent — Jean-François Leblanc",
+    "demoAdminEn": "Admin — John Smith",
+    "demoEducatorEn": "Educator — Emma Johnson",
+    "demoParentEn": "Parent — Michael Anderson",
+    "demoLoginError": "Demo login failed. Please try again in a moment."
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -70,6 +80,7 @@
     "documents": "Documents",
     "children": "Children",
     "groups": "Groups",
+    "menus": "Menus",
     "journal": "Daily Journal",
     "settings": "Settings",
     "users": "Users",
@@ -109,7 +120,11 @@
     "logoUploadButton": "Upload",
     "logoUpdated": "Logo updated successfully",
     "logoDeleted": "Logo removed",
-    "logoDelete": "Remove logo"
+    "logoDelete": "Remove logo",
+    "journalAutoSend": "Automatic journal send",
+    "journalAutoSendDesc": "Daily journals are automatically sent to parents every weekday at {time}.",
+    "journalAutoSendTime": "Auto-send time",
+    "journalAutoSendSaved": "Send time updated"
   },
   "messages": {
     "title": "Messages",
@@ -201,6 +216,7 @@
     "birthDate": "Birth date",
     "group": "Group",
     "noChildren": "No children registered",
+    "selectChild": "Select a child",
     "assignParent": "Assign parent",
     "months": "months",
     "years": "years",
@@ -304,7 +320,7 @@
     "noChild": "Please select a child",
     "sendSuccess": "Journal sent successfully to parents",
     "sendError": "Error sending",
-    "menuPlaceholder": "Today's menu...",
+    "menuNotePlaceholder": "Exception for this child...",
     "healthPlaceholder": "Health...",
     "medicationsPlaceholder": "Medications...",
     "messagePlaceholder": "Message...",
@@ -321,7 +337,7 @@
     },
     "fields": {
       "temperature": "Weather",
-      "menu": "Menu",
+      "menu": "Food note",
       "appetit": "Appetite",
       "humeur": "Mood",
       "sommeil": "Sleep",
@@ -357,6 +373,14 @@
       "120": "2h",
       "150": "2h30",
       "180": "3h+"
-    }
+    },
+    "noEntryForDay": "No entry for this day"
+  },
+  "menus": {
+    "title": "Weekly Menus",
+    "prevWeek": "Previous week",
+    "nextWeek": "Next week",
+    "placeholder": "Today's menu...",
+    "menuOfDay": "Today's menu"
   }
 }

@@ -46,6 +46,8 @@ pub fn deny_if_demo(tenant: &str) -> Result<(), (StatusCode, Json<Value>)> {
 pub struct DemoLoginRequest {
     /// One of: "admin", "educateur", "parent"
     pub role: String,
+    /// Optional: "fr" (default) or "en" for English demo users
+    pub locale: Option<String>,
 }
 
 /// POST /demo/login — bypass 2FA for the demo tenant only.
@@ -83,11 +85,19 @@ pub async fn demo_login(
         ));
     }
 
+    // Determine locale (default: "fr")
+    let locale = body.locale.as_deref().unwrap_or("fr");
+
     // Map requested role to the corresponding demo email
-    let email = match body.role.as_str() {
-        "admin"     => "admin@demo.minispace.app",
-        "educateur" => "sophie@demo.minispace.app",
-        "parent"    => "jean@demo.minispace.app",
+    let email = match (body.role.as_str(), locale) {
+        // French users
+        ("admin", "fr")     => "admin@demo.minispace.app",
+        ("educateur", "fr") => "sophie@demo.minispace.app",
+        ("parent", "fr")    => "jean@demo.minispace.app",
+        // English users
+        ("admin", "en")     => "admin-en@demo.minispace.app",
+        ("educateur", "en") => "emma-en@demo.minispace.app",
+        ("parent", "en")    => "michael-en@demo.minispace.app",
         _ => {
             return Err((
                 StatusCode::BAD_REQUEST,
