@@ -1,9 +1,58 @@
 use lazy_static::lazy_static;
-use prometheus::{register_gauge_vec, register_gauge, GaugeVec, Gauge};
+use prometheus::{register_counter_vec, register_gauge_vec, register_gauge, CounterVec, GaugeVec, Gauge};
 use sqlx::PgPool;
 use tracing::{info, warn};
 
 lazy_static! {
+    // ── Event counters (increment on each event) ────────────────────────────
+    pub static ref LOGINS_COUNTER: CounterVec = register_counter_vec!(
+        "api_logins_total",
+        "Tentatives de login par tenant et statut",
+        &["tenant", "status"]
+    ).unwrap();
+
+    pub static ref TWO_FA_COUNTER: CounterVec = register_counter_vec!(
+        "api_2fa_emails_total",
+        "Emails 2FA envoyés par tenant",
+        &["tenant"]
+    ).unwrap();
+
+    pub static ref INVITATIONS_COUNTER: CounterVec = register_counter_vec!(
+        "api_invitations_total",
+        "Invitations envoyées par tenant",
+        &["tenant"]
+    ).unwrap();
+
+    pub static ref PASSWORD_RESETS_COUNTER: CounterVec = register_counter_vec!(
+        "api_password_resets_total",
+        "Demandes de réinitialisation de mot de passe par tenant",
+        &["tenant"]
+    ).unwrap();
+
+    pub static ref MEDIA_UPLOADS_COUNTER: CounterVec = register_counter_vec!(
+        "api_media_uploads_total",
+        "Fichiers média uploadés par tenant",
+        &["tenant"]
+    ).unwrap();
+
+    pub static ref DOCUMENT_UPLOADS_COUNTER: CounterVec = register_counter_vec!(
+        "api_document_uploads_total",
+        "Documents uploadés par tenant",
+        &["tenant"]
+    ).unwrap();
+
+    pub static ref MESSAGES_COUNTER: CounterVec = register_counter_vec!(
+        "api_messages_sent_total",
+        "Messages envoyés par tenant",
+        &["tenant"]
+    ).unwrap();
+
+    pub static ref JOURNAL_EMAILS_COUNTER: CounterVec = register_counter_vec!(
+        "api_journal_emails_total",
+        "Emails journal envoyés par tenant (événement)",
+        &["tenant"]
+    ).unwrap();
+
     // ── Business metrics ────────────────────────────────────────────────────
     pub static ref USERS_GAUGE: GaugeVec = register_gauge_vec!(
         "garderie_users_total",
