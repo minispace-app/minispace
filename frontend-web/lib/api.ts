@@ -99,6 +99,13 @@ export const authApi = {
     last_name: string;
     password: string;
     preferred_locale?: string;
+    consent?: {
+      privacy_accepted: boolean;
+      photos_accepted: boolean;
+      accepted_at: string;
+      policy_version: string;
+      language: string;
+    };
   }) => apiClient.post("/auth/register", data),
   registerPushToken: (platform: string, token: string) =>
     apiClient.post("/auth/push-token", { platform, token }),

@@ -200,6 +200,40 @@ pub async fn signup(
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
 
+    // 4. Persist consent record (Loi 25) — fire-and-forget to not block signup
+    if let Some(ref c) = body.consent {
+        let garderie_id = _id;
+        let privacy   = c.privacy_accepted;
+        let commitment = c.parents_commitment_accepted;
+        let accepted_at = c.accepted_at;
+        let policy_ver  = c.policy_version.clone();
+        let lang        = c.language.clone().unwrap_or_else(|| "fr".to_string());
+        let ip_addr     = ip.clone();
+        let db          = state.db.clone();
+
+        tokio::spawn(async move {
+            let res = sqlx::query(
+                "INSERT INTO public.consent_records
+                    (entity_type, entity_id, privacy_accepted, parents_commitment_accepted,
+                     accepted_at, policy_version, language, ip_address)
+                 VALUES ('garderie_signup', $1, $2, $3, $4, $5, $6, $7)"
+            )
+            .bind(garderie_id)
+            .bind(privacy)
+            .bind(commitment)
+            .bind(accepted_at)
+            .bind(&policy_ver)
+            .bind(&lang)
+            .bind(&ip_addr)
+            .execute(&db)
+            .await;
+
+            if let Err(e) = res {
+                tracing::warn!("Failed to persist consent record for garderie {garderie_id}: {e}");
+            }
+        });
+    }
+
     // Build login URL from base URL: https://minispace.app → https://{slug}.minispace.app/fr/login
     let login_url = {
         let base = &state.config.app_base_url;

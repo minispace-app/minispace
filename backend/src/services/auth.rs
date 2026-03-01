@@ -713,6 +713,8 @@ impl AuthService {
         last_name: &str,
         password: &str,
         preferred_locale: &str,
+        consent: Option<&crate::models::user::ParentConsentPayload>,
+        ip_address: &str,
     ) -> anyhow::Result<UserProfile> {
         let schema = schema_name(tenant);
 
@@ -754,6 +756,27 @@ impl AuthService {
         .bind(invite.id)
         .execute(pool)
         .await?;
+
+        // Persist consent record (Loi 25)
+        if let Some(c) = consent {
+            if let Err(e) = sqlx::query(&format!(
+                "INSERT INTO {schema}.consent_records
+                    (user_id, privacy_accepted, photos_accepted, accepted_at, policy_version, language, ip_address)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)"
+            ))
+            .bind(user.id)
+            .bind(c.privacy_accepted)
+            .bind(c.photos_accepted)
+            .bind(c.accepted_at)
+            .bind(&c.policy_version)
+            .bind(c.language.as_deref().unwrap_or("fr"))
+            .bind(ip_address)
+            .execute(pool)
+            .await
+            {
+                tracing::warn!("Failed to persist consent record for user {}: {e}", user.id);
+            }
+        }
 
         Ok(user.into())
     }

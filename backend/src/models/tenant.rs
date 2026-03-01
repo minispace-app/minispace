@@ -38,6 +38,16 @@ pub struct CreateGarderieRequest {
     pub plan: Option<PlanType>,
 }
 
+/// Loi 25 — consentement enregistré lors du signup admin garderie.
+#[derive(Debug, Deserialize)]
+pub struct SignupConsentPayload {
+    pub privacy_accepted: bool,
+    pub parents_commitment_accepted: Option<bool>,
+    pub accepted_at: chrono::DateTime<Utc>,
+    pub policy_version: String,
+    pub language: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SignupRequest {
     pub slug: String,
@@ -48,4 +58,7 @@ pub struct SignupRequest {
     pub last_name: String,
     pub email: String,
     pub password: String,
+    /// Loi 25 — métadonnées de consentement horodatées.
+    /// Optionnel pour rétrocompatibilité mais persisté si fourni.
+    pub consent: Option<SignupConsentPayload>,
 }
