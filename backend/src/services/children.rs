@@ -141,63 +141,23 @@ impl ChildService {
         Ok(())
     }
 
-    /// Hard-delete a child and all associated data (Law 25 compliance - right to be forgotten).
-    ///
-    /// Deletion strategy (respects multi-child photos):
-    /// 1. Delete single-child media (child_id = this child)
-    /// 2. Remove this child from multi-child media (via media_children junction)
-    /// 3. Delete daily journals for this child
-    /// 4. Delete documents for this child
-    /// 5. Hard-delete child record (FK cascades handle child_parents)
+    /// Soft-delete a child (mark as deleted).
+    /// Actual hard-delete happens after retention period expires via purge cron job.
+    /// Retention: attendance duration + 1 year (per privacy policy).
     pub async fn delete(
         pool: &PgPool,
         tenant: &str,
         child_id: Uuid,
     ) -> anyhow::Result<()> {
         let schema = schema_name(tenant);
-
-        // Step 1: Identify and delete single-child media (media.child_id = this child)
-        // These media have ONLY this child, so they should be deleted entirely
         sqlx::query(&format!(
-            "DELETE FROM {schema}.media WHERE child_id = $1"
+            "UPDATE {schema}.children
+             SET is_active = FALSE, is_deleted = TRUE, deleted_at = NOW(), updated_at = NOW()
+             WHERE id = $1"
         ))
         .bind(child_id)
         .execute(pool)
         .await?;
-
-        // Step 2: Remove this child from multi-child media (media_children junction)
-        // The media remains but this child's tag is removed (right to be forgotten)
-        sqlx::query(&format!(
-            "DELETE FROM {schema}.media_children WHERE child_id = $1"
-        ))
-        .bind(child_id)
-        .execute(pool)
-        .await?;
-
-        // Step 3: Delete daily journals for this child
-        sqlx::query(&format!(
-            "DELETE FROM {schema}.daily_journals WHERE child_id = $1"
-        ))
-        .bind(child_id)
-        .execute(pool)
-        .await?;
-
-        // Step 4: Delete documents for this child
-        sqlx::query(&format!(
-            "DELETE FROM {schema}.documents WHERE child_id = $1"
-        ))
-        .bind(child_id)
-        .execute(pool)
-        .await?;
-
-        // Step 5: Hard-delete the child (FK CASCADE will handle child_parents)
-        sqlx::query(&format!(
-            "DELETE FROM {schema}.children WHERE id = $1"
-        ))
-        .bind(child_id)
-        .execute(pool)
-        .await?;
-
         Ok(())
     }
 
