@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { superAdminApi } from "../../../lib/api";
-import { Plus, Users, ChevronRight, Eye, EyeOff, Building2, UserPlus, Mail, Pencil, X, Trash2, AlertTriangle, Save, RotateCcw, Megaphone, BarChart2 } from "lucide-react";
+import { Plus, Users, ChevronRight, Eye, EyeOff, Building2, UserPlus, Mail, Pencil, X, Trash2, AlertTriangle, Save, RotateCcw, Megaphone, BarChart2, Shield, ChevronLeft } from "lucide-react";
 
 interface Garderie {
   id: string;
@@ -51,6 +51,16 @@ export default function SuperAdminPage() {
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [garderieUsers, setGarderieUsers] = useState<TenantUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Audit log panel
+  type RightPanel = "users" | "audit";
+  const [rightPanel, setRightPanel] = useState<RightPanel>("users");
+  interface AuditEntry { id: string; user_name: string | null; action: string; resource_label: string | null; ip_address: string | null; created_at: string; }
+  interface AuditResponse { entries: AuditEntry[]; total: number; page: number; limit: number; }
+  const [auditData, setAuditData] = useState<AuditResponse | null>(null);
+  const [auditPage, setAuditPage] = useState(1);
+  const [auditAction, setAuditAction] = useState("");
+  const [loadingAudit, setLoadingAudit] = useState(false);
 
   // Forms
   const [showCreateGarderie, setShowCreateGarderie] = useState(false);
@@ -171,12 +181,26 @@ export default function SuperAdminPage() {
     }
   }, []);
 
+  const loadAuditLog = useCallback(async (slug: string, page = 1, action = "") => {
+    setLoadingAudit(true);
+    try {
+      const res = await superAdminApi.getAuditLog(slug, { page, limit: 100, action: action || undefined });
+      setAuditData(res.data);
+    } finally {
+      setLoadingAudit(false);
+    }
+  }, []);
+
   const selectGarderie = (slug: string) => {
     if (selectedSlug === slug) {
       setSelectedSlug(null);
       setGarderieUsers([]);
+      setAuditData(null);
     } else {
       setSelectedSlug(slug);
+      setRightPanel("users");
+      setAuditPage(1);
+      setAuditAction("");
       loadGarderieUsers(slug);
     }
     setShowCreateUser(false);
@@ -954,10 +978,32 @@ export default function SuperAdminPage() {
           </div>
         )}
 
-        {/* Right: Users panel */}
+        {/* Right: Users / Audit panel */}
         {selectedSlug && (
           <div className="w-96 flex-shrink-0">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+
+              {/* Tab switcher */}
+              <div className="flex border-b border-slate-100">
+                <button
+                  onClick={() => setRightPanel("users")}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition ${rightPanel === "users" ? "text-purple-600 border-b-2 border-purple-500" : "text-slate-400 hover:text-slate-600"}`}
+                >
+                  <Users className="w-3.5 h-3.5" /> Utilisateurs
+                </button>
+                <button
+                  onClick={() => {
+                    setRightPanel("audit");
+                    if (!auditData) loadAuditLog(selectedSlug, 1, "");
+                  }}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition ${rightPanel === "audit" ? "text-slate-700 border-b-2 border-slate-600" : "text-slate-400 hover:text-slate-600"}`}
+                >
+                  <Shield className="w-3.5 h-3.5" /> Journal d&apos;audit
+                </button>
+              </div>
+
+              {/* Users panel — header + form + list */}
+              {rightPanel === "users" && <>
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold text-slate-800 flex items-center gap-2">
@@ -1078,6 +1124,73 @@ export default function SuperAdminPage() {
                   ))}
                 </div>
               )}
+              </>}
+
+              {/* Audit log panel */}
+              {rightPanel === "audit" && (
+                <div>
+                  {/* Filters */}
+                  <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap gap-1.5">
+                    {[["", "Toutes"], ["auth", "Auth"], ["child", "Enfants"], ["user", "Utilisateurs"], ["media", "Photos"], ["document", "Documents"]].map(([val, label]) => (
+                      <button
+                        key={val}
+                        onClick={() => {
+                          setAuditAction(val);
+                          setAuditPage(1);
+                          loadAuditLog(selectedSlug!, 1, val);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${auditAction === val ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Entries */}
+                  {loadingAudit ? (
+                    <div className="p-6 text-center text-slate-400 text-sm">Chargement…</div>
+                  ) : !auditData || auditData.entries.length === 0 ? (
+                    <div className="p-6 text-center text-slate-400 text-sm">Aucune entrée.</div>
+                  ) : (
+                    <div className="divide-y divide-slate-50 max-h-[480px] overflow-y-auto">
+                      {auditData.entries.map((entry) => {
+                        const prefix = entry.action.split(".")[0];
+                        const colors: Record<string, string> = { auth: "bg-blue-100 text-blue-700", child: "bg-green-100 text-green-700", user: "bg-orange-100 text-orange-700", media: "bg-purple-100 text-purple-700", document: "bg-yellow-100 text-yellow-700" };
+                        return (
+                          <div key={entry.id} className="px-4 py-2.5 hover:bg-slate-50 transition">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold flex-shrink-0 ${colors[prefix] ?? "bg-slate-100 text-slate-600"}`}>
+                                {entry.action}
+                              </span>
+                              <span className="text-xs text-slate-400 whitespace-nowrap font-mono">
+                                {new Date(entry.created_at).toLocaleString("fr-CA", { dateStyle: "short", timeStyle: "short" })}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-600 mt-1 truncate">{entry.user_name ?? "—"} {entry.resource_label ? `· ${entry.resource_label}` : ""}</p>
+                            {entry.ip_address && <p className="text-xs text-slate-400 font-mono">{entry.ip_address}</p>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Pagination */}
+                  {auditData && auditData.total > 100 && (
+                    <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-xs text-slate-400">Page {auditPage} · {auditData.total} entrées</span>
+                      <div className="flex gap-1">
+                        <button onClick={() => { const p = Math.max(1, auditPage - 1); setAuditPage(p); loadAuditLog(selectedSlug!, p, auditAction); }} disabled={auditPage === 1} className="p-1.5 rounded border border-slate-200 disabled:opacity-40 hover:bg-slate-50">
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => { const p = auditPage + 1; setAuditPage(p); loadAuditLog(selectedSlug!, p, auditAction); }} disabled={auditData.entries.length < 100} className="p-1.5 rounded border border-slate-200 disabled:opacity-40 hover:bg-slate-50">
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           </div>
         )}

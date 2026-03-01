@@ -313,6 +313,8 @@ export const superAdminApi = {
     superAdminClient.put("/super-admin/announcement", { message, color }),
   deleteAnnouncement: () =>
     superAdminClient.delete("/super-admin/announcement"),
+  getAuditLog: (slug: string, params?: { page?: number; limit?: number; action?: string }) =>
+    superAdminClient.get(`/super-admin/audit-log/${slug}`, { params }),
 };
 
 export const auditApi = {
