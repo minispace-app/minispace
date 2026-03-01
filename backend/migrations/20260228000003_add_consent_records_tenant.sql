@@ -17,7 +17,7 @@ BEGIN
                 photos_accepted  BOOLEAN     NOT NULL DEFAULT FALSE,
                 accepted_at      TIMESTAMPTZ NOT NULL,
                 policy_version   VARCHAR(32) NOT NULL,
-                language         VARCHAR(8)  NOT NULL DEFAULT ''fr'',
+                language         VARCHAR(8)  NOT NULL DEFAULT 'fr',
                 ip_address       VARCHAR(64),
                 created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )
