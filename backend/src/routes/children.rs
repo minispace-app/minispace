@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     Json,
 };
 use serde_json::{json, Value};
@@ -13,9 +13,17 @@ use crate::{
         child::{AssignParentRequest, CreateChildRequest, UpdateChildRequest},
         user::UserRole,
     },
-    services::children::ChildService,
+    services::{audit::{self, AuditEntry}, children::ChildService},
     AppState,
 };
+
+fn client_ip(h: &HeaderMap) -> String {
+    h.get("x-real-ip").and_then(|v| v.to_str().ok())
+        .or_else(|| h.get("x-forwarded-for").and_then(|v| v.to_str().ok())
+            .and_then(|s| s.split(',').next()).map(|s| s.trim()))
+        .unwrap_or("unknown")
+        .to_string()
+}
 
 fn forbid_parent(user: &AuthenticatedUser) -> Option<(StatusCode, Json<Value>)> {
     if let UserRole::Parent = user.role {
@@ -58,6 +66,7 @@ pub async fn list_children(
 pub async fn create_child(
     State(state): State<AppState>,
     TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
     user: AuthenticatedUser,
     Json(body): Json<CreateChildRequest>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
@@ -65,20 +74,30 @@ pub async fn create_child(
         return Err(err);
     }
 
-    ChildService::create(&state.db, &tenant, &body)
-        .await
+    let result = ChildService::create(&state.db, &tenant, &body).await;
+
+    if let Ok(ref child) = result {
+        let label = format!("{} {}", child.first_name, child.last_name);
+        audit::log(state.db.clone(), &tenant, AuditEntry {
+            user_id:        Some(user.user_id),
+            user_name:      None,
+            action:         "child.create".to_string(),
+            resource_type:  Some("child".to_string()),
+            resource_id:    Some(child.id.to_string()),
+            resource_label: Some(label),
+            ip_address:     client_ip(&headers),
+        });
+    }
+
+    result
         .map(|child| (StatusCode::CREATED, Json(serde_json::to_value(child).unwrap())))
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": e.to_string() })),
-            )
-        })
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
 }
 
 pub async fn update_child(
     State(state): State<AppState>,
     TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateChildRequest>,
@@ -86,10 +105,23 @@ pub async fn update_child(
     if let Some(err) = require_admin(&user) {
         return Err(err);
     }
-    let req = body;
 
-    ChildService::update(&state.db, &tenant, id, &req)
-        .await
+    let result = ChildService::update(&state.db, &tenant, id, &body).await;
+
+    if let Ok(ref child) = result {
+        let label = format!("{} {}", child.first_name, child.last_name);
+        audit::log(state.db.clone(), &tenant, AuditEntry {
+            user_id:        Some(user.user_id),
+            user_name:      None,
+            action:         "child.update".to_string(),
+            resource_type:  Some("child".to_string()),
+            resource_id:    Some(child.id.to_string()),
+            resource_label: Some(label),
+            ip_address:     client_ip(&headers),
+        });
+    }
+
+    result
         .map(|child| Json(serde_json::to_value(child).unwrap()))
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
 }
@@ -146,6 +178,7 @@ pub async fn remove_parent(
 pub async fn delete_child(
     State(state): State<AppState>,
     TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
     user: AuthenticatedUser,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
@@ -153,8 +186,21 @@ pub async fn delete_child(
         return Err(err);
     }
 
-    ChildService::delete(&state.db, &tenant, id)
-        .await
+    let result = ChildService::delete(&state.db, &tenant, id).await;
+
+    if result.is_ok() {
+        audit::log(state.db.clone(), &tenant, AuditEntry {
+            user_id:        Some(user.user_id),
+            user_name:      None,
+            action:         "child.delete".to_string(),
+            resource_type:  Some("child".to_string()),
+            resource_id:    Some(id.to_string()),
+            resource_label: None,
+            ip_address:     client_ip(&headers),
+        });
+    }
+
+    result
         .map(|_| Json(json!({ "message": "Enfant supprimé" })))
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
 }

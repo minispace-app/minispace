@@ -101,6 +101,15 @@ pub async fn login(
         }
         Ok(LoginOutcome::Authenticated { response, device_token }) => {
             crate::services::metrics::LOGINS_COUNTER.with_label_values(&[&tenant, "success"]).inc();
+            crate::services::audit::log(state.db.clone(), &tenant, crate::services::audit::AuditEntry {
+                user_id:        None,
+                user_name:      Some(body.email.clone()),
+                action:         "auth.login".to_string(),
+                resource_type:  None,
+                resource_id:    None,
+                resource_label: Some(body.email.clone()),
+                ip_address:     real_client_ip(&headers),
+            });
             Ok(json_response_with_cookie(
                 &serde_json::to_value(response).unwrap(),
                 Some(&device_token),
@@ -108,6 +117,15 @@ pub async fn login(
         }
         Err(e) => {
             crate::services::metrics::LOGINS_COUNTER.with_label_values(&[&tenant, "failed"]).inc();
+            crate::services::audit::log(state.db.clone(), &tenant, crate::services::audit::AuditEntry {
+                user_id:        None,
+                user_name:      Some(body.email.clone()),
+                action:         "auth.login_failure".to_string(),
+                resource_type:  None,
+                resource_id:    None,
+                resource_label: Some(body.email.clone()),
+                ip_address:     real_client_ip(&headers),
+            });
             Err((StatusCode::UNAUTHORIZED, Json(json!({ "error": e.to_string() }))))
         }
     }
@@ -363,24 +381,34 @@ pub async fn register_push_token(
 pub async fn change_password(
     State(state): State<AppState>,
     TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
     user: AuthenticatedUser,
     Json(body): Json<ChangePasswordRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    AuthService::change_password(
+    let result = AuthService::change_password(
         &state.db,
         &tenant,
         user.user_id,
         &body.current_password,
         &body.new_password,
     )
-    .await
-    .map(|_| Json(json!({ "message": "Mot de passe modifié avec succès" })))
-    .map_err(|e| {
-        (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": e.to_string() })),
-        )
-    })
+    .await;
+
+    if result.is_ok() {
+        crate::services::audit::log(state.db.clone(), &tenant, crate::services::audit::AuditEntry {
+            user_id:        Some(user.user_id),
+            user_name:      None,
+            action:         "auth.password_change".to_string(),
+            resource_type:  Some("user".to_string()),
+            resource_id:    Some(user.user_id.to_string()),
+            resource_label: None,
+            ip_address:     real_client_ip(&headers),
+        });
+    }
+
+    result
+        .map(|_| Json(json!({ "message": "Mot de passe modifié avec succès" })))
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({ "error": e.to_string() }))))
 }
 
 pub async fn update_email(
