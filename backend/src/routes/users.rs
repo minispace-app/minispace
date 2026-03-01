@@ -43,10 +43,14 @@ pub async fn list_users(
     let rows = sqlx::query(&format!(
         "SELECT u.id, u.email, u.first_name, u.last_name, u.role::TEXT as role,
                 u.is_active, u.preferred_locale, u.created_at, u.updated_at,
-                c.privacy_accepted, c.photos_accepted
+                COALESCE(c.privacy_accepted, false) as privacy_accepted,
+                COALESCE(c.photos_accepted, false) as photos_accepted
          FROM {schema}.users u
-         LEFT JOIN {schema}.consent_records c ON u.id = c.user_id
-         QUALIFY ROW_NUMBER() OVER (PARTITION BY u.id ORDER BY c.accepted_at DESC) = 1
+         LEFT JOIN (
+           SELECT DISTINCT ON (user_id) user_id, privacy_accepted, photos_accepted
+           FROM {schema}.consent_records
+           ORDER BY user_id, accepted_at DESC
+         ) c ON u.id = c.user_id
          ORDER BY u.role, u.last_name, u.first_name"
     ))
     .fetch_all(&state.db)
@@ -55,7 +59,7 @@ pub async fn list_users(
 
     // Get deletion requests from audit log
     let deletion_requests = sqlx::query_scalar::<_, String>(&format!(
-        "SELECT DISTINCT resource_id FROM {schema}_audit.audit_log
+        "SELECT DISTINCT resource_id FROM {schema}.audit_log
          WHERE action = 'user.deletion_requested'
          AND created_at > NOW() - INTERVAL '30 days'"
     ))
@@ -78,8 +82,8 @@ pub async fn list_users(
                 "role": row.get::<String, _>("role"),
                 "is_active": row.get::<bool, _>("is_active"),
                 "preferred_locale": row.get::<String, _>("preferred_locale"),
-                "privacy_accepted": row.get::<Option<bool>, _>("privacy_accepted").unwrap_or(false),
-                "photos_accepted": row.get::<Option<bool>, _>("photos_accepted").unwrap_or(false),
+                "privacy_accepted": row.get::<bool, _>("privacy_accepted"),
+                "photos_accepted": row.get::<bool, _>("photos_accepted"),
                 "deletion_requested": deletion_set.contains(&user_id),
             })
         })
