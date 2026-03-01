@@ -16,7 +16,7 @@ use crate::{
         child::{AssignParentRequest, CreateChildRequest, UpdateChildRequest},
         user::UserRole,
     },
-    services::{audit::{self, AuditEntry}, children::ChildService},
+    services::{audit::{self, AuditEntry}, children::ChildService, cron::CronService},
     AppState,
 };
 
@@ -242,6 +242,11 @@ pub async fn delete_child(
     let result = ChildService::delete(&state.db, &tenant, id).await;
 
     if result.is_ok() {
+        // Soft-delete associated media and messages according to retention schedule
+        // Media: deleted + 6 months, Messages: deleted + 2 years, per privacy policy
+        let _ = CronService::soft_delete_child_media(&state.db, &tenant, &id).await;
+        let _ = CronService::soft_delete_child_messages(&state.db, &tenant, &id).await;
+
         audit::log(state.db.clone(), &tenant, AuditEntry {
             user_id:        Some(user.user_id),
             user_name:      None,
