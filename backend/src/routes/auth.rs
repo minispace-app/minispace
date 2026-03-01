@@ -22,6 +22,19 @@ use crate::{
     AppState,
 };
 
+/// Extract the real client IP from nginx-forwarded headers.
+fn real_client_ip(headers: &HeaderMap) -> String {
+    if let Some(ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
+        return ip.to_string();
+    }
+    if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+        if let Some(first) = xff.split(',').next() {
+            return first.trim().to_string();
+        }
+    }
+    "unknown".to_string()
+}
+
 /// Extract a named cookie value from request headers.
 fn get_cookie(headers: &HeaderMap, name: &str) -> Option<String> {
     let prefix = format!("{name}=");
@@ -224,8 +237,11 @@ pub async fn invite_user(
 pub async fn register_from_invite(
     State(state): State<AppState>,
     TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
     Json(body): Json<RegisterFromInviteRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let ip = real_client_ip(&headers);
+
     AuthService::register_from_invite(
         &state.db,
         &tenant,
@@ -234,6 +250,8 @@ pub async fn register_from_invite(
         &body.last_name,
         &body.password,
         body.preferred_locale.as_deref().unwrap_or("fr"),
+        body.consent.as_ref(),
+        &ip,
     )
     .await
     .map(|profile| Json(serde_json::to_value(profile).unwrap()))

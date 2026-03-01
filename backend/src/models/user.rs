@@ -131,6 +131,16 @@ impl From<User> for UserProfile {
     }
 }
 
+/// Loi 25 — consentement enregistré lors de l'inscription d'un parent via invitation.
+#[derive(Debug, Deserialize)]
+pub struct ParentConsentPayload {
+    pub privacy_accepted: bool,
+    pub photos_accepted: bool,
+    pub accepted_at: chrono::DateTime<chrono::Utc>,
+    pub policy_version: String,
+    pub language: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct RegisterFromInviteRequest {
     pub token: String,
@@ -138,6 +148,9 @@ pub struct RegisterFromInviteRequest {
     pub last_name: String,
     pub password: String,
     pub preferred_locale: Option<String>,
+    /// Loi 25 — métadonnées de consentement horodatées.
+    /// Optionnel pour rétrocompatibilité (ex. démo), mais persisté si fourni.
+    pub consent: Option<ParentConsentPayload>,
 }
 
 #[derive(Debug, Deserialize)]

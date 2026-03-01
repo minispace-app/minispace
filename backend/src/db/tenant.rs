@@ -553,6 +553,23 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     .execute(pool)
     .await?;
 
+    // --- Consent records (Loi 25) ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE TABLE IF NOT EXISTS "{schema}".consent_records (
+            id               UUID        PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            user_id          UUID        NOT NULL REFERENCES "{schema}".users(id) ON DELETE CASCADE,
+            privacy_accepted BOOLEAN     NOT NULL DEFAULT TRUE,
+            photos_accepted  BOOLEAN     NOT NULL DEFAULT FALSE,
+            accepted_at      TIMESTAMPTZ NOT NULL,
+            policy_version   VARCHAR(32) NOT NULL,
+            language         VARCHAR(8)  NOT NULL DEFAULT 'fr',
+            ip_address       VARCHAR(64),
+            created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )"#
+    ))
+    .execute(pool)
+    .await?;
+
     // --- updated_at trigger function ---
     sqlx::raw_sql(&format!(
         r#"CREATE OR REPLACE FUNCTION "{schema}".update_updated_at()

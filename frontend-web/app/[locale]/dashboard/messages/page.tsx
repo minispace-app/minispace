@@ -302,14 +302,14 @@ export default function MessagesPage() {
 
             {/* Input bar */}
             {canWrite ? (
-              <div className="p-4 bg-white border-t border-slate-200">
-                <div className="flex gap-3 items-end">
+              <div className="p-1.5 md:p-4 bg-white border-t border-slate-200 overflow-hidden">
+                <div className="flex gap-1.5 md:gap-3 items-end">
                   <textarea
                     value={newMsg}
                     onChange={(e) => setNewMsg(e.target.value)}
                     placeholder={t("placeholder")}
                     rows={1}
-                    className="flex-1 px-4 py-3 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="flex-1 px-3 md:px-4 py-1.5 md:py-3 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -320,7 +320,7 @@ export default function MessagesPage() {
                   <button
                     onClick={sendMessage}
                     disabled={sending || !newMsg.trim()}
-                    className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50 transition flex-shrink-0"
+                    className="p-1.5 md:p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50 transition flex-shrink-0"
                   >
                     <Send className="w-4 h-4" />
                   </button>

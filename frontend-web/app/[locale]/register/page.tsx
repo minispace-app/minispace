@@ -26,7 +26,9 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
   });
-  const [error, setError] = useState("");
+  const [consentPrivacy, setConsentPrivacy] = useState(false);
+  const [consentPhotos, setConsentPhotos]   = useState(false);
+  const [error, setError]   = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,6 +44,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!consentPrivacy) {
+      setError(t("consentMissing"));
+      return;
+    }
+
     setLoading(true);
     try {
       await authApi.register({
@@ -50,6 +57,13 @@ export default function RegisterPage() {
         last_name: form.last_name,
         password: form.password,
         preferred_locale: locale,
+        consent: {
+          privacy_accepted: true,
+          photos_accepted: consentPhotos,
+          accepted_at: new Date().toISOString(),
+          policy_version: "2026-02-28",
+          language: locale,
+        },
       });
       router.push(`/${locale}/login`);
     } catch (err: unknown) {
@@ -153,6 +167,89 @@ export default function RegisterPage() {
               className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
+          </div>
+
+          {/* Consentement Loi 25 */}
+          <div className="pt-2 border-t border-slate-100">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+              {t("consentTitle")}
+            </p>
+
+            {/* Politique de confidentialité — requis */}
+            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition mb-2 ${
+              consentPrivacy
+                ? "border-indigo-400 bg-indigo-50"
+                : "border-slate-200 hover:bg-slate-50"
+            }`}>
+              <div className="relative flex-shrink-0 mt-0.5">
+                <input
+                  type="checkbox"
+                  checked={consentPrivacy}
+                  onChange={(e) => setConsentPrivacy(e.target.checked)}
+                  className="sr-only"
+                />
+                <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition ${
+                  consentPrivacy
+                    ? "bg-indigo-600 border-indigo-600"
+                    : "bg-white border-slate-300"
+                }`}>
+                  {consentPrivacy && (
+                    <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                      <polyline points="2 6 5 9 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+              </div>
+              <span className="text-sm text-slate-700 leading-snug">
+                {t("consentPrivacyBefore")}
+                <a
+                  href="/confidentialite"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 underline font-medium"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {t("consentPrivacyLink")}
+                </a>
+                {t("consentPrivacyAfter")}
+                <span className="ml-1.5 inline-block text-xs font-bold uppercase text-indigo-600 bg-indigo-100 px-1.5 py-0.5 rounded">
+                  {t("consentRequired")}
+                </span>
+              </span>
+            </label>
+
+            {/* Photos — optionnel */}
+            <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition ${
+              consentPhotos
+                ? "border-green-400 bg-green-50"
+                : "border-slate-200 hover:bg-slate-50"
+            }`}>
+              <div className="relative flex-shrink-0 mt-0.5">
+                <input
+                  type="checkbox"
+                  checked={consentPhotos}
+                  onChange={(e) => setConsentPhotos(e.target.checked)}
+                  className="sr-only"
+                />
+                <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition ${
+                  consentPhotos
+                    ? "bg-green-600 border-green-600"
+                    : "bg-white border-slate-300"
+                }`}>
+                  {consentPhotos && (
+                    <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                      <polyline points="2 6 5 9 10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+              </div>
+              <span className="text-sm text-slate-700 leading-snug">
+                {t("consentPhotos")}
+                <span className="block mt-0.5 text-xs text-slate-400 italic">
+                  {t("consentPhotosHint")}
+                </span>
+              </span>
+            </label>
           </div>
 
           <button
