@@ -276,6 +276,27 @@ pub async fn deactivate_user(
         }
     }
 
+    // Fetch target user info before deletion (for audit log)
+    let target_info: Option<(String, String, String)> = sqlx::query_as(&format!(
+        "SELECT first_name, last_name, email FROM {schema}.users WHERE id = $1"
+    ))
+    .bind(target_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    let (first_name, last_name, email) = match target_info {
+        Some(info) => info,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Utilisateur non trouvé" })),
+            ))
+        }
+    };
+
+    let resource_label = format!("{} {} ({})", first_name, last_name, email);
+
     if query.hard.unwrap_or(false) {
         // Permanent deletion within tenant schema — FK ON DELETE CASCADE will handle most related rows.
         sqlx::query(&format!(
@@ -288,11 +309,11 @@ pub async fn deactivate_user(
 
         audit::log(state.db.clone(), &tenant, AuditEntry {
             user_id:        Some(user.user_id),
-            user_name:      None,
+            user_name:      Some(email.clone()),
             action:         "user.delete".to_string(),
             resource_type:  Some("user".to_string()),
             resource_id:    Some(target_id.to_string()),
-            resource_label: None,
+            resource_label: Some(resource_label),
             ip_address:     "unknown".to_string(),
         });
         Ok(Json(json!({ "message": "Utilisateur supprimé définitivement" })))
@@ -307,11 +328,11 @@ pub async fn deactivate_user(
 
         audit::log(state.db.clone(), &tenant, AuditEntry {
             user_id:        Some(user.user_id),
-            user_name:      None,
+            user_name:      Some(email.clone()),
             action:         "user.deactivate".to_string(),
             resource_type:  Some("user".to_string()),
             resource_id:    Some(target_id.to_string()),
-            resource_label: None,
+            resource_label: Some(resource_label),
             ip_address:     "unknown".to_string(),
         });
         Ok(Json(json!({ "message": "Utilisateur désactivé" })))

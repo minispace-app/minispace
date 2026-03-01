@@ -158,6 +158,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/verify-2fa", post(routes::auth::verify_2fa))
         .route("/auth/forgot-password", post(routes::auth::forgot_password))
         .route("/auth/reset-password", post(routes::auth::reset_password))
+        .route("/auth/consent", get(routes::auth::get_consent).put(routes::auth::update_consent))
+        .route("/auth/account/deletion-request", post(routes::auth::request_account_deletion))
         // Email
         .route("/email/send-to-parents", post(routes::email::send_to_parents))
         // Messages
