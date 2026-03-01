@@ -23,6 +23,7 @@ import {
   X,
   User,
   UtensilsCrossed,
+  Shield,
 } from "lucide-react";
 import { LanguageSwitcher } from "../LanguageSwitcher";
 import { AnnouncementBanner } from "../AnnouncementBanner";
@@ -40,6 +41,7 @@ const navItems = [
   { key: "journal", icon: BookOpen, href: "/dashboard/journal", roles: null },
   { key: "users",     icon: Settings, href: "/dashboard/users",   roles: ["admin_garderie", "super_admin"] },
   { key: "myProfile", icon: User,    href: "/dashboard/profile", roles: null },
+  { key: "privacy", icon: Shield, href: "/dashboard/privacy", roles: ["admin_garderie", "super_admin"] },
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {

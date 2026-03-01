@@ -95,7 +95,8 @@
     "settings": "Paramètres",
     "users": "Utilisateurs",
     "auditLog": "Journal d'audit",
-    "myProfile": "Mon profil"
+    "myProfile": "Mon profil",
+    "privacy": "Confidentialité & données"
   },
   "dashboard": {
     "welcome": "Bienvenue, {name}!",
@@ -425,5 +426,19 @@
     "actionMediaDelete":    "Suppression photo",
     "actionDocumentUpload": "Téléversement document",
     "actionDocumentDelete": "Suppression document"
+  },
+  "privacy": {
+    "title": "Confidentialité & données personnelles",
+    "subtitle": "Exercez vos droits conformément à la Loi 25 — droit à la portabilité des données",
+    "childrenSection": "Vos enfants",
+    "noChildren": "Aucun enfant associé à votre compte.",
+    "exportBtn": "Exporter les données",
+    "exporting": "Export en cours...",
+    "exportSuccess": "Données exportées avec succès",
+    "exportError": "Erreur lors de l'export",
+    "exportHint": "Le fichier JSON contiendra le profil, les journaux, les photos (métadonnées) et les consentements.",
+    "law25Info": "Conformément à la Loi 25, vous avez le droit d'obtenir une copie des renseignements personnels que nous détenons sur votre enfant.",
+    "contactTitle": "Demandes supplémentaires",
+    "contactDesc": "Pour toute demande de rectification ou de suppression, contactez l'administrateur de votre garderie."
   }
 }
