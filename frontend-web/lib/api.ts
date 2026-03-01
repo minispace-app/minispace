@@ -125,6 +125,11 @@ export const authApi = {
     apiClient.post("/auth/verify-2fa", { email, code }, {
       headers: { "X-Tenant": getTenantSlug() },
     }),
+  getConsent: () => apiClient.get("/auth/consent"),
+  updateConsent: (photos_accepted: boolean) =>
+    apiClient.put("/auth/consent", { photos_accepted }),
+  requestAccountDeletion: () =>
+    apiClient.post("/auth/account/deletion-request"),
   demoLogin: (role: "admin" | "educateur" | "parent", locale?: string) =>
     apiClient.post("/demo/login", { role, locale }),
 };

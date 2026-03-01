@@ -712,4 +712,96 @@ impl EmailService {
 
         Ok(())
     }
+
+    pub async fn send_account_deletion_request(
+        &self,
+        admin_email: &str,
+        first_name: &str,
+        last_name: &str,
+        user_email: &str,
+        user_id: &str,
+        timestamp: &str,
+        _tenant: &str,
+    ) -> anyhow::Result<()> {
+        let to = admin_email.parse::<Mailbox>()
+            .context("Invalid admin email")?;
+
+        let subject = format!(
+            "[minispace.app] Demande de suppression de compte — {} {}",
+            first_name, last_name
+        );
+
+        let html_body = format!(
+            r#"<h1 style="margin:0 0 20px 0;font-size:20px;font-weight:700;color:#0f172a">Demande de suppression de compte</h1>
+<p style="margin:0 0 20px 0;color:#475569;line-height:1.6">Un utilisateur a demandé la suppression de son compte et de ses données personnelles conformément à la Loi 25 (droit à l'oubli).</p>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;margin:20px 0">
+  <tr>
+    <td style="padding:20px">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="width:160px;color:#64748b;font-size:14px;padding:8px 0;font-weight:600">Nom complet :</td>
+          <td style="color:#0f172a;font-size:14px;padding:8px 0;font-weight:500">{} {}</td>
+        </tr>
+        <tr>
+          <td style="width:160px;color:#64748b;font-size:14px;padding:8px 0;font-weight:600">Courriel :</td>
+          <td style="color:#0f172a;font-size:14px;padding:8px 0;font-weight:500"><a href="mailto:{}" style="color:#0284c7;text-decoration:none">{}</a></td>
+        </tr>
+        <tr>
+          <td style="width:160px;color:#64748b;font-size:14px;padding:8px 0;font-weight:600">ID utilisateur :</td>
+          <td style="color:#0f172a;font-size:14px;padding:8px 0;font-family:monospace;background:#e2e8f0;padding:4px 8px;border-radius:4px;display:inline-block">{}</td>
+        </tr>
+        <tr>
+          <td style="width:160px;color:#64748b;font-size:14px;padding:8px 0;font-weight:600">Date/Heure :</td>
+          <td style="color:#0f172a;font-size:14px;padding:8px 0">{}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:16px;border-radius:4px;margin:20px 0">
+  <p style="margin:0;color:#7f1d1d;font-size:14px;font-weight:500">⚠️ Action requise</p>
+  <p style="margin:8px 0 0 0;color:#991b1b;font-size:14px;line-height:1.5">Cette demande doit être traitée conformément à la Loi 25 du Québec (droit à l'oubli). Veuillez :</p>
+  <ol style="margin:8px 0 0 16px;color:#991b1b;font-size:14px;line-height:1.6">
+    <li>Vérifier l'identité de l'utilisateur</li>
+    <li>Supprimer le compte et toutes les données personnelles associées</li>
+    <li>Conserver une trace de cette action à des fins de conformité</li>
+  </ol>
+</div>
+
+<p style="margin:20px 0 0 0;color:#64748b;font-size:12px;line-height:1.6">
+  <strong>Note :</strong> Ce courriel a été envoyé automatiquement par minispace.app suite à une demande de suppression de compte.<br>
+  Pour toute question concernant la conformité LOI 25, veuillez consulter la documentation de minispace.app.
+</p>"#,
+            first_name, last_name, user_email, user_email, user_id, timestamp
+        );
+
+        let text = format!(
+            "Demande de suppression de compte\n\n\
+             Nom: {} {}\n\
+             Courriel: {}\n\
+             ID utilisateur: {}\n\
+             Demandé le: {}\n\n\
+             Veuillez traiter cette demande conformément à la Loi 25 (droit à l'oubli).",
+            first_name, last_name, user_email, user_id, timestamp
+        );
+
+        let email = Message::builder()
+            .message_id(Some(self.new_message_id()))
+            .from(self.from.clone())
+            .to(to)
+            .subject(subject)
+            .multipart(MultiPart::alternative()
+                .singlepart(SinglePart::plain(text))
+                .singlepart(SinglePart::html(html_body)))
+            .context("Failed to build email message")?;
+
+        self.transport
+            .send(email)
+            .await
+            .context("Failed to send email")?;
+
+        Ok(())
+    }
 }
