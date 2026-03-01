@@ -94,6 +94,7 @@
     "journal": "Journal de bord",
     "settings": "Paramètres",
     "users": "Utilisateurs",
+    "auditLog": "Journal d'audit",
     "myProfile": "Mon profil"
   },
   "dashboard": {
