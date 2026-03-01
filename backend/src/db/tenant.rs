@@ -589,6 +589,34 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     .execute(pool)
     .await?;
 
+    // --- Retention tracking columns (soft-delete + scheduled hard-delete per privacy policy) ---
+    // Retention periods: children=1yr, media=6mo, messages=2yr, documents=7yr, audit_logs=90d
+    sqlx::raw_sql(&format!(
+        r#"ALTER TABLE "{schema}".children ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+           ALTER TABLE "{schema}".children ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+           ALTER TABLE "{schema}".media ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+           ALTER TABLE "{schema}".media ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+           ALTER TABLE "{schema}".messages ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+           ALTER TABLE "{schema}".messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+           ALTER TABLE "{schema}".documents ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+           ALTER TABLE "{schema}".documents ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+           ALTER TABLE "{schema}".audit_log ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+           ALTER TABLE "{schema}".audit_log ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // --- Indexes for retention purge queries ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE INDEX IF NOT EXISTS children_deleted_at_idx ON "{schema}".children(deleted_at) WHERE is_deleted = TRUE;
+           CREATE INDEX IF NOT EXISTS media_deleted_at_idx ON "{schema}".media(deleted_at) WHERE is_deleted = TRUE;
+           CREATE INDEX IF NOT EXISTS messages_deleted_at_idx ON "{schema}".messages(deleted_at) WHERE is_deleted = TRUE;
+           CREATE INDEX IF NOT EXISTS documents_deleted_at_idx ON "{schema}".documents(deleted_at) WHERE is_deleted = TRUE;
+           CREATE INDEX IF NOT EXISTS audit_log_deleted_at_idx ON "{schema}".audit_log(deleted_at) WHERE is_deleted = TRUE"#
+    ))
+    .execute(pool)
+    .await?;
+
     // --- updated_at trigger function ---
     sqlx::raw_sql(&format!(
         r#"CREATE OR REPLACE FUNCTION "{schema}".update_updated_at()
