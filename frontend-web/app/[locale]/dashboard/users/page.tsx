@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import { usersApi, authApi } from "../../../../lib/api";
-import { Mail, UserCheck, UserX, Pencil, X, Check, KeyRound } from "lucide-react";
+import { Mail, UserCheck, UserX, Pencil, X, Check, KeyRound, Lock, Camera, AlertCircle } from "lucide-react";
 import PendingInvitationsTable from "../../../../components/PendingInvitationsTable";
 
 interface TenantUser {
@@ -15,6 +15,9 @@ interface TenantUser {
   role: string;
   is_active: boolean;
   preferred_locale: string;
+  privacy_accepted?: boolean;
+  photos_accepted?: boolean;
+  deletion_requested?: boolean;
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -232,6 +235,15 @@ export default function UsersPage() {
                 <th className="text-left px-4 py-3 font-medium text-slate-600">{t("role")}</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">{t("language")}</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600">{t("status")}</th>
+                <th className="text-center px-4 py-3 font-medium text-slate-600" title="Privacy Policy Consent">
+                  <Lock className="w-4 h-4 mx-auto text-slate-400" />
+                </th>
+                <th className="text-center px-4 py-3 font-medium text-slate-600" title="Photo Consent">
+                  <Camera className="w-4 h-4 mx-auto text-slate-400" />
+                </th>
+                <th className="text-center px-4 py-3 font-medium text-slate-600" title="Deletion Requested">
+                  <AlertCircle className="w-4 h-4 mx-auto text-slate-400" />
+                </th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -300,6 +312,39 @@ export default function UsersPage() {
                         <span className="flex items-center gap-1 text-green-600 text-xs"><UserCheck className="w-3.5 h-3.5" />{t("active")}</span>
                       ) : (
                         <span className="flex items-center gap-1 text-slate-400 text-xs"><UserX className="w-3.5 h-3.5" />{t("inactive")}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {u.privacy_accepted ? (
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-green-100 rounded-full">
+                          <Check className="w-3.5 h-3.5 text-green-600" />
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-slate-100 rounded-full">
+                          <X className="w-3.5 h-3.5 text-slate-400" />
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {u.photos_accepted ? (
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-blue-100 rounded-full">
+                          <Check className="w-3.5 h-3.5 text-blue-600" />
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-slate-100 rounded-full">
+                          <X className="w-3.5 h-3.5 text-slate-400" />
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {u.deletion_requested ? (
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-red-100 rounded-full" title="Deletion requested">
+                          <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center justify-center w-6 h-6 bg-slate-100 rounded-full">
+                          <Check className="w-3.5 h-3.5 text-slate-300" />
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3">
