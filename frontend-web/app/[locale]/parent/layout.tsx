@@ -11,7 +11,7 @@ import { useTenantInfo } from "../../../hooks/useTenantInfo";
 import { messagesApi } from "../../../lib/api";
 import {
   MessageSquare, Image, FileText, Users, BookOpen,
-  LogOut, User, Menu, X,
+  LogOut, User, Menu, X, Shield,
 } from "lucide-react";
 import { LanguageSwitcher } from "../../../components/LanguageSwitcher";
 import { AnnouncementBanner } from "../../../components/AnnouncementBanner";
@@ -24,6 +24,7 @@ const navItems = [
   { key: "documents", icon: FileText, href: "/parent/documents" },
   { key: "journal", icon: BookOpen, href: "/parent/journal" },
   { key: "myProfile", icon: User, href: "/parent/profile" },
+  { key: "privacy", icon: Shield, href: "/parent/privacy" },
 ];
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {

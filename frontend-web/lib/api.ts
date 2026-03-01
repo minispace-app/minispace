@@ -232,6 +232,7 @@ export const childrenApi = {
   removeParent: (childId: string, userId: string) =>
     apiClient.delete(`/children/${childId}/parents/${userId}`),
   delete: (childId: string) => apiClient.delete(`/children/${childId}`),
+  export: (childId: string) => apiClient.get(`/children/${childId}/export`),
 };
 
 // Tenant user management (admin_garderie)

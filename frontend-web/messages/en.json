@@ -95,7 +95,8 @@
     "settings": "Settings",
     "users": "Users",
     "auditLog": "Audit Log",
-    "myProfile": "My profile"
+    "myProfile": "My profile",
+    "privacy": "Privacy & data"
   },
   "dashboard": {
     "welcome": "Welcome, {name}!",
@@ -425,5 +426,19 @@
     "actionMediaDelete":    "Photo deleted",
     "actionDocumentUpload": "Document uploaded",
     "actionDocumentDelete": "Document deleted"
+  },
+  "privacy": {
+    "title": "Privacy & Personal Data",
+    "subtitle": "Exercise your rights under Law 25 — right to data portability",
+    "childrenSection": "Your children",
+    "noChildren": "No children associated with your account.",
+    "exportBtn": "Export data",
+    "exporting": "Exporting...",
+    "exportSuccess": "Data exported successfully",
+    "exportError": "Error during export",
+    "exportHint": "The JSON file will contain the profile, journals, photos (metadata) and consents.",
+    "law25Info": "Under Law 25, you have the right to obtain a copy of the personal information we hold about your child.",
+    "contactTitle": "Additional requests",
+    "contactDesc": "For any data rectification or deletion requests, please contact your daycare administrator."
   }
 }
