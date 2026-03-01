@@ -553,6 +553,25 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     .execute(pool)
     .await?;
 
+    // --- Audit log (Loi 25 + security traceability) ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE TABLE IF NOT EXISTS "{schema}".audit_log (
+            id             UUID        PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            user_id        UUID        REFERENCES "{schema}".users(id) ON DELETE SET NULL,
+            user_name      TEXT,
+            action         TEXT        NOT NULL,
+            resource_type  TEXT,
+            resource_id    TEXT,
+            resource_label TEXT,
+            ip_address     VARCHAR(64),
+            created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON "{schema}".audit_log (created_at DESC);
+        CREATE INDEX IF NOT EXISTS audit_log_user_id_idx    ON "{schema}".audit_log (user_id)"#
+    ))
+    .execute(pool)
+    .await?;
+
     // --- Consent records (Loi 25) ---
     sqlx::raw_sql(&format!(
         r#"CREATE TABLE IF NOT EXISTS "{schema}".consent_records (

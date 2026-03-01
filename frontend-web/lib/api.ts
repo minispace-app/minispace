@@ -315,6 +315,11 @@ export const superAdminApi = {
     superAdminClient.delete("/super-admin/announcement"),
 };
 
+export const auditApi = {
+  list: (params?: { page?: number; limit?: number; action?: string }) =>
+    apiClient.get("/audit-log", { params }),
+};
+
 export const settingsApi = {
   get: () => apiClient.get("/settings"),
   update: (data: { journal_auto_send_time: string }) => apiClient.put("/settings", data),

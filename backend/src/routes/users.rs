@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State, Query},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     Json,
 };
 use serde::Deserialize;
@@ -12,8 +12,17 @@ use crate::{
     middleware::tenant::TenantSlug,
     models::auth::AuthenticatedUser,
     models::user::UserRole,
+    services::audit::{self, AuditEntry},
     AppState,
 };
+
+fn client_ip(h: &HeaderMap) -> String {
+    h.get("x-real-ip").and_then(|v| v.to_str().ok())
+        .or_else(|| h.get("x-forwarded-for").and_then(|v| v.to_str().ok())
+            .and_then(|s| s.split(',').next()).map(|s| s.trim()))
+        .unwrap_or("unknown")
+        .to_string()
+}
 
 fn require_admin(user: &AuthenticatedUser) -> Result<(), (StatusCode, Json<Value>)> {
     match user.role {
@@ -74,6 +83,7 @@ pub struct CreateUserRequest {
 pub async fn create_user(
     State(state): State<AppState>,
     TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
     user: AuthenticatedUser,
     Json(body): Json<CreateUserRequest>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
@@ -106,6 +116,16 @@ pub async fn create_user(
     .fetch_one(&state.db)
     .await
     .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({ "error": e.to_string() }))))?;
+
+    audit::log(state.db.clone(), &tenant, AuditEntry {
+        user_id:        Some(user.user_id),
+        user_name:      None,
+        action:         "user.create".to_string(),
+        resource_type:  Some("user".to_string()),
+        resource_id:    Some(user_id.to_string()),
+        resource_label: Some(format!("{} {} ({})", body.first_name, body.last_name, body.email)),
+        ip_address:     client_ip(&headers),
+    });
 
     Ok((StatusCode::CREATED, Json(json!({
         "id": user_id.to_string(),
@@ -191,6 +211,16 @@ pub async fn update_user(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?
         .ok_or((StatusCode::NOT_FOUND, Json(json!({ "error": "Utilisateur introuvable" }))))?;
 
+    audit::log(state.db.clone(), &tenant, AuditEntry {
+        user_id:        Some(user.user_id),
+        user_name:      None,
+        action:         "user.update".to_string(),
+        resource_type:  Some("user".to_string()),
+        resource_id:    Some(target_id.to_string()),
+        resource_label: body.role.as_deref().map(|r| format!("role → {r}")),
+        ip_address:     "unknown".to_string(),
+    });
+
     Ok(Json(json!({ "message": "Utilisateur mis à jour" })))
 }
 
@@ -256,6 +286,15 @@ pub async fn deactivate_user(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
 
+        audit::log(state.db.clone(), &tenant, AuditEntry {
+            user_id:        Some(user.user_id),
+            user_name:      None,
+            action:         "user.delete".to_string(),
+            resource_type:  Some("user".to_string()),
+            resource_id:    Some(target_id.to_string()),
+            resource_label: None,
+            ip_address:     "unknown".to_string(),
+        });
         Ok(Json(json!({ "message": "Utilisateur supprimé définitivement" })))
     } else {
         sqlx::query(&format!(
@@ -266,6 +305,15 @@ pub async fn deactivate_user(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
 
+        audit::log(state.db.clone(), &tenant, AuditEntry {
+            user_id:        Some(user.user_id),
+            user_name:      None,
+            action:         "user.deactivate".to_string(),
+            resource_type:  Some("user".to_string()),
+            resource_id:    Some(target_id.to_string()),
+            resource_label: None,
+            ip_address:     "unknown".to_string(),
+        });
         Ok(Json(json!({ "message": "Utilisateur désactivé" })))
     }
 }

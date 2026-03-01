@@ -190,6 +190,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/journals/{child_id}/send-to-parents", post(routes::journal::send_to_parents))
         // Settings
         .route("/settings", get(routes::settings::get_settings).put(routes::settings::update_settings))
+        // Audit log (Loi 25 — admin only)
+        .route("/audit-log", get(routes::audit_log::list_audit_log))
         // Children
         .route("/children", get(routes::children::list_children).post(routes::children::create_child))
         .route("/children/{id}", put(routes::children::update_child).delete(routes::children::delete_child))

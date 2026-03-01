@@ -1,4 +1,5 @@
 pub mod announcements;
+pub mod audit_log;
 pub mod grafana_auth;
 pub mod metrics;
 pub mod settings;

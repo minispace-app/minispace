@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod auth;
 pub mod children;
 pub mod metrics;
