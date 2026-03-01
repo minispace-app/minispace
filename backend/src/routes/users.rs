@@ -41,27 +41,46 @@ pub async fn list_users(
     let schema = schema_name(&tenant);
 
     let rows = sqlx::query(&format!(
-        "SELECT id, email, first_name, last_name, role::TEXT as role,
-                is_active, preferred_locale, created_at, updated_at
-         FROM {schema}.users
-         ORDER BY role, last_name, first_name"
+        "SELECT u.id, u.email, u.first_name, u.last_name, u.role::TEXT as role,
+                u.is_active, u.preferred_locale, u.created_at, u.updated_at,
+                c.privacy_accepted, c.photos_accepted
+         FROM {schema}.users u
+         LEFT JOIN {schema}.consent_records c ON u.id = c.user_id
+         QUALIFY ROW_NUMBER() OVER (PARTITION BY u.id ORDER BY c.accepted_at DESC) = 1
+         ORDER BY u.role, u.last_name, u.first_name"
     ))
     .fetch_all(&state.db)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
 
+    // Get deletion requests from audit log
+    let deletion_requests = sqlx::query_scalar::<_, String>(&format!(
+        "SELECT DISTINCT resource_id FROM {schema}_audit.audit_log
+         WHERE action = 'user.deletion_requested'
+         AND created_at > NOW() - INTERVAL '30 days'"
+    ))
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let deletion_set: std::collections::HashSet<String> = deletion_requests.into_iter().collect();
+
     let result: Vec<Value> = rows
         .iter()
         .map(|row| {
             use sqlx::Row;
+            let user_id = row.get::<Uuid, _>("id").to_string();
             json!({
-                "id": row.get::<Uuid, _>("id").to_string(),
+                "id": user_id.clone(),
                 "email": row.get::<String, _>("email"),
                 "first_name": row.get::<String, _>("first_name"),
                 "last_name": row.get::<String, _>("last_name"),
                 "role": row.get::<String, _>("role"),
                 "is_active": row.get::<bool, _>("is_active"),
                 "preferred_locale": row.get::<String, _>("preferred_locale"),
+                "privacy_accepted": row.get::<Option<bool>, _>("privacy_accepted").unwrap_or(false),
+                "photos_accepted": row.get::<Option<bool>, _>("photos_accepted").unwrap_or(false),
+                "deletion_requested": deletion_set.contains(&user_id),
             })
         })
         .collect();
