@@ -94,6 +94,7 @@
     "journal": "Daily Journal",
     "settings": "Settings",
     "users": "Users",
+    "auditLog": "Audit Log",
     "myProfile": "My profile"
   },
   "dashboard": {
