@@ -7,9 +7,9 @@ import useSWR from "swr";
 import { childrenApi, attendanceApi, journalApi, activitiesApi } from "../../../../lib/api";
 import {
   ChevronLeft, ChevronRight, Clock, CheckCircle2, XCircle, AlertCircle,
-  BookOpen, PlusCircle, Minus, X,
+  BookOpen, PlusCircle, Minus, X, CheckSquare, Square,
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, startOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, parseISO, getISODay, startOfWeek } from "date-fns";
 import { fr, enUS } from "date-fns/locale";
 import { ChildAvatar, childAvatarColor } from "../../../../components/ChildAvatar";
 
@@ -55,6 +55,9 @@ export default function CalendarPage() {
   const [journalModalDate, setJournalModalDate] = useState<string | null>(null);
   const [statusModalDate, setStatusModalDate] = useState<string | null>(null);
   const [mobileView, setMobileView] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
 
   const { data: children = [] } = useSWR("children", () =>
     childrenApi.list().then((r) => r.data as any[])
@@ -87,10 +90,53 @@ export default function CalendarPage() {
   const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
 
   const dateLocale = locale === "en" ? enUS : fr;
-  const days = eachDayOfInterval({
+  const allDays = eachDayOfInterval({
     start: startOfMonth(currentMonth),
     end: endOfMonth(currentMonth),
   });
+
+  // Only weekdays (Mon=1 … Fri=5, ISO)
+  const days = allDays.filter((d) => getISODay(d) <= 5);
+  // Empty cells before first weekday of month (Mon=0, Tue=1, …, Fri=4)
+  const firstDayOffset = days.length > 0 ? getISODay(days[0]) - 1 : 0;
+
+  // Selected child schedule info
+  const selectedChildData = children.find((c: any) => c.id === selectedChild);
+  const childScheduleDays: number[] = selectedChildData?.schedule_days ?? [1, 2, 3, 4, 5];
+  const childStartDate: Date | null = selectedChildData?.start_date ? parseISO(selectedChildData.start_date) : null;
+
+  const isDayDisabled = (day: Date) => {
+    if (childStartDate && day < childStartDate) return true;
+    if (!childScheduleDays.includes(getISODay(day))) return true;
+    return false;
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const toggleDaySelection = (dateStr: string) => {
+    setSelectedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateStr)) next.delete(dateStr);
+      else next.add(dateStr);
+      return next;
+    });
+  };
+
+  const handleBatchVacances = async () => {
+    if (selectedDates.size === 0) return;
+    setBatchLoading(true);
+    try {
+      for (const date of Array.from(selectedDates)) {
+        await attendanceApi.setStatus(selectedChild!, date, "vacances");
+      }
+      setSelectedDates(new Set());
+      setSelectionMode(false);
+      mutateAttendance();
+    } finally {
+      setBatchLoading(false);
+    }
+  };
 
   const journalMap = journals.reduce((acc: Record<string, JournalDay>, j: JournalDay) => {
     acc[j.date] = j;
@@ -99,8 +145,6 @@ export default function CalendarPage() {
 
   const activitiesForDay = (date: Date) =>
     activities.filter((a: Activity) => a.date === format(date, "yyyy-MM-dd"));
-
-  const today = new Date();
   const dateStr = format(selectedDate, "yyyy-MM-dd");
   const selectedDayActivities = activitiesForDay(selectedDate);
   const selectedDayAttendance = attendance[dateStr] as AttendanceStatus | undefined || "attendu";
@@ -186,67 +230,104 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        {/* Calendar grid */}
-        <div className="grid grid-cols-7 gap-2 mb-6">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-            <div key={day} className="text-center font-semibold text-slate-600 py-2">
+        {/* Toolbar: month nav + selection mode toggle */}
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => {
+              setSelectionMode((v) => !v);
+              setSelectedDates(new Set());
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+              selectionMode
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            {selectionMode ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+            {selectionMode ? `${selectedDates.size} sélectionné${selectedDates.size > 1 ? "s" : ""}` : "Sélectionner"}
+          </button>
+          {selectionMode && selectedDates.size > 0 && (
+            <button
+              onClick={handleBatchVacances}
+              disabled={batchLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 transition disabled:opacity-50"
+            >
+              🏖 {batchLoading ? "..." : "Marquer vacances"}
+            </button>
+          )}
+        </div>
+
+        {/* Calendar grid — Mon to Fri only */}
+        <div className="grid grid-cols-5 gap-2 mb-6">
+          {["Mon", "Tue", "Wed", "Thu", "Fri"].map((day) => (
+            <div key={day} className="text-center font-semibold text-slate-600 py-2 text-sm">
               {t(`day_${day.toLowerCase()}`)}
             </div>
           ))}
 
-          {Array.from({ length: startOfWeek(days[0], { weekStartsOn: 0 }).getDate() }).map(
-            (_, i) => (
-              <div key={`empty-${i}`} className="h-24 bg-slate-50 rounded-lg" />
-            )
-          )}
+          {Array.from({ length: firstDayOffset }).map((_, i) => (
+            <div key={`empty-${i}`} className="h-24 bg-slate-50 rounded-lg" />
+          ))}
 
           {days.map((day) => {
             const dateStr = format(day, "yyyy-MM-dd");
-            const dayAttendance = (attendance[dateStr] || "attendu") as AttendanceStatus;
-            const dayJournal = journalMap[dateStr];
-            const dayActivities = activitiesForDay(day);
-            const colors = ATTENDANCE_COLORS[dayAttendance];
-            const isPast = day < today && !isSameDay(day, today);
+            const disabled = isDayDisabled(day);
+            const dayAttendance = disabled ? "attendu" : (attendance[dateStr] || "attendu") as AttendanceStatus;
+            const dayJournal = !disabled && journalMap[dateStr];
+            const dayActivities = disabled ? [] : activitiesForDay(day);
+            const colors = disabled ? { bg: "bg-slate-50", text: "text-slate-300", icon: null } : ATTENDANCE_COLORS[dayAttendance];
             const isFuture = day > today;
+            const isSelected = selectedDates.has(dateStr);
+
+            const handleClick = () => {
+              if (disabled) return;
+              if (selectionMode) {
+                if (isFuture) toggleDaySelection(dateStr);
+                return;
+              }
+              if (isFuture) setStatusModalDate(dateStr);
+            };
 
             return (
               <div
                 key={dateStr}
-                className={`h-24 rounded-lg border-2 p-2 cursor-pointer transition hover:shadow-md ${
-                  isSameMonth(day, currentMonth)
-                    ? `${colors.bg} border-slate-200`
-                    : "bg-slate-50 border-slate-100"
+                onClick={handleClick}
+                className={`h-24 rounded-lg border-2 p-2 transition ${
+                  disabled
+                    ? "bg-slate-50 border-slate-100 cursor-not-allowed opacity-40"
+                    : isSelected
+                    ? "bg-blue-100 border-blue-400 cursor-pointer shadow-sm"
+                    : `${colors.bg} border-slate-200 cursor-pointer hover:shadow-md`
                 }`}
-                onClick={() => {
-                  if (isFuture) setStatusModalDate(dateStr);
-                }}
               >
-                <div className="text-sm font-semibold text-slate-800">{format(day, "d")}</div>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-sm">{colors.icon}</span>
+                <div className={`text-sm font-semibold ${disabled ? "text-slate-300" : "text-slate-800"} flex items-center justify-between`}>
+                  {format(day, "d")}
+                  {isSelected && <CheckSquare className="w-3.5 h-3.5 text-blue-600" />}
                 </div>
-                {dayJournal && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setJournalModalDate(dateStr);
-                    }}
-                    className="text-xs text-blue-600 hover:text-blue-800 underline mt-1"
-                  >
-                    📋
-                  </button>
-                )}
-                {dayActivities.length > 0 && (
-                  <div className="text-xs mt-1 space-y-0.5">
-                    {dayActivities.slice(0, 2).map((a: Activity) => (
-                      <div key={a.id} className="bg-white/60 px-1 py-0.5 rounded text-slate-700 truncate">
-                        {a.title}
-                      </div>
-                    ))}
-                    {dayActivities.length > 2 && (
-                      <div className="text-slate-600">+{dayActivities.length - 2}</div>
+                {!disabled && (
+                  <>
+                    <div className="flex items-center gap-1 mt-1">
+                      <span className="text-sm">{colors.icon}</span>
+                    </div>
+                    {dayJournal && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setJournalModalDate(dateStr); }}
+                        className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                      >📋</button>
                     )}
-                  </div>
+                    {dayActivities.length > 0 && (
+                      <div className="text-xs mt-0.5 space-y-0.5">
+                        {dayActivities.slice(0, 1).map((a: Activity) => (
+                          <div key={a.id} className="bg-white/60 px-1 py-0.5 rounded text-slate-700 truncate">
+                            {a.title}
+                          </div>
+                        ))}
+                        {dayActivities.length > 1 && (
+                          <div className="text-slate-500">+{dayActivities.length - 1}</div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             );
@@ -275,7 +356,11 @@ export default function CalendarPage() {
       <div className="md:hidden bg-white rounded-lg shadow p-4">
         <div className="flex items-center justify-between mb-4">
           <button
-            onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}
+            onClick={() => {
+              let d = new Date(selectedDate.getTime() - 86400000);
+              while (getISODay(d) > 5) d = new Date(d.getTime() - 86400000);
+              setSelectedDate(d);
+            }}
             className="p-2 hover:bg-slate-100 rounded-lg transition"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -286,7 +371,11 @@ export default function CalendarPage() {
             </div>
           </div>
           <button
-            onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}
+            onClick={() => {
+              let d = new Date(selectedDate.getTime() + 86400000);
+              while (getISODay(d) > 5) d = new Date(d.getTime() + 86400000);
+              setSelectedDate(d);
+            }}
             className="p-2 hover:bg-slate-100 rounded-lg transition"
           >
             <ChevronRight className="w-5 h-5" />

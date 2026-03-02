@@ -15,6 +15,8 @@ interface Child {
   birth_date: string;
   group_id: string | null;
   is_active: boolean;
+  start_date: string | null;
+  schedule_days: number[] | null;
 }
 
 interface Group {
@@ -54,12 +56,22 @@ function ChildDetails({
   const tc = useTranslations("common");
   const t = useTranslations("children");
 
+  const DAYS = [
+    { num: 1, label: "Lun" }, { num: 2, label: "Mar" }, { num: 3, label: "Mer" },
+    { num: 4, label: "Jeu" }, { num: 5, label: "Ven" },
+  ];
+
   // Edit state
   const [firstName, setFirstName] = useState(child.first_name);
   const [lastName, setLastName] = useState(child.last_name);
   const [birthDate, setBirthDate] = useState(child.birth_date);
   const [groupId, setGroupId] = useState(child.group_id ?? "");
+  const [startDate, setStartDate] = useState(child.start_date ?? "");
+  const [scheduleDays, setScheduleDays] = useState<number[]>(child.schedule_days ?? [1, 2, 3, 4, 5]);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  const toggleDay = (day: number) =>
+    setScheduleDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort());
 
   // Parents state
   const [showAddParent, setShowAddParent] = useState(false);
@@ -114,6 +126,8 @@ function ChildDetails({
         last_name: lastName,
         birth_date: birthDate,
         group_id: groupId || undefined,
+        start_date: startDate || undefined,
+        schedule_days: scheduleDays,
       });
       onUpdated();
     } finally {
@@ -196,6 +210,38 @@ function ChildDetails({
                 ))}
               </select>
             </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Date de commencement
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-2">
+                Jours de présence
+              </label>
+              <div className="flex gap-2">
+                {DAYS.map(({ num, label }) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => toggleDay(num)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                      scheduleDays.includes(num)
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-slate-400 border-slate-200"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex gap-2 pt-2">
               <button
                 type="submit"
@@ -211,6 +257,8 @@ function ChildDetails({
                   setLastName(child.last_name);
                   setBirthDate(child.birth_date);
                   setGroupId(child.group_id ?? "");
+                  setStartDate(child.start_date ?? "");
+                  setScheduleDays(child.schedule_days ?? [1, 2, 3, 4, 5]);
                 }}
                 className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50"
               >
@@ -378,14 +426,28 @@ export default function ChildrenPage() {
   const canWrite = user?.role === "admin_garderie" || user?.role === "super_admin";
   const [selectedChildId, setSelectedChildId] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
+  const CREATE_DAYS = [
+    { num: 1, label: "Lun" }, { num: 2, label: "Mar" }, { num: 3, label: "Mer" },
+    { num: 4, label: "Jeu" }, { num: 5, label: "Ven" },
+  ];
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
     birth_date: "",
     group_id: "",
     notes: "",
+    start_date: "",
+    schedule_days: [1, 2, 3, 4, 5] as number[],
   });
   const [saving, setSaving] = useState(false);
+
+  const toggleCreateDay = (day: number) =>
+    setForm((p) => ({
+      ...p,
+      schedule_days: p.schedule_days.includes(day)
+        ? p.schedule_days.filter((d) => d !== day)
+        : [...p.schedule_days, day].sort(),
+    }));
 
   const { data, mutate } = useSWR("children-list", () => childrenApi.list());
   const { data: groupsData } = useSWR("groups-list-ch", () => groupsApi.list());
@@ -406,8 +468,10 @@ export default function ChildrenPage() {
         birth_date: form.birth_date,
         group_id: form.group_id || undefined,
         notes: form.notes || undefined,
+        start_date: form.start_date || undefined,
+        schedule_days: form.schedule_days,
       });
-      setForm({ first_name: "", last_name: "", birth_date: "", group_id: "", notes: "" });
+      setForm({ first_name: "", last_name: "", birth_date: "", group_id: "", notes: "", start_date: "", schedule_days: [1, 2, 3, 4, 5] });
       setShowForm(false);
       mutate();
     } finally {
@@ -595,6 +659,38 @@ export default function ChildrenPage() {
                   </option>
                 ))}
               </select>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">
+                  Date de commencement <span className="font-normal text-slate-400">({tc("optional")})</span>
+                </label>
+                <input
+                  type="date"
+                  value={form.start_date}
+                  onChange={(e) => setForm((p) => ({ ...p, start_date: e.target.value }))}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-2">
+                  Jours de présence
+                </label>
+                <div className="flex gap-2">
+                  {CREATE_DAYS.map(({ num, label }) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => toggleCreateDay(num)}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${
+                        form.schedule_days.includes(num)
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-slate-400 border-slate-200"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"

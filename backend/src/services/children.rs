@@ -44,8 +44,8 @@ impl ChildService {
     ) -> anyhow::Result<Child> {
         let schema = schema_name(tenant);
         let child = sqlx::query_as::<_, Child>(&format!(
-            "INSERT INTO {schema}.children (first_name, last_name, birth_date, group_id, notes)
-             VALUES ($1, $2, $3, $4, $5)
+            "INSERT INTO {schema}.children (first_name, last_name, birth_date, group_id, notes, start_date, schedule_days)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING *"
         ))
         .bind(&req.first_name)
@@ -53,6 +53,8 @@ impl ChildService {
         .bind(req.birth_date)
         .bind(req.group_id)
         .bind(&req.notes)
+        .bind(req.start_date)
+        .bind(&req.schedule_days)
         .fetch_one(pool)
         .await?;
         Ok(child)
@@ -67,12 +69,15 @@ impl ChildService {
         let schema = schema_name(tenant);
         let child = sqlx::query_as::<_, Child>(&format!(
             "UPDATE {schema}.children
-             SET first_name = COALESCE($1, first_name),
-                 last_name  = COALESCE($2, last_name),
-                 birth_date = COALESCE($3, birth_date),
-                 group_id   = COALESCE($4, group_id),
-                 notes      = COALESCE($5, notes),
-                 is_active  = COALESCE($6, is_active)
+             SET first_name    = COALESCE($1, first_name),
+                 last_name     = COALESCE($2, last_name),
+                 birth_date    = COALESCE($3, birth_date),
+                 group_id      = COALESCE($4, group_id),
+                 notes         = COALESCE($5, notes),
+                 is_active     = COALESCE($6, is_active),
+                 start_date    = COALESCE($8, start_date),
+                 schedule_days = COALESCE($9, schedule_days),
+                 updated_at    = NOW()
              WHERE id = $7
              RETURNING *"
         ))
@@ -83,6 +88,8 @@ impl ChildService {
         .bind(&req.notes)
         .bind(req.is_active)
         .bind(id)
+        .bind(req.start_date)
+        .bind(&req.schedule_days)
         .fetch_one(pool)
         .await?;
         Ok(child)

@@ -228,8 +228,10 @@ export const childrenApi = {
     birth_date: string;
     group_id?: string;
     notes?: string;
+    start_date?: string;
+    schedule_days?: number[];
   }) => apiClient.post("/children", data),
-  update: (id: string, data: Partial<{ first_name: string; last_name: string; birth_date: string; group_id: string | null; is_active: boolean }>) =>
+  update: (id: string, data: Partial<{ first_name: string; last_name: string; birth_date: string; group_id: string | null; is_active: boolean; start_date: string; schedule_days: number[] }>) =>
     apiClient.put(`/children/${id}`, data),
   listParents: (childId: string) => apiClient.get(`/children/${childId}/parents`),
   assignParent: (childId: string, userId: string, relationship: string) =>
