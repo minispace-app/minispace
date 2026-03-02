@@ -212,6 +212,29 @@ pub async fn set_attendance(
         )
     })?;
 
+    // Update journal absent flag if status is absent
+    let is_absent = req.status == "absent";
+    let _journal_result = sqlx::query(
+        &format!(
+            "INSERT INTO {}.daily_journals (child_id, date, absent, created_by, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, NOW(), NOW())
+             ON CONFLICT (child_id, date) DO UPDATE SET absent = $3, updated_at = NOW()",
+            schema
+        ),
+    )
+    .bind(req.child_id)
+    .bind(date)
+    .bind(is_absent)
+    .bind(user.user_id)
+    .execute(&state.db)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
     Ok(Json(json!({ "success": true })))
 }
 
