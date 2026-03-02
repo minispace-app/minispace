@@ -318,15 +318,15 @@ export default function CalendarPage() {
                 </div>
                 {!disabled && (
                   <>
-                    <div className="flex items-center gap-1 mt-1">
+                    <div className="flex items-center justify-between gap-1 mt-1">
                       <span className="text-sm">{colors.icon}</span>
+                      {dayJournal && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setJournalModalDate(dateStr); }}
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                        >📋</button>
+                      )}
                     </div>
-                    {dayJournal && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setJournalModalDate(dateStr); }}
-                        className="text-xs text-blue-600 hover:text-blue-800 mt-1"
-                      >📋</button>
-                    )}
                     {dayActivities.length > 0 && (
                       <div className="text-xs mt-0.5 space-y-0.5">
                         {dayActivities.slice(0, 1).map((a: Activity) => (
@@ -350,7 +350,7 @@ export default function CalendarPage() {
         <div className="text-xs text-slate-600 space-y-1">
           <div className="font-semibold mb-2">{t("legend")}</div>
           <div className="grid grid-cols-3 gap-4">
-            {["present", "vacances"].map((status) => {
+            {["present", "absent"].map((status) => {
               const { icon, label } = ATTENDANCE_COLORS[status as AttendanceStatus];
               return (
                 <div key={status} className="flex items-center gap-2">
@@ -458,8 +458,10 @@ export default function CalendarPage() {
                   }`}
                 >
                   <div className="font-semibold text-slate-800">{format(day, "d")}</div>
-                  <div className="text-xs">{colors.icon}</div>
-                  {dayJournal && <div className="text-xs">📋</div>}
+                  <div className="flex items-center justify-between gap-1 text-xs">
+                    <span>{colors.icon}</span>
+                    {dayJournal && <span>📋</span>}
+                  </div>
                   {isSelected && <CheckSquare className="absolute w-3 h-3 text-blue-600 bottom-0.5 right-0.5" />}
                 </button>
               );
