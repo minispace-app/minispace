@@ -193,10 +193,10 @@ pub async fn set_attendance(
     // Upsert attendance record
     let _result = sqlx::query(
         &format!(
-            "INSERT INTO {schema}.attendance (child_id, date, status, marked_by, created_at, updated_at)
-             VALUES ($1, $2, $3::{schema}.attendance_status, $4, NOW(), NOW())
-             ON CONFLICT (child_id, date) DO UPDATE SET status = $3::{schema}.attendance_status, marked_by = $4, updated_at = NOW()",
-            schema = schema
+            "INSERT INTO {}.attendance (child_id, date, status, marked_by, created_at, updated_at)
+             VALUES ($1, $2, $3::{}.attendance_status, $4, NOW(), NOW())
+             ON CONFLICT (child_id, date) DO UPDATE SET status = $3::{}.attendance_status, marked_by = $4, updated_at = NOW()",
+            schema, schema, schema
         ),
     )
     .bind(req.child_id)
