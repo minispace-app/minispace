@@ -63,15 +63,17 @@ export default function StaffCalendarPage() {
 
   const monthStr = format(currentMonth, "yyyy-MM");
 
-  const { data: attendance = {} } = useSWR(
+  const { data: attendanceData } = useSWR(
     selectedChild ? `attendance-${selectedChild}-${monthStr}` : null,
-    () => attendanceApi.getMonth(selectedChild!, monthStr).then((r) => r.data.attendance || {})
+    () => attendanceApi.getMonth(selectedChild!, monthStr).then((r) => r.data as { attendance: Record<string, string> })
   );
+  const attendance = attendanceData?.attendance || {};
 
-  const { data: journals = [] } = useSWR(
+  const { data: journalsData } = useSWR(
     selectedChild ? `journals-${selectedChild}-${monthStr}` : null,
-    () => journalApi.getMonthSummary(selectedChild!, monthStr).then((r) => r.data.journals || [])
+    () => journalApi.getMonthSummary(selectedChild!, monthStr).then((r) => r.data as { journals: JournalDay[] })
   );
+  const journals = journalsData?.journals || [];
 
   const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
