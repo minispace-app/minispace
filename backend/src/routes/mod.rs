@@ -1,4 +1,6 @@
 pub mod announcements;
+pub mod attendance;
+pub mod activities;
 pub mod audit_log;
 pub mod grafana_auth;
 pub mod metrics;

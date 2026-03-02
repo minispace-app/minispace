@@ -188,8 +188,17 @@ async fn main() -> anyhow::Result<()> {
         .route("/menus", get(routes::menu::get_week).put(routes::menu::upsert_menu))
         // Journal de bord
         .route("/journals", get(routes::journal::get_week).put(routes::journal::upsert_entry))
+        .route("/journals/month", get(routes::journal::get_month_summary))
         .route("/journals/send-all-to-parents", post(routes::journal::send_all_to_parents))
         .route("/journals/{child_id}/send-to-parents", post(routes::journal::send_to_parents))
+        // Attendance
+        .route("/attendance", get(routes::attendance::get_month).put(routes::attendance::set_attendance))
+        .route("/attendance/month", get(routes::attendance::get_month_all_children))
+        // Activities
+        .route("/activities", get(routes::activities::list_activities).post(routes::activities::create_activity))
+        .route("/activities/{id}", put(routes::activities::update_activity).delete(routes::activities::delete_activity))
+        .route("/activities/{id}/register", post(routes::activities::register_child))
+        .route("/activities/{id}/register/{child_id}", delete(routes::activities::unregister_child))
         // Settings
         .route("/settings", get(routes::settings::get_settings).put(routes::settings::update_settings))
         // Children

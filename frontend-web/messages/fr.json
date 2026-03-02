@@ -91,6 +91,8 @@
     "children": "Enfants",
     "groups": "Groupes",
     "menus": "Menus",
+    "calendar": "Calendrier",
+    "activities": "Activités",
     "journal": "Journal de bord",
     "settings": "Paramètres",
     "users": "Utilisateurs",
@@ -459,5 +461,53 @@
     "deleteError": "Erreur lors de l'envoi de la demande",
     "contactTitle": "Demandes supplémentaires",
     "contactDesc": "Pour toute demande de rectification ou de suppression, contactez l'administrateur de votre garderie."
+  },
+  "calendar": {
+    "title": "Calendrier",
+    "selectChild": "Sélectionner un enfant",
+    "legend": "Légende",
+    "hasJournal": "Journal fait",
+    "activities": "Activités",
+    "changeStatus": "Changer le statut",
+    "viewJournal": "Voir le journal",
+    "day_sun": "Dim",
+    "day_mon": "Lun",
+    "day_tue": "Mar",
+    "day_wed": "Mer",
+    "day_thu": "Jeu",
+    "day_fri": "Ven",
+    "day_sat": "Sam",
+    "statusModal": {
+      "title": "Changer le statut",
+      "present": "Présent",
+      "vacation": "Vacances"
+    },
+    "journalModal": {
+      "title": "Journal de bord",
+      "noData": "Aucune donnée pour ce jour"
+    }
+  },
+  "activities": {
+    "title": "Activités",
+    "create": "Nouvelle activité",
+    "empty": "Aucune activité pour ce mois",
+    "registered": "inscrits",
+    "error": {
+      "unauthorized": "Seul l'administrateur peut accéder à cette page"
+    },
+    "confirm": {
+      "delete": "Êtes-vous sûr de vouloir supprimer cette activité?"
+    },
+    "form": {
+      "create": "Créer une activité",
+      "edit": "Modifier l'activité",
+      "title": "Titre",
+      "description": "Description",
+      "date": "Date",
+      "capacity": "Capacité (nombre de places)",
+      "capacityPlaceholder": "Illimité",
+      "save": "Enregistrer",
+      "saving": "Enregistrement..."
+    }
   }
 }

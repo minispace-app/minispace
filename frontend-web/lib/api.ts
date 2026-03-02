@@ -257,6 +257,8 @@ export const usersApi = {
 export const journalApi = {
   getWeek: (childId: string, weekStart: string) =>
     apiClient.get("/journals", { params: { child_id: childId, week_start: weekStart } }),
+  getMonthSummary: (childId: string, month: string) =>
+    apiClient.get("/journals/month", { params: { child_id: childId, month } }),
   upsert: (data: {
     child_id: string;
     date: string;
@@ -274,6 +276,31 @@ export const journalApi = {
     apiClient.post(`/journals/${childId}/send-to-parents`, { week_start: weekStart }),
   sendAllToParents: (weekStart: string) =>
     apiClient.post("/journals/send-all-to-parents", { week_start: weekStart }),
+};
+
+// Attendance
+export const attendanceApi = {
+  getMonth: (childId: string, month: string) =>
+    apiClient.get("/attendance", { params: { child_id: childId, month } }),
+  setStatus: (childId: string, date: string, status: string) =>
+    apiClient.put("/attendance", { child_id: childId, date, status }),
+  getMonthAllChildren: (month: string) =>
+    apiClient.get("/attendance/month", { params: { month } }),
+};
+
+// Activities
+export const activitiesApi = {
+  list: (month: string, childId?: string) =>
+    apiClient.get("/activities", { params: { month, child_id: childId } }),
+  create: (data: { title: string; description?: string; date: string; capacity?: number }) =>
+    apiClient.post("/activities", data),
+  update: (id: string, data: { title?: string; description?: string; date?: string; capacity?: number }) =>
+    apiClient.put(`/activities/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/activities/${id}`),
+  register: (activityId: string, childId: string) =>
+    apiClient.post(`/activities/${activityId}/register`, { child_id: childId }),
+  unregister: (activityId: string, childId: string) =>
+    apiClient.delete(`/activities/${activityId}/register/${childId}`),
 };
 
 // Menus de la garderie (un menu par jour, partagé pour tous les enfants)

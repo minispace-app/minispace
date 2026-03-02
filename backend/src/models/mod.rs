@@ -1,4 +1,6 @@
 pub mod announcement;
+pub mod activity;
+pub mod attendance;
 pub mod auth;
 pub mod child;
 pub mod document;

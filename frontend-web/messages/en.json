@@ -91,6 +91,8 @@
     "children": "Children",
     "groups": "Groups",
     "menus": "Menus",
+    "calendar": "Calendar",
+    "activities": "Activities",
     "journal": "Daily Journal",
     "settings": "Settings",
     "users": "Users",
@@ -459,5 +461,53 @@
     "deleteError": "Error sending request",
     "contactTitle": "Additional requests",
     "contactDesc": "For any data rectification or deletion requests, please contact your daycare administrator."
+  },
+  "calendar": {
+    "title": "Calendar",
+    "selectChild": "Select a child",
+    "legend": "Legend",
+    "hasJournal": "Journal entry",
+    "activities": "Activities",
+    "changeStatus": "Change status",
+    "viewJournal": "View journal",
+    "day_sun": "Sun",
+    "day_mon": "Mon",
+    "day_tue": "Tue",
+    "day_wed": "Wed",
+    "day_thu": "Thu",
+    "day_fri": "Fri",
+    "day_sat": "Sat",
+    "statusModal": {
+      "title": "Change Status",
+      "present": "Present",
+      "vacation": "Vacation"
+    },
+    "journalModal": {
+      "title": "Journal Entry",
+      "noData": "No data for this day"
+    }
+  },
+  "activities": {
+    "title": "Activities",
+    "create": "New Activity",
+    "empty": "No activities this month",
+    "registered": "registered",
+    "error": {
+      "unauthorized": "Only administrators can access this page"
+    },
+    "confirm": {
+      "delete": "Are you sure you want to delete this activity?"
+    },
+    "form": {
+      "create": "Create Activity",
+      "edit": "Edit Activity",
+      "title": "Title",
+      "description": "Description",
+      "date": "Date",
+      "capacity": "Capacity (number of spots)",
+      "capacityPlaceholder": "Unlimited",
+      "save": "Save",
+      "saving": "Saving..."
+    }
   }
 }

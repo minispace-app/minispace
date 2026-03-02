@@ -10,7 +10,7 @@ import { getGarderieName } from "../../../lib/auth";
 import { useTenantInfo } from "../../../hooks/useTenantInfo";
 import { messagesApi } from "../../../lib/api";
 import {
-  MessageSquare, Image, FileText, Users, BookOpen,
+  MessageSquare, Image, FileText, Users, BookOpen, CalendarDays,
   LogOut, User, Menu, X, Shield,
 } from "lucide-react";
 import { LanguageSwitcher } from "../../../components/LanguageSwitcher";
@@ -18,11 +18,11 @@ import { AnnouncementBanner } from "../../../components/AnnouncementBanner";
 import { DemoBanner } from "../../../components/DemoBanner";
 
 const navItems = [
+  { key: "calendar", icon: CalendarDays, href: "/parent/calendar" },
   { key: "children", icon: Users, href: "/parent/children" },
   { key: "messages", icon: MessageSquare, href: "/parent/messages" },
   { key: "media", icon: Image, href: "/parent/media" },
   { key: "documents", icon: FileText, href: "/parent/documents" },
-  { key: "journal", icon: BookOpen, href: "/parent/journal" },
   { key: "myProfile", icon: User, href: "/parent/profile" },
   { key: "privacy", icon: Shield, href: "/parent/privacy" },
 ];
