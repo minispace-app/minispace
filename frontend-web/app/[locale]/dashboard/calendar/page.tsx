@@ -50,6 +50,7 @@ export default function StaffCalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedChild, setSelectedChild] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [statusModalDate, setStatusModalDate] = useState<string | null>(null);
 
   const { data: children = [] } = useSWR("children", () =>
     childrenApi.list().then((r) => r.data as any[])
@@ -63,7 +64,7 @@ export default function StaffCalendarPage() {
 
   const monthStr = format(currentMonth, "yyyy-MM");
 
-  const { data: attendanceData } = useSWR(
+  const { data: attendanceData, mutate: mutateAttendance } = useSWR(
     selectedChild ? `attendance-${selectedChild}-${monthStr}` : null,
     () => attendanceApi.getMonth(selectedChild!, monthStr).then((r) => r.data as { attendance: Record<string, string> })
   );
@@ -213,6 +214,7 @@ export default function StaffCalendarPage() {
                 return (
                   <div
                     key={dateStr}
+                    onClick={() => !disabled && setStatusModalDate(dateStr)}
                     className={`h-24 rounded-lg border-2 p-2 transition ${
                       disabled
                         ? "bg-slate-50 border-slate-100 cursor-not-allowed opacity-40"
@@ -308,6 +310,8 @@ export default function StaffCalendarPage() {
                   return (
                     <button
                       key={dateStr}
+                      onClick={() => !disabled && setStatusModalDate(dateStr)}
+                      disabled={disabled}
                       className={`aspect-square rounded p-1 transition flex flex-col items-center justify-center text-xs ${
                         disabled
                           ? "bg-slate-50 opacity-40 cursor-not-allowed"
@@ -325,6 +329,80 @@ export default function StaffCalendarPage() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Status modal */}
+      {statusModalDate && selectedChild && (
+        <StaffStatusModal
+          date={statusModalDate}
+          childId={selectedChild}
+          onClose={() => setStatusModalDate(null)}
+          onStatusChange={() => {
+            setStatusModalDate(null);
+            mutateAttendance();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function StaffStatusModal({
+  date,
+  childId,
+  onClose,
+  onStatusChange,
+}: {
+  date: string;
+  childId: string;
+  onClose: () => void;
+  onStatusChange: () => void;
+}) {
+  const t = useTranslations("calendar");
+  const [loading, setLoading] = useState(false);
+
+  const handleSetStatus = async (status: string) => {
+    setLoading(true);
+    try {
+      await attendanceApi.setStatus(childId, date, status);
+      onStatusChange();
+      onClose();
+    } catch (error) {
+      console.error("Error setting status:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statuses: Array<{ key: string; label: string; color: string }> = [
+    { key: "present", label: "✓ Présent", color: "bg-green-100 text-green-700 border-green-300 hover:bg-green-200" },
+    { key: "absent", label: "✗ Absent", color: "bg-red-100 text-red-700 border-red-300 hover:bg-red-200" },
+    { key: "malade", label: "🤒 Malade", color: "bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200" },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-lg max-w-sm w-full p-6">
+        <h3 className="text-lg font-bold text-slate-800 mb-4">Marquer la présence</h3>
+        <div className="space-y-3">
+          {statuses.map(({ key, label, color }) => (
+            <button
+              key={key}
+              onClick={() => handleSetStatus(key)}
+              disabled={loading}
+              className={`w-full px-4 py-2 rounded-lg font-medium border transition disabled:opacity-50 ${color}`}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="w-full px-4 py-2 bg-slate-100 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-200 transition font-medium disabled:opacity-50"
+          >
+            Annuler
+          </button>
         </div>
       </div>
     </div>
