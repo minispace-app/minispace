@@ -11,6 +11,12 @@ import { ChildAvatar } from "../../../components/ChildAvatar";
 
 const fetcher = (fn: () => Promise<{ data: unknown }>) => fn().then((r) => r.data);
 
+interface Child {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
 export default function DashboardPage() {
   const t = useTranslations("dashboard");
   const { user } = useAuth();
@@ -27,7 +33,7 @@ export default function DashboardPage() {
   );
 
   const recentMessages = (messages as { data: { data?: unknown[] } } | undefined)?.data as { id: string; content: string; created_at: string; message_type: string }[] | undefined;
-  const childrenList = (children as { data: unknown[] } | undefined)?.data as { id: string; first_name: string; last_name: string }[] | undefined;
+  const childrenList = (children as { data: unknown[] } | undefined)?.data as Child[] | undefined;
   const groupsList = (groups as { data: unknown[] } | undefined)?.data as { id: string }[] | undefined;
 
   // Get absent children for the week
@@ -42,7 +48,7 @@ export default function DashboardPage() {
   );
 
   // Group absent children by day
-  const absentByDay: Record<string, typeof childrenList> = {};
+  const absentByDay: Record<string, Child[]> = {};
   weekDays.forEach((day) => {
     const dateStr = format(day, "yyyy-MM-dd");
     const absentIds = new Set(
