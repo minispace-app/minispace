@@ -123,7 +123,7 @@ export default function CalendarPage() {
     });
   };
 
-  const handleBatchStatus = async (status: "present" | "vacances") => {
+  const handleBatchStatus = async (status: "present" | "absent") => {
     if (selectedDates.size === 0) return;
     setBatchLoading(true);
     try {
@@ -256,11 +256,11 @@ export default function CalendarPage() {
                 ✓ {batchLoading ? "..." : "Présent"}
               </button>
               <button
-                onClick={() => handleBatchStatus("vacances")}
+                onClick={() => handleBatchStatus("absent")}
                 disabled={batchLoading}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 transition disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-red-100 text-red-700 border border-red-300 hover:bg-red-200 transition disabled:opacity-50"
               >
-                🏖 {batchLoading ? "..." : "Vacances"}
+                ✗ {batchLoading ? "..." : "Absent"}
               </button>
             </div>
           )}
@@ -478,11 +478,11 @@ export default function CalendarPage() {
               ✓ {batchLoading ? "..." : "Présent"}
             </button>
             <button
-              onClick={() => handleBatchStatus("vacances")}
+              onClick={() => handleBatchStatus("absent")}
               disabled={batchLoading}
-              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs font-medium bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 transition disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs font-medium bg-red-100 text-red-700 border border-red-300 hover:bg-red-200 transition disabled:opacity-50"
             >
-              🏖 {batchLoading ? "..." : "Vacances"}
+              ✗ {batchLoading ? "..." : "Absent"}
             </button>
           </div>
         )}
@@ -559,7 +559,7 @@ function StatusModal({
   const t = useTranslations("calendar");
   const [loading, setLoading] = useState(false);
 
-  const handleSetStatus = async (status: "present" | "vacances") => {
+  const handleSetStatus = async (status: "present" | "absent") => {
     setLoading(true);
     try {
       await attendanceApi.setStatus(childId, date, status);
@@ -585,11 +585,11 @@ function StatusModal({
             ✓ {t("statusModal.present")}
           </button>
           <button
-            onClick={() => handleSetStatus("vacances")}
+            onClick={() => handleSetStatus("absent")}
             disabled={loading}
-            className="w-full px-4 py-2 bg-blue-100 text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-200 transition font-medium disabled:opacity-50"
+            className="w-full px-4 py-2 bg-red-100 text-red-700 border border-red-300 rounded-lg hover:bg-red-200 transition font-medium disabled:opacity-50"
           >
-            🏖 {t("statusModal.vacation")}
+            ✗ Absent
           </button>
           <button
             onClick={onClose}
