@@ -4,7 +4,8 @@ import { useTranslations } from "next-intl";
 import { useAuth } from "../../../hooks/useAuth";
 import useSWR from "swr";
 import { groupsApi, childrenApi, messagesApi, attendanceApi } from "../../../lib/api";
-import { format } from "date-fns";
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, getISODay } from "date-fns";
+import { fr } from "date-fns/locale";
 import { AlertCircle } from "lucide-react";
 import { ChildAvatar } from "../../../components/ChildAvatar";
 
@@ -13,32 +14,49 @@ const fetcher = (fn: () => Promise<{ data: unknown }>) => fn().then((r) => r.dat
 export default function DashboardPage() {
   const t = useTranslations("dashboard");
   const { user } = useAuth();
+  const dateLocale = fr;
 
   const { data: messages } = useSWR("messages", () => messagesApi.list(1, 5));
   const { data: children } = useSWR("children", () => childrenApi.list());
   const { data: groups } = useSWR("groups", () => groupsApi.list());
 
-  const today = format(new Date(), "yyyy-MM");
+  const currentMonth = format(new Date(), "yyyy-MM");
   const { data: attendance } = useSWR(
-    user?.role === "educateur" || user?.role === "admin_garderie" ? `attendance-${today}` : null,
-    () => attendanceApi.getMonthAllChildren(today)
+    user?.role === "educateur" || user?.role === "admin_garderie" ? `attendance-${currentMonth}` : null,
+    () => attendanceApi.getMonthAllChildren(currentMonth)
   );
 
   const recentMessages = (messages as { data: { data?: unknown[] } } | undefined)?.data as { id: string; content: string; created_at: string; message_type: string }[] | undefined;
   const childrenList = (children as { data: unknown[] } | undefined)?.data as { id: string; first_name: string; last_name: string }[] | undefined;
   const groupsList = (groups as { data: unknown[] } | undefined)?.data as { id: string }[] | undefined;
 
-  // Get absent children for today
+  // Get absent children for the week
   const attendanceRecords = (attendance as { data: { attendance?: [string, string, string][] } } | undefined)?.data?.attendance || [];
-  const todayStr = format(new Date(), "yyyy-MM-dd");
 
-  const absentToday = new Set(
-    attendanceRecords
-      .filter(([_, date, status]) => date === todayStr && status === "absent")
-      .map(([childId]) => childId)
+  // Get this week (Monday to Friday only)
+  const today = new Date();
+  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd }).filter(
+    (d) => getISODay(d) <= 5
   );
 
-  const absentChildren = childrenList?.filter((child) => absentToday.has(child.id)) ?? [];
+  // Group absent children by day
+  const absentByDay: Record<string, typeof childrenList> = {};
+  weekDays.forEach((day) => {
+    const dateStr = format(day, "yyyy-MM-dd");
+    const absentIds = new Set(
+      attendanceRecords
+        .filter(([_, date, status]) => date === dateStr && status === "absent")
+        .map(([childId]) => childId)
+    );
+    const absentThisDay = childrenList?.filter((child) => absentIds.has(child.id)) ?? [];
+    if (absentThisDay.length > 0) {
+      absentByDay[dateStr] = absentThisDay;
+    }
+  });
+
+  const hasAbsentThisWeek = Object.keys(absentByDay).length > 0;
 
   return (
     <div className="p-8">
@@ -64,28 +82,42 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Absent children section */}
-      {(user?.role === "educateur" || user?.role === "admin_garderie") && absentChildren.length > 0 && (
+      {/* Absent children section - Week view */}
+      {(user?.role === "educateur" || user?.role === "admin_garderie") && hasAbsentThisWeek && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-8">
           <div className="flex items-center gap-2 mb-4">
             <AlertCircle className="w-5 h-5 text-red-600" />
-            <h2 className="font-semibold text-red-900">Enfants absents aujourd'hui</h2>
+            <h2 className="font-semibold text-red-900">
+              Absences de la semaine ({format(weekStart, "d MMM", { locale: dateLocale })} - {format(weekEnd, "d MMM", { locale: dateLocale })})
+            </h2>
           </div>
-          <div className="space-y-2">
-            {absentChildren.map((child) => (
-              <div key={child.id} className="flex items-center gap-3 bg-white rounded-lg p-3">
-                <ChildAvatar
-                  id={child.id}
-                  firstName={child.first_name}
-                  lastName={child.last_name}
-                  size="sm"
-                />
-                <div>
-                  <p className="font-medium text-slate-800">{child.first_name} {child.last_name}</p>
-                  <p className="text-xs text-slate-500">Absent - {format(new Date(), "d MMMM yyyy")}</p>
+          <div className="space-y-4">
+            {weekDays.map((day) => {
+              const dateStr = format(day, "yyyy-MM-dd");
+              const absentThisDay = absentByDay[dateStr];
+              if (!absentThisDay) return null;
+
+              return (
+                <div key={dateStr} className="bg-white rounded-lg p-4">
+                  <h3 className="font-semibold text-slate-700 mb-3">
+                    {format(day, "EEEE d MMMM", { locale: dateLocale })}
+                  </h3>
+                  <div className="space-y-2">
+                    {absentThisDay.map((child) => (
+                      <div key={child.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition">
+                        <ChildAvatar
+                          id={child.id}
+                          firstName={child.first_name}
+                          lastName={child.last_name}
+                          size="sm"
+                        />
+                        <p className="text-sm font-medium text-slate-800">{child.first_name} {child.last_name}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
