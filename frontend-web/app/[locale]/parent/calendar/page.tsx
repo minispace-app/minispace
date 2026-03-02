@@ -123,12 +123,12 @@ export default function CalendarPage() {
     });
   };
 
-  const handleBatchVacances = async () => {
+  const handleBatchStatus = async (status: "present" | "vacances") => {
     if (selectedDates.size === 0) return;
     setBatchLoading(true);
     try {
       for (const date of Array.from(selectedDates)) {
-        await attendanceApi.setStatus(selectedChild!, date, "vacances");
+        await attendanceApi.setStatus(selectedChild!, date, status);
       }
       setSelectedDates(new Set());
       setSelectionMode(false);
@@ -147,7 +147,7 @@ export default function CalendarPage() {
     activities.filter((a: Activity) => a.date === format(date, "yyyy-MM-dd"));
   const dateStr = format(selectedDate, "yyyy-MM-dd");
   const selectedDayActivities = activitiesForDay(selectedDate);
-  const selectedDayAttendance = attendance[dateStr] as AttendanceStatus | undefined || "attendu";
+  const selectedDayAttendance = attendance[dateStr] as AttendanceStatus | undefined || "present";
 
   return (
     <div className="flex h-screen bg-slate-50" style={{ height: "100dvh" }}>
@@ -247,13 +247,22 @@ export default function CalendarPage() {
             {selectionMode ? `${selectedDates.size} sélectionné${selectedDates.size > 1 ? "s" : ""}` : "Sélectionner"}
           </button>
           {selectionMode && selectedDates.size > 0 && (
-            <button
-              onClick={handleBatchVacances}
-              disabled={batchLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 transition disabled:opacity-50"
-            >
-              🏖 {batchLoading ? "..." : "Marquer vacances"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleBatchStatus("present")}
+                disabled={batchLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-green-100 text-green-700 border border-green-300 hover:bg-green-200 transition disabled:opacity-50"
+              >
+                ✓ {batchLoading ? "..." : "Présent"}
+              </button>
+              <button
+                onClick={() => handleBatchStatus("vacances")}
+                disabled={batchLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 transition disabled:opacity-50"
+              >
+                🏖 {batchLoading ? "..." : "Vacances"}
+              </button>
+            </div>
           )}
         </div>
 
@@ -272,12 +281,13 @@ export default function CalendarPage() {
           {days.map((day) => {
             const dateStr = format(day, "yyyy-MM-dd");
             const disabled = isDayDisabled(day);
-            const dayAttendance = disabled ? "attendu" : (attendance[dateStr] || "attendu") as AttendanceStatus;
+            const dayAttendance = disabled ? "present" : (attendance[dateStr] || "present") as AttendanceStatus;
             const dayJournal = !disabled && journalMap[dateStr];
             const dayActivities = disabled ? [] : activitiesForDay(day);
             const colors = disabled ? { bg: "bg-slate-50", text: "text-slate-300", icon: null } : ATTENDANCE_COLORS[dayAttendance];
             const isFuture = day > today;
             const isSelected = selectedDates.has(dateStr);
+            const isToday = isSameDay(day, today);
 
             const handleClick = () => {
               if (disabled) return;
@@ -297,6 +307,8 @@ export default function CalendarPage() {
                     ? "bg-slate-50 border-slate-100 cursor-not-allowed opacity-40"
                     : isSelected
                     ? "bg-blue-100 border-blue-400 cursor-pointer shadow-sm"
+                    : isToday
+                    ? `${colors.bg} border-slate-900 cursor-pointer hover:shadow-md ring-2 ring-slate-900/20`
                     : `${colors.bg} border-slate-200 cursor-pointer hover:shadow-md`
                 }`}
               >
@@ -338,12 +350,15 @@ export default function CalendarPage() {
         <div className="text-xs text-slate-600 space-y-1">
           <div className="font-semibold mb-2">{t("legend")}</div>
           <div className="grid grid-cols-3 gap-4">
-            {Object.entries(ATTENDANCE_COLORS).map(([status, { icon, label }]) => (
-              <div key={status} className="flex items-center gap-2">
-                <span>{icon}</span>
-                <span>{label}</span>
-              </div>
-            ))}
+            {["present", "vacances"].map((status) => {
+              const { icon, label } = ATTENDANCE_COLORS[status as AttendanceStatus];
+              return (
+                <div key={status} className="flex items-center gap-2">
+                  <span>{icon}</span>
+                  <span>{label}</span>
+                </div>
+              );
+            })}
             <div className="flex items-center gap-2">
               <span>📋</span>
               <span>{t("hasJournal")}</span>
@@ -352,80 +367,155 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Mobile: Day Carousel */}
-      <div className="md:hidden bg-white rounded-lg shadow p-4">
-        <div className="flex items-center justify-between mb-4">
+      {/* Mobile: Small calendar grid */}
+      <div className="md:hidden bg-white rounded-lg shadow p-4 flex flex-col h-full overflow-hidden">
+        {/* Month navigation */}
+        <div className="flex items-center justify-between mb-3 flex-shrink-0">
           <button
-            onClick={() => {
-              let d = new Date(selectedDate.getTime() - 86400000);
-              while (getISODay(d) > 5) d = new Date(d.getTime() - 86400000);
-              setSelectedDate(d);
-            }}
+            onClick={handlePrevMonth}
             className="p-2 hover:bg-slate-100 rounded-lg transition"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-4 h-4" />
           </button>
-          <div className="text-center">
-            <div className="font-semibold text-slate-800">
-              {format(selectedDate, "EEEE d MMMM", { locale: dateLocale })}
-            </div>
-          </div>
+          <h2 className="text-sm font-semibold text-slate-800">
+            {format(currentMonth, "MMM yyyy", { locale: dateLocale })}
+          </h2>
           <button
-            onClick={() => {
-              let d = new Date(selectedDate.getTime() + 86400000);
-              while (getISODay(d) > 5) d = new Date(d.getTime() + 86400000);
-              setSelectedDate(d);
-            }}
+            onClick={handleNextMonth}
             className="p-2 hover:bg-slate-100 rounded-lg transition"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Day detail card */}
-        <div className={`rounded-lg p-4 mb-4 ${ATTENDANCE_COLORS[selectedDayAttendance].bg}`}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-3xl">{ATTENDANCE_COLORS[selectedDayAttendance].icon}</div>
-            <span className={`font-semibold ${ATTENDANCE_COLORS[selectedDayAttendance].text}`}>
-              {ATTENDANCE_COLORS[selectedDayAttendance].label}
-            </span>
-          </div>
-
-          {dateStr > format(today, "yyyy-MM-dd") && (
-            <button
-              onClick={() => setStatusModalDate(dateStr)}
-              className="w-full mt-2 px-4 py-2 bg-white text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition font-medium text-sm"
-            >
-              {t("changeStatus")}
-            </button>
-          )}
-
-          {journalMap[dateStr] && (
-            <button
-              onClick={() => setJournalModalDate(dateStr)}
-              className="w-full mt-2 px-4 py-2 bg-white text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-50 transition font-medium text-sm flex items-center justify-center gap-2"
-            >
-              <BookOpen className="w-4 h-4" />
-              {t("viewJournal")}
-            </button>
-          )}
+        {/* Toolbar: selection mode toggle */}
+        <div className="flex gap-2 mb-3 flex-shrink-0">
+          <button
+            onClick={() => {
+              setSelectionMode((v) => !v);
+              setSelectedDates(new Set());
+            }}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium border transition ${
+              selectionMode
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            {selectionMode ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
+            {selectionMode ? `${selectedDates.size}` : "Sélectionner"}
+          </button>
         </div>
 
-        {/* Activities for the day */}
-        {selectedDayActivities.length > 0 && (
-          <div className="mb-4">
-            <h3 className="font-semibold text-slate-800 mb-2">{t("activities")}</h3>
-            <div className="space-y-2">
-              {selectedDayActivities.map((activity: Activity) => (
-                <ActivityCard
-                  key={activity.id}
-                  activity={activity}
-                  selectedChild={selectedChild!}
-                />
-              ))}
-            </div>
+        {/* Small calendar grid */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-5 gap-1">
+            {/* Day headers */}
+            {["Lun", "Mar", "Mer", "Jeu", "Ven"].map((day) => (
+              <div key={day} className="text-center font-semibold text-slate-500 py-1 text-xs">
+                {day}
+              </div>
+            ))}
+
+            {/* Empty cells */}
+            {Array.from({ length: firstDayOffset }).map((_, i) => (
+              <div key={`empty-${i}`} />
+            ))}
+
+            {/* Days */}
+            {days.map((day) => {
+              const dateStr = format(day, "yyyy-MM-dd");
+              const disabled = isDayDisabled(day);
+              const dayAttendance = disabled ? "present" : (attendance[dateStr] || "present") as AttendanceStatus;
+              const dayJournal = !disabled && journalMap[dateStr];
+              const colors = disabled ? { bg: "bg-slate-50", text: "text-slate-300", icon: null } : ATTENDANCE_COLORS[dayAttendance];
+              const isToday = isSameDay(day, today);
+              const isFuture = day > today;
+              const isSelected = selectedDates.has(dateStr);
+
+              const handleClick = () => {
+                if (disabled) return;
+                if (selectionMode) {
+                  if (isFuture) toggleDaySelection(dateStr);
+                  return;
+                }
+                setSelectedDate(day);
+              };
+
+              return (
+                <button
+                  key={dateStr}
+                  onClick={handleClick}
+                  className={`aspect-square rounded p-1 transition flex flex-col items-center justify-center text-xs relative ${
+                    disabled
+                      ? "bg-slate-50 opacity-40 cursor-not-allowed"
+                      : isSelected
+                      ? "bg-blue-100 border border-blue-400 cursor-pointer shadow-sm"
+                      : isSameDay(day, selectedDate)
+                      ? "bg-blue-50 border border-blue-300 cursor-pointer"
+                      : isToday
+                      ? `${colors.bg} border border-slate-900 cursor-pointer ring-1 ring-slate-900/20`
+                      : `${colors.bg} cursor-pointer hover:shadow-sm`
+                  }`}
+                >
+                  <div className="font-semibold text-slate-800">{format(day, "d")}</div>
+                  <div className="text-xs">{colors.icon}</div>
+                  {dayJournal && <div className="text-xs">📋</div>}
+                  {isSelected && <CheckSquare className="absolute w-3 h-3 text-blue-600 bottom-0.5 right-0.5" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Batch action buttons (when in selection mode with selected days) */}
+        {selectionMode && selectedDates.size > 0 && (
+          <div className="flex gap-2 mb-3 flex-shrink-0">
+            <button
+              onClick={() => handleBatchStatus("present")}
+              disabled={batchLoading}
+              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs font-medium bg-green-100 text-green-700 border border-green-300 hover:bg-green-200 transition disabled:opacity-50"
+            >
+              ✓ {batchLoading ? "..." : "Présent"}
+            </button>
+            <button
+              onClick={() => handleBatchStatus("vacances")}
+              disabled={batchLoading}
+              className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-xs font-medium bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200 transition disabled:opacity-50"
+            >
+              🏖 {batchLoading ? "..." : "Vacances"}
+            </button>
           </div>
         )}
+
+        {/* Day detail panel */}
+        {!selectionMode && (isSameDay(selectedDate, today) || selectedDate > today) ? (
+          <div className={`mt-2 rounded-lg p-3 border border-slate-200 flex-shrink-0 ${ATTENDANCE_COLORS[selectedDayAttendance].bg}`}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-lg">{ATTENDANCE_COLORS[selectedDayAttendance].icon}</span>
+              <span className={`text-xs font-semibold ${ATTENDANCE_COLORS[selectedDayAttendance].text}`}>
+                {format(selectedDate, "EEE d MMM", { locale: dateLocale })}
+              </span>
+            </div>
+
+            {selectedDate > today && (
+              <button
+                onClick={() => setStatusModalDate(dateStr)}
+                className="w-full px-3 py-1 bg-white text-blue-600 border border-blue-300 rounded text-xs font-medium hover:bg-blue-50 transition"
+              >
+                {t("changeStatus")}
+              </button>
+            )}
+
+            {journalMap[dateStr] && (
+              <button
+                onClick={() => setJournalModalDate(dateStr)}
+                className="w-full mt-2 px-3 py-1 bg-white text-blue-600 border border-blue-300 rounded text-xs font-medium hover:bg-blue-50 transition flex items-center justify-center gap-1"
+              >
+                📋 {t("viewJournal")}
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
 
       {/* Status modal */}

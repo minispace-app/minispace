@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import { childrenApi, groupsApi, usersApi } from "../../../../lib/api";
@@ -69,6 +69,16 @@ function ChildDetails({
   const [startDate, setStartDate] = useState(child.start_date ?? "");
   const [scheduleDays, setScheduleDays] = useState<number[]>(child.schedule_days ?? [1, 2, 3, 4, 5]);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // Update state when child changes
+  useEffect(() => {
+    setFirstName(child.first_name);
+    setLastName(child.last_name);
+    setBirthDate(child.birth_date);
+    setGroupId(child.group_id ?? "");
+    setStartDate(child.start_date ?? "");
+    setScheduleDays(child.schedule_days ?? [1, 2, 3, 4, 5]);
+  }, [child.id]);
 
   const toggleDay = (day: number) =>
     setScheduleDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort());
