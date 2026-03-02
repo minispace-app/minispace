@@ -378,7 +378,6 @@ function StaffStatusModal({
   const statuses: Array<{ key: string; label: string; color: string }> = [
     { key: "present", label: "✓ Présent", color: "bg-green-100 text-green-700 border-green-300 hover:bg-green-200" },
     { key: "absent", label: "✗ Absent", color: "bg-red-100 text-red-700 border-red-300 hover:bg-red-200" },
-    { key: "malade", label: "🤒 Malade", color: "bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200" },
   ];
 
   return (
