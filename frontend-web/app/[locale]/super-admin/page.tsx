@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { superAdminApi } from "../../../lib/api";
-import { Plus, Users, ChevronRight, Eye, EyeOff, Building2, UserPlus, Mail, Pencil, X, Trash2, AlertTriangle, Save, RotateCcw, Megaphone, BarChart2, Shield, ChevronLeft } from "lucide-react";
+import { Plus, Users, ChevronRight, Eye, EyeOff, Building2, UserPlus, Mail, Pencil, X, Trash2, AlertTriangle, Save, RotateCcw, Megaphone, BarChart2, Shield, ChevronDown } from "lucide-react";
 
 interface Garderie {
   id: string;
@@ -52,15 +52,19 @@ export default function SuperAdminPage() {
   const [garderieUsers, setGarderieUsers] = useState<TenantUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
-  // Audit log panel
-  type RightPanel = "users" | "audit";
+  // Right panel
+  type RightPanel = "users";
   const [rightPanel, setRightPanel] = useState<RightPanel>("users");
-  interface AuditEntry { id: string; user_name: string | null; action: string; resource_label: string | null; ip_address: string | null; created_at: string; }
-  interface AuditResponse { entries: AuditEntry[]; total: number; page: number; limit: number; }
-  const [auditData, setAuditData] = useState<AuditResponse | null>(null);
-  const [auditPage, setAuditPage] = useState(1);
-  const [auditAction, setAuditAction] = useState("");
-  const [loadingAudit, setLoadingAudit] = useState(false);
+
+  // Global audit log
+  interface GlobalAuditEntry { id: string; tenant: string; user_name: string | null; action: string; resource_label: string | null; ip_address: string | null; created_at: string; }
+  interface GlobalAuditResponse { entries: GlobalAuditEntry[]; total: number; page: number; limit: number; }
+  const [globalAudit, setGlobalAudit] = useState<GlobalAuditResponse | null>(null);
+  const [globalAuditPage, setGlobalAuditPage] = useState(1);
+  const [globalAuditAction, setGlobalAuditAction] = useState("");
+  const [globalAuditTenant, setGlobalAuditTenant] = useState("");
+  const [loadingGlobalAudit, setLoadingGlobalAudit] = useState(false);
+  const [expandGlobalAudit, setExpandGlobalAudit] = useState(false);
 
   // Forms
   const [showCreateGarderie, setShowCreateGarderie] = useState(false);
@@ -109,6 +113,7 @@ export default function SuperAdminPage() {
         setAuthenticated(true);
         loadGarderies();
         loadAnnouncement();
+        loadGlobalAudit();
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,13 +186,18 @@ export default function SuperAdminPage() {
     }
   }, []);
 
-  const loadAuditLog = useCallback(async (slug: string, page = 1, action = "") => {
-    setLoadingAudit(true);
+  const loadGlobalAudit = useCallback(async (page = 1, action = "", tenant = "") => {
+    setLoadingGlobalAudit(true);
     try {
-      const res = await superAdminApi.getAuditLog(slug, { page, limit: 100, action: action || undefined });
-      setAuditData(res.data);
+      const res = await superAdminApi.getGlobalAuditLog({
+        page,
+        limit: 50,
+        action: action || undefined,
+        tenant: tenant || undefined,
+      });
+      setGlobalAudit(res.data);
     } finally {
-      setLoadingAudit(false);
+      setLoadingGlobalAudit(false);
     }
   }, []);
 
@@ -195,12 +205,9 @@ export default function SuperAdminPage() {
     if (selectedSlug === slug) {
       setSelectedSlug(null);
       setGarderieUsers([]);
-      setAuditData(null);
     } else {
       setSelectedSlug(slug);
       setRightPanel("users");
-      setAuditPage(1);
-      setAuditAction("");
       loadGarderieUsers(slug);
     }
     setShowCreateUser(false);
@@ -983,27 +990,14 @@ export default function SuperAdminPage() {
           <div className="w-96 flex-shrink-0">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
 
-              {/* Tab switcher */}
-              <div className="flex border-b border-slate-100">
-                <button
-                  onClick={() => setRightPanel("users")}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition ${rightPanel === "users" ? "text-purple-600 border-b-2 border-purple-500" : "text-slate-400 hover:text-slate-600"}`}
-                >
-                  <Users className="w-3.5 h-3.5" /> Utilisateurs
-                </button>
-                <button
-                  onClick={() => {
-                    setRightPanel("audit");
-                    if (!auditData) loadAuditLog(selectedSlug, 1, "");
-                  }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold transition ${rightPanel === "audit" ? "text-slate-700 border-b-2 border-slate-600" : "text-slate-400 hover:text-slate-600"}`}
-                >
-                  <Shield className="w-3.5 h-3.5" /> Journal d&apos;audit
-                </button>
+              {/* Header */}
+              <div className="border-b border-slate-100 px-5 py-3">
+                <h3 className="font-semibold text-slate-800">Utilisateurs</h3>
               </div>
 
               {/* Users panel — header + form + list */}
-              {rightPanel === "users" && <>
+              {rightPanel === "users" && (
+              <>
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold text-slate-800 flex items-center gap-2">
@@ -1124,77 +1118,172 @@ export default function SuperAdminPage() {
                   ))}
                 </div>
               )}
-              </>}
-
-              {/* Audit log panel */}
-              {rightPanel === "audit" && (
-                <div>
-                  {/* Filters */}
-                  <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap gap-1.5">
-                    {[["", "Toutes"], ["auth", "Auth"], ["child", "Enfants"], ["user", "Utilisateurs"], ["media", "Photos"], ["document", "Documents"]].map(([val, label]) => (
-                      <button
-                        key={val}
-                        onClick={() => {
-                          setAuditAction(val);
-                          setAuditPage(1);
-                          loadAuditLog(selectedSlug!, 1, val);
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${auditAction === val ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Entries */}
-                  {loadingAudit ? (
-                    <div className="p-6 text-center text-slate-400 text-sm">Chargement…</div>
-                  ) : !auditData || auditData.entries.length === 0 ? (
-                    <div className="p-6 text-center text-slate-400 text-sm">Aucune entrée.</div>
-                  ) : (
-                    <div className="divide-y divide-slate-50 max-h-[480px] overflow-y-auto">
-                      {auditData.entries.map((entry) => {
-                        const prefix = entry.action.split(".")[0];
-                        const colors: Record<string, string> = { auth: "bg-blue-100 text-blue-700", child: "bg-green-100 text-green-700", user: "bg-orange-100 text-orange-700", media: "bg-purple-100 text-purple-700", document: "bg-yellow-100 text-yellow-700" };
-                        return (
-                          <div key={entry.id} className="px-4 py-2.5 hover:bg-slate-50 transition">
-                            <div className="flex items-start justify-between gap-2">
-                              <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold flex-shrink-0 ${colors[prefix] ?? "bg-slate-100 text-slate-600"}`}>
-                                {entry.action}
-                              </span>
-                              <span className="text-xs text-slate-400 whitespace-nowrap font-mono">
-                                {new Date(entry.created_at).toLocaleString("fr-CA", { dateStyle: "short", timeStyle: "short" })}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-600 mt-1 truncate">{entry.user_name ?? "—"} {entry.resource_label ? `· ${entry.resource_label}` : ""}</p>
-                            {entry.ip_address && <p className="text-xs text-slate-400 font-mono">{entry.ip_address}</p>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Pagination */}
-                  {auditData && auditData.total > 100 && (
-                    <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-xs text-slate-400">Page {auditPage} · {auditData.total} entrées</span>
-                      <div className="flex gap-1">
-                        <button onClick={() => { const p = Math.max(1, auditPage - 1); setAuditPage(p); loadAuditLog(selectedSlug!, p, auditAction); }} disabled={auditPage === 1} className="p-1.5 rounded border border-slate-200 disabled:opacity-40 hover:bg-slate-50">
-                          <ChevronLeft className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => { const p = auditPage + 1; setAuditPage(p); loadAuditLog(selectedSlug!, p, auditAction); }} disabled={auditData.entries.length < 100} className="p-1.5 rounded border border-slate-200 disabled:opacity-40 hover:bg-slate-50">
-                          <ChevronRight className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+              </>
               )}
 
             </div>
           </div>
         )}
       </div>
+
+      {/* Global Audit Log — Bottom section below garderies */}
+      {authenticated && (
+        <div className="max-w-7xl mx-auto px-6 pt-6">
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            {/* Header */}
+            <div
+              onClick={() => setExpandGlobalAudit(!expandGlobalAudit)}
+              className="px-6 py-4 border-b border-slate-100 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition"
+            >
+              <div className="flex items-center gap-3">
+                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandGlobalAudit ? 'rotate-180' : ''}`} />
+                <Shield className="w-5 h-5 text-slate-500" />
+                <h2 className="font-semibold text-slate-800">Journal d&apos;audit global</h2>
+                {globalAudit && <span className="text-xs text-slate-400 font-medium">({globalAudit.total} entrées)</span>}
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  loadGlobalAudit(globalAuditPage, globalAuditAction, globalAuditTenant);
+                }}
+                disabled={loadingGlobalAudit}
+                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition"
+              >
+                {loadingGlobalAudit ? "..." : "↻"}
+              </button>
+            </div>
+
+            {/* Content — Collapsible */}
+            {expandGlobalAudit && (
+            <>
+            {/* Filters */}
+            <div className="px-6 py-4 border-b border-slate-100 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {[["", "Toutes"], ["auth", "Auth"], ["child", "Enfants"], ["user", "Utilisateurs"], ["media", "Photos"], ["document", "Documents"]].map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => {
+                      setGlobalAuditAction(val);
+                      setGlobalAuditPage(1);
+                      loadGlobalAudit(1, val, globalAuditTenant);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${globalAuditAction === val ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tenant filter */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-600">Garderie:</label>
+                <select
+                  value={globalAuditTenant}
+                  onChange={(e) => {
+                    setGlobalAuditTenant(e.target.value);
+                    setGlobalAuditPage(1);
+                    loadGlobalAudit(1, globalAuditAction, e.target.value);
+                  }}
+                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300"
+                >
+                  <option value="">Toutes</option>
+                  {garderies.map((g) => (
+                    <option key={g.slug} value={g.slug}>
+                      {g.name} ({g.slug})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Entries */}
+            {loadingGlobalAudit ? (
+              <div className="p-8 text-center text-slate-400 text-sm">Chargement…</div>
+            ) : !globalAudit || globalAudit.entries.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-sm">Aucune entrée.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Garderie</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Action</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Utilisateur</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">IP</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {globalAudit.entries.map((entry) => {
+                      const prefix = entry.action.split(".")[0];
+                      const colors: Record<string, string> = { auth: "bg-blue-100 text-blue-700", child: "bg-green-100 text-green-700", user: "bg-orange-100 text-orange-700", media: "bg-purple-100 text-purple-700", document: "bg-yellow-100 text-yellow-700" };
+                      return (
+                        <tr key={entry.id} className="border-b border-slate-50 hover:bg-slate-50 transition">
+                          <td className="px-6 py-3 text-sm font-medium text-slate-700">
+                            <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+                              {entry.tenant}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-sm">
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${colors[prefix] ?? "bg-slate-100 text-slate-600"}`}>
+                              {entry.action}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-sm text-slate-600">
+                            {entry.user_name ?? "—"}
+                            {entry.resource_label ? <div className="text-xs text-slate-400 mt-0.5">{entry.resource_label}</div> : ""}
+                          </td>
+                          <td className="px-6 py-3 text-sm font-mono text-slate-400">
+                            {entry.ip_address ?? "—"}
+                          </td>
+                          <td className="px-6 py-3 text-sm text-slate-400 whitespace-nowrap">
+                            {new Date(entry.created_at).toLocaleString("fr-CA", { dateStyle: "short", timeStyle: "short" })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {globalAudit && globalAudit.total > 50 && (
+              <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs text-slate-400">
+                  Page {globalAuditPage} · {globalAudit.total} entrées
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const p = Math.max(1, globalAuditPage - 1);
+                      setGlobalAuditPage(p);
+                      loadGlobalAudit(p, globalAuditAction, globalAuditTenant);
+                    }}
+                    disabled={globalAuditPage === 1}
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition"
+                  >
+                    ◀ Précédent
+                  </button>
+                  <button
+                    onClick={() => {
+                      const p = globalAuditPage + 1;
+                      setGlobalAuditPage(p);
+                      loadGlobalAudit(p, globalAuditAction, globalAuditTenant);
+                    }}
+                    disabled={globalAudit.entries.length < 50}
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition"
+                  >
+                    Suivant ▶
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

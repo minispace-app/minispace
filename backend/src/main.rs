@@ -214,6 +214,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/super-admin/backups", get(routes::tenants::list_backups))
         .route("/super-admin/restore", post(routes::tenants::trigger_restore))
         // Grafana SSO
+        .route("/super-admin/audit-log", get(routes::audit_log::super_admin_global_audit_log))
         .route("/super-admin/audit-log/{slug}", get(routes::audit_log::super_admin_audit_log))
         .route("/super-admin/grafana-access", post(routes::grafana_auth::grafana_access))
         .route("/super-admin/grafana-auth", get(routes::grafana_auth::grafana_auth))

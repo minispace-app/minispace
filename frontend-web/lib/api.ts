@@ -321,6 +321,8 @@ export const superAdminApi = {
     superAdminClient.delete("/super-admin/announcement"),
   getAuditLog: (slug: string, params?: { page?: number; limit?: number; action?: string }) =>
     superAdminClient.get(`/super-admin/audit-log/${slug}`, { params }),
+  getGlobalAuditLog: (params?: { page?: number; limit?: number; action?: string; tenant?: string }) =>
+    superAdminClient.get(`/super-admin/audit-log`, { params }),
 };
 
 export const auditApi = {
