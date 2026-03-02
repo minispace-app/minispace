@@ -93,7 +93,7 @@ pub async fn get_month(
 
     let records = sqlx::query_as::<_, (String, String)>(
         &format!(
-            "SELECT date, status FROM {}.attendance WHERE child_id = $1 AND date >= $2 AND date < $3 ORDER BY date ASC",
+            "SELECT date::TEXT, status::TEXT FROM {}.attendance WHERE child_id = $1 AND date >= $2 AND date < $3 ORDER BY date ASC",
             schema
         ),
     )
@@ -275,7 +275,7 @@ pub async fn get_month_all_children(
 
     let records = sqlx::query_as::<_, (Uuid, String, String)>(
         &format!(
-            "SELECT child_id, date, status FROM {}.attendance WHERE date >= $1 AND date < $2 ORDER BY child_id, date",
+            "SELECT child_id, date::TEXT, status::TEXT FROM {}.attendance WHERE date >= $1 AND date < $2 ORDER BY child_id, date",
             schema
         ),
     )
