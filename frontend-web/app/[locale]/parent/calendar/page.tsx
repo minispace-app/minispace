@@ -68,7 +68,7 @@ export default function CalendarPage() {
 
   const monthStr = format(currentMonth, "yyyy-MM");
 
-  const { data: attendance = {} } = useSWR(
+  const { data: attendance = {}, mutate: mutateAttendance } = useSWR(
     selectedChild ? `attendance-${selectedChild}-${monthStr}` : null,
     () => attendanceApi.getMonth(selectedChild!, monthStr).then((r) => r.data.attendance || {})
   );
@@ -347,6 +347,7 @@ export default function CalendarPage() {
           onClose={() => setStatusModalDate(null)}
           onStatusChange={() => {
             setStatusModalDate(null);
+            mutateAttendance();
           }}
         />
       )}
