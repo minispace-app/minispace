@@ -147,11 +147,11 @@ pub async fn set_attendance(
 
     // Check if parent and apply restrictions
     if let UserRole::Parent = user.role {
-        // Parents can only set vacances or present
-        if !["vacances", "present"].contains(&req.status.as_str()) {
+        // Parents can only set absent or present
+        if !["absent", "present"].contains(&req.status.as_str()) {
             return Err((
                 StatusCode::FORBIDDEN,
-                Json(json!({ "error": "Parents can only set vacances or present status" })),
+                Json(json!({ "error": "Parents can only set absent or present status" })),
             ));
         }
 
