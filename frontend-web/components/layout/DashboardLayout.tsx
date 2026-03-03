@@ -22,8 +22,7 @@ import {
   Menu,
   X,
   User,
-  UtensilsCrossed,
-  PartyPopper,
+  ClipboardList,
 } from "lucide-react";
 import { LanguageSwitcher } from "../LanguageSwitcher";
 import { AnnouncementBanner } from "../AnnouncementBanner";
@@ -37,8 +36,7 @@ const navItems = [
   { key: "documents", icon: FileText, href: "/dashboard/documents", roles: null },
   { key: "children", icon: Users, href: "/dashboard/children", roles: null },
   { key: "groups", icon: FolderOpen, href: "/dashboard/groups", roles: null },
-  { key: "menus", icon: UtensilsCrossed, href: "/dashboard/menus", roles: null },
-  { key: "activities", icon: PartyPopper, href: "/dashboard/activities", roles: ["admin_garderie"] },
+  { key: "planning", icon: ClipboardList, href: "/dashboard/planning", roles: null },
   { key: "users",     icon: Settings, href: "/dashboard/users",   roles: ["admin_garderie", "super_admin"] },
   { key: "myProfile", icon: User,    href: "/dashboard/profile", roles: null },
 ];

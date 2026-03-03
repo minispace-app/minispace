@@ -90,9 +90,7 @@
     "documents": "Documents",
     "children": "Enfants",
     "groups": "Groupes",
-    "menus": "Menus",
-    "calendar": "Calendrier",
-    "activities": "Activités",
+    "planning": "Planification",
     "journal": "Journal de bord",
     "settings": "Paramètres",
     "users": "Utilisateurs",
@@ -396,6 +394,9 @@
     "nextWeek": "Semaine suivante",
     "placeholder": "Menu du jour...",
     "menuOfDay": "Menu du jour"
+  },
+  "planning": {
+    "title": "Planification"
   },
   "auditLog": {
     "title": "Journal d'audit",
