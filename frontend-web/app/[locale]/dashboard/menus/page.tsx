@@ -26,6 +26,7 @@ export default function MenusPage() {
   const [localData, setLocalData] = useState<Record<string, Partial<DailyMenuData>>>({});
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<Record<string, Partial<DailyMenuData>>>({});
 
   const weekDates = WEEK_DAYS.map((_, i) => addDays(weekStart, i));
   const weekStartStr = formatDate(weekStart);
@@ -54,12 +55,16 @@ export default function MenusPage() {
   useEffect(() => {
     if (Object.keys(localData).length === 0) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+    // Store current localData as pending save
+    pendingSaveRef.current = { ...localData };
+
     saveTimerRef.current = setTimeout(async () => {
-      if (Object.keys(localData).length === 0) return;
+      if (Object.keys(pendingSaveRef.current).length === 0) return;
       setSaveStatus("saving");
       try {
         await Promise.all(
-          Object.entries(localData).map(([dateStr, sections]) =>
+          Object.entries(pendingSaveRef.current).map(([dateStr, sections]) =>
             menusApi.upsert({
               date: dateStr,
               collation_matin: sections.collation_matin,
@@ -68,7 +73,16 @@ export default function MenusPage() {
             })
           )
         );
-        setLocalData({});
+
+        // Only clear data that was actually saved, keep any new changes
+        setLocalData((prev) => {
+          const newData = { ...prev };
+          Object.keys(pendingSaveRef.current).forEach((dateStr) => {
+            delete newData[dateStr];
+          });
+          return newData;
+        });
+        pendingSaveRef.current = {};
         mutate();
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 2000);
