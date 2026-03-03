@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import { childrenApi, groupsApi, usersApi, attendanceApi, journalApi, activitiesApi, menusApi, settingsApi } from "../../../../lib/api";
 import { useAuth } from "../../../../hooks/useAuth";
+import { getTodayInMontreal, formatDateInMontreal } from "../../../../lib/dateUtils";
 import { Plus, ChevronDown, ChevronUp, UserPlus, X, Pencil, ChevronLeft, ChevronRight, Loader2, Check, BookOpen, Clock } from "lucide-react";
 import { ChildAvatar, childAvatarColor } from "../../../../components/ChildAvatar";
 import { WeatherPicker } from "../../../../components/journal/WeatherPicker";
@@ -512,7 +513,7 @@ function CalendarSection({
     return false;
   };
 
-  const today = new Date();
+  const today = getTodayInMontreal();
   today.setHours(0, 0, 0, 0);
 
   const journalMap = journals.reduce((acc: Record<string, JournalDay>, j: JournalDay) => {
@@ -802,7 +803,7 @@ function JournalsSection({
 
   const weekStartStr = formatDate(weekStart);
   const weekDates = WEEK_DAYS.map((_, i) => addDays(weekStart, i));
-  const today = formatDate(new Date());
+  const today = formatDateInMontreal(getTodayInMontreal());
 
   const { data: settingsData } = useSWR("settings-journal", () =>
     settingsApi.get().then((r) => r.data as { journal_auto_send_time: string })

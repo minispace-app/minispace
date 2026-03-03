@@ -11,6 +11,7 @@ import { fr } from "date-fns/locale";
 import { TextareaField } from "../../../../components/journal/TextareaField";
 import { WEEK_DAYS } from "../../../../components/journal/journalTypes";
 import { getMonday, formatDate, addDays } from "../../../../components/journal/journalUtils";
+import { getTodayInMontreal, formatDateInMontreal } from "../../../../lib/dateUtils";
 
 interface DailyMenuData {
   id?: string;
@@ -54,14 +55,14 @@ function MenusSection() {
   const t = useTranslations("menus");
   const tj = useTranslations("journal");
 
-  const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
+  const [weekStart, setWeekStart] = useState<Date>(() => getMonday(getTodayInMontreal()));
   const [localData, setLocalData] = useState<Record<string, string>>({});
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const weekDates = WEEK_DAYS.map((_, i) => addDays(weekStart, i));
   const weekStartStr = formatDate(weekStart);
-  const today = formatDate(new Date());
+  const today = formatDateInMontreal(getTodayInMontreal());
 
   const { data: menusData, mutate } = useSWR(["menus-week-planning", weekStartStr], () =>
     menusApi.getWeek(weekStartStr)
@@ -218,7 +219,7 @@ function MenusSection() {
 function ActivitiesSection() {
   const t = useTranslations("activities");
   const { user } = useAuth();
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(getTodayInMontreal());
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState<Partial<Activity> & { action?: string }>({});
   const [loading, setLoading] = useState(false);
@@ -248,7 +249,7 @@ function ActivitiesSection() {
     if (activity) {
       setFormData({ ...activity, action: "edit" });
     } else {
-      setFormData({ action: "create", date: format(new Date(), "yyyy-MM-dd") });
+      setFormData({ action: "create", date: formatDateInMontreal(getTodayInMontreal()) });
     }
     setShowForm(true);
   };
