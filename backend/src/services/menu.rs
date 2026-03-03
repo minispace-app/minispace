@@ -19,7 +19,8 @@ impl MenuService {
         let schema = schema_name(tenant);
         let week_end = week_start + chrono::Duration::days(4);
         let entries = sqlx::query_as::<_, DailyMenu>(&format!(
-            r#"SELECT id, date, menu, created_by, created_at, updated_at
+            r#"SELECT id, date, menu, collation_matin, diner, collation_apres_midi,
+                      created_by, created_at, updated_at
                FROM "{schema}".daily_menus
                WHERE date BETWEEN $1 AND $2
                ORDER BY date"#
@@ -40,15 +41,21 @@ impl MenuService {
     ) -> anyhow::Result<DailyMenu> {
         let schema = schema_name(tenant);
         let entry = sqlx::query_as::<_, DailyMenu>(&format!(
-            r#"INSERT INTO "{schema}".daily_menus (date, menu, created_by)
-               VALUES ($1, $2, $3)
+            r#"INSERT INTO "{schema}".daily_menus (date, menu, collation_matin, diner, collation_apres_midi, created_by)
+               VALUES ($1, $2, $3, $4, $5, $6)
                ON CONFLICT (date) DO UPDATE SET
-                   menu = EXCLUDED.menu,
+                   menu = COALESCE(EXCLUDED.menu, daily_menus.menu),
+                   collation_matin = COALESCE(EXCLUDED.collation_matin, daily_menus.collation_matin),
+                   diner = COALESCE(EXCLUDED.diner, daily_menus.diner),
+                   collation_apres_midi = COALESCE(EXCLUDED.collation_apres_midi, daily_menus.collation_apres_midi),
                    updated_at = NOW()
-               RETURNING id, date, menu, created_by, created_at, updated_at"#
+               RETURNING id, date, menu, collation_matin, diner, collation_apres_midi, created_by, created_at, updated_at"#
         ))
         .bind(req.date)
         .bind(&req.menu)
+        .bind(&req.collation_matin)
+        .bind(&req.diner)
+        .bind(&req.collation_apres_midi)
         .bind(created_by)
         .fetch_one(pool)
         .await?;
