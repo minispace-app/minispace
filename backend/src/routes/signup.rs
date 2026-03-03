@@ -146,14 +146,17 @@ pub async fn signup(
     let trial_expires_at = Utc::now() + chrono::Duration::days(30);
 
     let garderie_result = sqlx::query_as::<_, (uuid::Uuid, String, chrono::DateTime<Utc>)>(
-        "INSERT INTO public.garderies (slug, name, phone, address, email, plan, trial_expires_at)
-         VALUES ($1, $2, $3, $4, $5, 'free', $6)
+        "INSERT INTO public.garderies (slug, name, phone, address_line1, city, province, postal_code, email, plan, trial_expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'free', $9)
          RETURNING id, slug, trial_expires_at",
     )
     .bind(&slug)
     .bind(body.name.trim())
     .bind(body.phone.as_deref().filter(|s| !s.trim().is_empty()))
-    .bind(body.address.as_deref().filter(|s| !s.trim().is_empty()))
+    .bind(body.address_line1.as_deref().filter(|s| !s.trim().is_empty()))
+    .bind(body.city.as_deref().filter(|s| !s.trim().is_empty()))
+    .bind(body.province.as_deref().filter(|s| !s.trim().is_empty()))
+    .bind(body.postal_code.as_deref().filter(|s| !s.trim().is_empty()))
     .bind(&body.email)
     .bind(trial_expires_at)
     .fetch_one(&state.db)
@@ -258,12 +261,15 @@ pub async fn signup(
         let first_c = body.first_name.trim().to_string();
         let last_c = body.last_name.trim().to_string();
         let phone_c = body.phone.clone().unwrap_or_default();
-        let address_c = body.address.clone().unwrap_or_default();
+        let address_line1_c = body.address_line1.clone().unwrap_or_default();
+        let city_c = body.city.clone().unwrap_or_default();
+        let province_c = body.province.clone().unwrap_or_default();
+        let postal_code_c = body.postal_code.clone().unwrap_or_default();
         let login_url_c = login_url.clone();
         tokio::spawn(async move {
             // 1. Notification interne à contact@minispace.app
             if let Err(e) = svc
-                .send_new_signup_notification(&slug_c, &name_c, &email_c, &first_c, &last_c, &phone_c, &address_c, &expires_str)
+                .send_new_signup_notification(&slug_c, &name_c, &email_c, &first_c, &last_c, &phone_c, &address_line1_c, &city_c, &province_c, &postal_code_c, &expires_str)
                 .await
             {
                 tracing::warn!("signup admin notification failed for '{slug_c}': {e}");

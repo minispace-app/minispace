@@ -460,18 +460,28 @@ impl EmailService {
         first_name: &str,
         last_name: &str,
         phone: &str,
-        address: &str,
+        address_line1: &str,
+        city: &str,
+        province: &str,
+        postal_code: &str,
         trial_expires_at: &str,
     ) -> anyhow::Result<()> {
         let to = self.from.clone();
         let subject = format!("🎉 Nouvelle garderie — {name} ({slug})");
+
+        let full_address = [address_line1, city, province, postal_code]
+            .iter()
+            .filter(|s| !s.is_empty())
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ");
 
         let text = format!(
             "Nouvelle garderie créée via inscription libre\n\n\
             Identifiant : {slug}\n\
             Nom : {name}\n\
             Téléphone : {phone}\n\
-            Adresse : {address}\n\
+            Adresse : {full_address}\n\
             Admin : {first_name} {last_name}\n\
             Courriel : {email}\n\
             URL : https://{slug}.minispace.app\n\
@@ -481,8 +491,8 @@ impl EmailService {
         let phone_row = if !phone.is_empty() {
             format!(r#"  <tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b">Téléphone</td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#0f172a">{phone}</td></tr>"#)
         } else { String::new() };
-        let address_row = if !address.is_empty() {
-            format!(r#"  <tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b">Adresse</td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#0f172a">{address}</td></tr>"#)
+        let address_row = if !full_address.is_empty() {
+            format!(r#"  <tr><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#64748b">Adresse</td><td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#0f172a">{full_address}</td></tr>"#)
         } else { String::new() };
 
         let content = format!(
