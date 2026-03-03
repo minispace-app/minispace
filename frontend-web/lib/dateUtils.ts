@@ -1,9 +1,19 @@
 /**
- * Get today's date in Montreal timezone (America/Montreal)
- * This ensures that "today" is determined by Montreal time, not UTC
+ * Get the configured timezone from environment variable
+ * Uses NEXT_PUBLIC_TZ (frontend-accessible) from .env
+ * Defaults to America/Montreal if not set
+ */
+function getConfiguredTimezone(): string {
+  return process.env.NEXT_PUBLIC_TZ || "America/Montreal";
+}
+
+/**
+ * Get today's date in the configured timezone
+ * The timezone can be set via NEXT_PUBLIC_TIMEZONE environment variable
+ * Defaults to America/Montreal if not configured
  */
 export function getTodayInMontreal(): Date {
-  const timeZone = "America/Montreal";
+  const timeZone = getConfiguredTimezone();
 
   // Get the current time formatted in Montreal timezone
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -36,10 +46,12 @@ export function getTodayInMontreal(): Date {
 }
 
 /**
- * Format a date as YYYY-MM-DD in Montreal timezone
+ * Format a date as YYYY-MM-DD in the configured timezone
+ * The timezone can be set via NEXT_PUBLIC_TIMEZONE environment variable
+ * Defaults to America/Montreal if not configured
  */
 export function formatDateInMontreal(date: Date): string {
-  const timeZone = "America/Montreal";
+  const timeZone = getConfiguredTimezone();
 
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone,
