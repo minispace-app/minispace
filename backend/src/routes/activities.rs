@@ -12,7 +12,7 @@ use crate::{
     middleware::tenant::TenantSlug,
     models::{
         activity::{
-            ActivitiesListQuery, Activity, CreateActivityRequest, RegisterRequest,
+            ActivitiesListQuery, Activity, ActivityRegistrationWithChild, CreateActivityRequest, RegisterRequest,
             UpdateActivityRequest,
         },
         auth::AuthenticatedUser,
@@ -69,14 +69,16 @@ pub async fn list_activities(
     let schema = schema_name(&tenant);
 
     // Fetch activities with registration counts
+    // Include activities that have a start date within the month,
+    // or span across the month (end_date >= first_day)
     let mut activities = sqlx::query_as::<_, Activity>(
         &format!(
-            "SELECT a.id, a.title, a.description, a.date, a.capacity, a.created_by, a.created_at, a.updated_at,
+            "SELECT a.id, a.title, a.description, a.date, a.end_date, a.capacity, a.group_id, a.type, a.created_by, a.created_at, a.updated_at,
                     CAST(COUNT(ar.id) AS INT) as registration_count
              FROM {}.activities a
              LEFT JOIN {}.activity_registrations ar ON a.id = ar.activity_id
-             WHERE a.date >= $1 AND a.date < $2
-             GROUP BY a.id
+             WHERE a.date <= $2 AND (a.end_date IS NULL AND a.date >= $1 OR a.end_date IS NOT NULL AND a.end_date >= $1)
+             GROUP BY a.id, a.type
              ORDER BY a.date ASC",
             schema, schema
         ),
@@ -138,14 +140,22 @@ pub async fn create_activity(
     let date = NaiveDate::parse_from_str(&req.date, "%Y-%m-%d")
         .map_err(|_| (StatusCode::BAD_REQUEST, Json(json!({ "error": "Invalid date format" }))))?;
 
+    let end_date = if let Some(end_date_str) = &req.end_date {
+        Some(NaiveDate::parse_from_str(end_date_str, "%Y-%m-%d")
+            .map_err(|_| (StatusCode::BAD_REQUEST, Json(json!({ "error": "Invalid end_date format" }))))?)
+    } else {
+        None
+    };
+
     let schema = schema_name(&tenant);
 
     let activity_id = Uuid::new_v4();
+    let activity_type = req.activity_type.as_deref().unwrap_or("sortie");
 
     sqlx::query(
         &format!(
-            "INSERT INTO {}.activities (id, title, description, date, capacity, created_by, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())",
+            "INSERT INTO {}.activities (id, title, description, date, end_date, capacity, group_id, type, created_by, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())",
             schema
         ),
     )
@@ -153,7 +163,10 @@ pub async fn create_activity(
     .bind(&req.title)
     .bind(&req.description)
     .bind(date)
+    .bind(end_date)
     .bind(req.capacity)
+    .bind(req.group_id)
+    .bind(activity_type)
     .bind(user.user_id)
     .execute(&state.db)
     .await
@@ -263,6 +276,50 @@ pub async fn update_activity(
             })?;
     }
 
+    if let Some(end_date_str) = &req.end_date {
+        let end_date = NaiveDate::parse_from_str(end_date_str, "%Y-%m-%d")
+            .map_err(|_| (StatusCode::BAD_REQUEST, Json(json!({ "error": "Invalid end_date format" }))))?;
+        sqlx::query(&format!("UPDATE {}.activities SET end_date = $1, updated_at = NOW() WHERE id = $2", schema))
+            .bind(end_date)
+            .bind(activity_id)
+            .execute(&state.db)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": e.to_string() })),
+                )
+            })?;
+    }
+
+    if let Some(group_id) = req.group_id {
+        sqlx::query(&format!("UPDATE {}.activities SET group_id = $1, updated_at = NOW() WHERE id = $2", schema))
+            .bind(group_id)
+            .bind(activity_id)
+            .execute(&state.db)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": e.to_string() })),
+                )
+            })?;
+    }
+
+    if let Some(activity_type) = &req.activity_type {
+        sqlx::query(&format!("UPDATE {}.activities SET type = $1, updated_at = NOW() WHERE id = $2", schema))
+            .bind(activity_type)
+            .bind(activity_id)
+            .execute(&state.db)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": e.to_string() })),
+                )
+            })?;
+    }
+
     Ok(Json(json!({ "success": true })))
 }
 
@@ -342,9 +399,9 @@ pub async fn register_child(
         }
     }
 
-    // Check if activity exists and get capacity
-    let activity = sqlx::query_as::<_, (Option<i32>,)>(
-        &format!("SELECT capacity FROM {}.activities WHERE id = $1", schema),
+    // Check if activity exists and get capacity + type
+    let activity = sqlx::query_as::<_, (Option<i32>, String)>(
+        &format!("SELECT capacity, type FROM {}.activities WHERE id = $1", schema),
     )
     .bind(activity_id)
     .fetch_optional(&state.db)
@@ -356,12 +413,20 @@ pub async fn register_child(
         )
     })?;
 
-    let capacity = activity.ok_or_else(|| {
+    let (capacity, activity_type) = activity.ok_or_else(|| {
         (
             StatusCode::NOT_FOUND,
             Json(json!({ "error": "Activity not found" })),
         )
-    })?.0;
+    })?;
+
+    // Cannot register for theme activities
+    if activity_type == "theme" {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Cannot register for theme activities" })),
+        ));
+    }
 
     // If capacity is limited, check current registration count
     if let Some(cap) = capacity {
@@ -478,4 +543,46 @@ pub async fn unregister_child(
     }
 
     Ok(Json(json!({ "success": true })))
+}
+
+/// GET /activities/:id/registrations
+/// Get all registrations for an activity
+/// Access: Admin and educateurs only
+pub async fn get_activity_registrations(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    user: AuthenticatedUser,
+    Path(activity_id): Path<Uuid>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    // Admin and educateurs only
+    if !matches!(user.role, UserRole::AdminGarderie | UserRole::Educateur) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "Only admin and educateurs can view registrations" })),
+        ));
+    }
+
+    let schema = schema_name(&tenant);
+
+    let registrations = sqlx::query_as::<_, ActivityRegistrationWithChild>(
+        &format!(
+            "SELECT ar.id, ar.child_id, c.first_name, c.last_name, ar.registered_by, ar.created_at
+             FROM {}.activity_registrations ar
+             JOIN {}.children c ON c.id = ar.child_id
+             WHERE ar.activity_id = $1
+             ORDER BY c.last_name, c.first_name",
+            schema, schema
+        ),
+    )
+    .bind(activity_id)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    Ok(Json(json!({ "registrations": registrations })))
 }

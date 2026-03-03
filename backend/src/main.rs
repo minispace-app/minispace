@@ -149,6 +149,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/invitations", get(routes::auth::list_pending_invitations))
         .route("/auth/invitations/{id}", delete(routes::auth::delete_invitation))
         .route("/auth/invitations/{id}/resend", post(routes::auth::resend_invitation))
+        .route("/auth/validate-token/{token}", get(routes::auth::validate_invitation_token))
         .route("/auth/register", post(routes::auth::register_from_invite))
         .route("/auth/me", get(routes::auth::me))
         .route("/auth/change-password", post(routes::auth::change_password))
@@ -192,10 +193,12 @@ async fn main() -> anyhow::Result<()> {
         .route("/journals/{child_id}/send-to-parents", post(routes::journal::send_to_parents))
         // Attendance
         .route("/attendance", get(routes::attendance::get_month).put(routes::attendance::set_attendance))
+        .route("/attendance/bulk", put(routes::attendance::set_attendance_bulk))
         .route("/attendance/month", get(routes::attendance::get_month_all_children))
         // Activities
         .route("/activities", get(routes::activities::list_activities).post(routes::activities::create_activity))
         .route("/activities/{id}", put(routes::activities::update_activity).delete(routes::activities::delete_activity))
+        .route("/activities/{id}/registrations", get(routes::activities::get_activity_registrations))
         .route("/activities/{id}/register", post(routes::activities::register_child))
         .route("/activities/{id}/register/{child_id}", delete(routes::activities::unregister_child))
         // Settings

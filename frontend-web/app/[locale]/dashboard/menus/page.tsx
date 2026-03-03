@@ -12,7 +12,10 @@ import { getMonday, formatDate, addDays } from "../../../../components/journal/j
 interface DailyMenuData {
   id?: string;
   date: string;
-  menu: string;
+  menu?: string;
+  collation_matin?: string;
+  diner?: string;
+  collation_apres_midi?: string;
 }
 
 export default function MenusPage() {
@@ -20,9 +23,10 @@ export default function MenusPage() {
   const tj = useTranslations("journal");
 
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
-  const [localData, setLocalData] = useState<Record<string, string>>({});
+  const [localData, setLocalData] = useState<Record<string, Partial<DailyMenuData>>>({});
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<Record<string, Partial<DailyMenuData>>>({});
 
   const weekDates = WEEK_DAYS.map((_, i) => addDays(weekStart, i));
   const weekStartStr = formatDate(weekStart);
@@ -35,29 +39,50 @@ export default function MenusPage() {
   const serverMenus: DailyMenuData[] =
     (menusData as { data: DailyMenuData[] } | undefined)?.data ?? [];
 
-  const getMenuForDate = (dateStr: string): string => {
-    if (localData[dateStr] !== undefined) return localData[dateStr];
-    return serverMenus.find((m) => m.date === dateStr)?.menu ?? "";
+  const getMenuForDate = (dateStr: string, section: "collation_matin" | "diner" | "collation_apres_midi"): string => {
+    if (localData[dateStr]?.[section] !== undefined) return localData[dateStr][section] ?? "";
+    return serverMenus.find((m) => m.date === dateStr)?.[section] ?? "";
   };
 
-  const updateMenu = (dateStr: string, value: string) => {
-    setLocalData((prev) => ({ ...prev, [dateStr]: value }));
+  const updateMenu = (dateStr: string, section: "collation_matin" | "diner" | "collation_apres_midi", value: string) => {
+    setLocalData((prev) => ({
+      ...prev,
+      [dateStr]: { ...prev[dateStr], [section]: value },
+    }));
   };
 
   // Auto-save debounce
   useEffect(() => {
     if (Object.keys(localData).length === 0) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+    // Store current localData as pending save
+    pendingSaveRef.current = { ...localData };
+
     saveTimerRef.current = setTimeout(async () => {
-      if (Object.keys(localData).length === 0) return;
+      if (Object.keys(pendingSaveRef.current).length === 0) return;
       setSaveStatus("saving");
       try {
         await Promise.all(
-          Object.entries(localData).map(([dateStr, menu]) =>
-            menusApi.upsert({ date: dateStr, menu })
+          Object.entries(pendingSaveRef.current).map(([dateStr, sections]) =>
+            menusApi.upsert({
+              date: dateStr,
+              collation_matin: sections.collation_matin,
+              diner: sections.diner,
+              collation_apres_midi: sections.collation_apres_midi,
+            })
           )
         );
-        setLocalData({});
+
+        // Only clear data that was actually saved, keep any new changes
+        setLocalData((prev) => {
+          const newData = { ...prev };
+          Object.keys(pendingSaveRef.current).forEach((dateStr) => {
+            delete newData[dateStr];
+          });
+          return newData;
+        });
+        pendingSaveRef.current = {};
         mutate();
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 2000);
@@ -166,12 +191,41 @@ export default function MenusPage() {
                     <span className="w-1.5 h-1.5 rounded-full bg-orange-400 flex-shrink-0" />
                   )}
                 </div>
-                <TextareaField
-                  value={getMenuForDate(dateStr)}
-                  onChange={(v) => updateMenu(dateStr, v)}
-                  placeholder={t("placeholder")}
-                  rows={5}
-                />
+                {/* 3 Menu Sections */}
+                <div className="space-y-3">
+                  {/* Collation Matin */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">🌅</label>
+                    <TextareaField
+                      value={getMenuForDate(dateStr, "collation_matin")}
+                      onChange={(v) => updateMenu(dateStr, "collation_matin", v)}
+                      placeholder="Matin"
+                      rows={2}
+                    />
+                  </div>
+
+                  {/* Dîner */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">🍽️</label>
+                    <TextareaField
+                      value={getMenuForDate(dateStr, "diner")}
+                      onChange={(v) => updateMenu(dateStr, "diner", v)}
+                      placeholder="Midi"
+                      rows={2}
+                    />
+                  </div>
+
+                  {/* Collation Après-midi */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">🌙</label>
+                    <TextareaField
+                      value={getMenuForDate(dateStr, "collation_apres_midi")}
+                      onChange={(v) => updateMenu(dateStr, "collation_apres_midi", v)}
+                      placeholder="Après-midi"
+                      rows={2}
+                    />
+                  </div>
+                </div>
               </div>
             );
           })}

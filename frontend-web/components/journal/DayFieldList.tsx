@@ -13,7 +13,8 @@ interface Props {
   onFieldChange?: (field: keyof DailyJournal, value: unknown) => void;
   appetitOptions: EmojiOption[];
   humeurOptions: EmojiOption[];
-  menuDuJour?: string | null;
+  menuDuJour?: { collation_matin?: string; diner?: string; collation_apres_midi?: string } | null;
+  weeklyTheme?: { title: string; date: string; end_date?: string } | null;
   placeholders?: {
     menu?: string;
     sante?: string;
@@ -48,6 +49,7 @@ export function DayFieldList({
   appetitOptions,
   humeurOptions,
   menuDuJour,
+  weeklyTheme,
   placeholders = {},
 }: Props) {
   const isAbsent = !!day.absent;
@@ -146,20 +148,63 @@ export function DayFieldList({
 
   return (
     <div className="divide-y divide-slate-100">
-      {/* Menu du jour card (garderie-level, read-only) */}
-      {menuDuJour && (
+      {/* Weekly theme card (read-only) */}
+      {weeklyTheme && (
         <div className="px-4 py-3">
-          <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
-            <UtensilsCrossed className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wide text-amber-700 block mb-1">
-                Menu du jour
+          <div className="flex items-start gap-2 p-3 bg-violet-50 rounded-lg border border-violet-200">
+            <span className="text-xl flex-shrink-0 mt-0.5">📚</span>
+            <div className="flex-1">
+              <span className="text-xs font-semibold uppercase tracking-wide text-violet-700 block mb-1">
+                Thème de la semaine
               </span>
-              <p className="text-sm text-amber-900 whitespace-pre-wrap">{menuDuJour}</p>
+              <p className="text-sm text-violet-900 font-medium">{weeklyTheme.title}</p>
             </div>
           </div>
         </div>
       )}
+
+      {/* Menu du jour card (garderie-level, read-only) */}
+      {menuDuJour && (() => {
+        const hasMenu = menuDuJour.collation_matin || menuDuJour.diner || menuDuJour.collation_apres_midi;
+        if (!hasMenu) return null;
+        return (
+          <div className="px-4 py-3 space-y-2">
+            {menuDuJour.collation_matin && (
+              <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <span className="text-xl flex-shrink-0 mt-0.5">🌅</span>
+                <div className="flex-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-blue-700 block mb-1">
+                    Collation matin
+                  </span>
+                  <p className="text-sm text-blue-900 whitespace-pre-wrap">{menuDuJour.collation_matin}</p>
+                </div>
+              </div>
+            )}
+            {menuDuJour.diner && (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <UtensilsCrossed className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-amber-700 block mb-1">
+                    Dîner
+                  </span>
+                  <p className="text-sm text-amber-900 whitespace-pre-wrap">{menuDuJour.diner}</p>
+                </div>
+              </div>
+            )}
+            {menuDuJour.collation_apres_midi && (
+              <div className="flex items-start gap-2 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <span className="text-xl flex-shrink-0 mt-0.5">🌙</span>
+                <div className="flex-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-purple-700 block mb-1">
+                    Collation après-midi
+                  </span>
+                  <p className="text-sm text-purple-900 whitespace-pre-wrap">{menuDuJour.collation_apres_midi}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Absent toggle */}
       <div className="px-4 py-3 flex items-center justify-between">

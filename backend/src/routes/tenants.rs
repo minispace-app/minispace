@@ -37,13 +37,16 @@ pub async fn create_garderie(
     Json(body): Json<CreateGarderieRequest>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
     let garderie = sqlx::query_as::<_, crate::models::tenant::Garderie>(
-        "INSERT INTO garderies (slug, name, address, phone, email, plan)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        "INSERT INTO garderies (slug, name, address_line1, city, province, postal_code, phone, email, plan)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *",
     )
     .bind(&body.slug)
     .bind(&body.name)
-    .bind(&body.address)
+    .bind(&body.address_line1)
+    .bind(&body.city)
+    .bind(&body.province)
+    .bind(&body.postal_code)
     .bind(&body.phone)
     .bind(&body.email)
     .bind(body.plan.unwrap_or(crate::models::tenant::PlanType::Free))
@@ -102,14 +105,17 @@ pub async fn update_garderie(
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     sqlx::query_as::<_, crate::models::tenant::Garderie>(
         "UPDATE garderies SET
-           name    = COALESCE($2, name),
-           address = COALESCE($3, address),
-           phone   = COALESCE($4, phone),
-           email   = COALESCE($5, email),
-           is_active = COALESCE($6, is_active),
+           name          = COALESCE($2, name),
+           address_line1 = COALESCE($3, address_line1),
+           city          = COALESCE($4, city),
+           province      = COALESCE($5, province),
+           postal_code   = COALESCE($6, postal_code),
+           phone         = COALESCE($7, phone),
+           email         = COALESCE($8, email),
+           is_active     = COALESCE($9, is_active),
            trial_expires_at = CASE
-               WHEN $7 = TRUE THEN NULL::TIMESTAMPTZ
-               ELSE COALESCE($8, trial_expires_at)
+               WHEN $10 = TRUE THEN NULL::TIMESTAMPTZ
+               ELSE COALESCE($11, trial_expires_at)
            END,
            updated_at = NOW()
          WHERE slug = $1
@@ -117,7 +123,10 @@ pub async fn update_garderie(
     )
     .bind(&slug)
     .bind(&body.name)
-    .bind(&body.address)
+    .bind(&body.address_line1)
+    .bind(&body.city)
+    .bind(&body.province)
+    .bind(&body.postal_code)
     .bind(&body.phone)
     .bind(&body.email)
     .bind(body.is_active)
@@ -133,7 +142,10 @@ pub async fn update_garderie(
 #[derive(Deserialize)]
 pub struct UpdateGarderieRequest {
     pub name: Option<String>,
-    pub address: Option<String>,
+    pub address_line1: Option<String>,
+    pub city: Option<String>,
+    pub province: Option<String>,
+    pub postal_code: Option<String>,
     pub phone: Option<String>,
     pub email: Option<String>,
     pub is_active: Option<bool>,

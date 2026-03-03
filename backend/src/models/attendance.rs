@@ -64,6 +64,13 @@ pub struct SetAttendanceRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct BulkSetAttendanceRequest {
+    pub child_id: Uuid,
+    pub dates: Vec<String>, // ["YYYY-MM-DD", ...]
+    pub status: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct AttendanceMonthQuery {
     pub child_id: Uuid,
     pub month: String, // YYYY-MM

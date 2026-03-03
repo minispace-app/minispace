@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
-import { activitiesApi, menusApi } from "../../../../lib/api";
+import { activitiesApi, menusApi, groupsApi } from "../../../../lib/api";
 import { useAuth } from "../../../../hooks/useAuth";
 import { ChevronLeft, ChevronRight, Edit2, Trash2, Plus, X, Loader2, Check, UtensilsCrossed, PartyPopper } from "lucide-react";
 import { format, parse, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
@@ -16,7 +16,10 @@ import { getTodayInMontreal, formatDateInMontreal } from "../../../../lib/dateUt
 interface DailyMenuData {
   id?: string;
   date: string;
-  menu: string;
+  menu?: string;
+  collation_matin?: string;
+  diner?: string;
+  collation_apres_midi?: string;
 }
 
 interface Activity {
@@ -24,7 +27,10 @@ interface Activity {
   title: string;
   description?: string;
   date: string;
+  end_date?: string;
   capacity?: number;
+  group_id?: string;
+  type?: "theme" | "sortie";
   registration_count?: number;
 }
 
@@ -56,7 +62,7 @@ function MenusSection() {
   const tj = useTranslations("journal");
 
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(getTodayInMontreal()));
-  const [localData, setLocalData] = useState<Record<string, string>>({});
+  const [localData, setLocalData] = useState<Record<string, Partial<DailyMenuData>>>({});
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,13 +77,16 @@ function MenusSection() {
   const serverMenus: DailyMenuData[] =
     (menusData as { data: DailyMenuData[] } | undefined)?.data ?? [];
 
-  const getMenuForDate = (dateStr: string): string => {
-    if (localData[dateStr] !== undefined) return localData[dateStr];
-    return serverMenus.find((m) => m.date === dateStr)?.menu ?? "";
+  const getMenuForDate = (dateStr: string, section: "collation_matin" | "diner" | "collation_apres_midi"): string => {
+    if (localData[dateStr]?.[section] !== undefined) return localData[dateStr][section] ?? "";
+    return serverMenus.find((m) => m.date === dateStr)?.[section] ?? "";
   };
 
-  const updateMenu = (dateStr: string, value: string) => {
-    setLocalData((prev) => ({ ...prev, [dateStr]: value }));
+  const updateMenu = (dateStr: string, section: "collation_matin" | "diner" | "collation_apres_midi", value: string) => {
+    setLocalData((prev) => ({
+      ...prev,
+      [dateStr]: { ...prev[dateStr], [section]: value },
+    }));
   };
 
   // Auto-save debounce
@@ -89,8 +98,13 @@ function MenusSection() {
       setSaveStatus("saving");
       try {
         await Promise.all(
-          Object.entries(localData).map(([dateStr, menu]) =>
-            menusApi.upsert({ date: dateStr, menu })
+          Object.entries(localData).map(([dateStr, sections]) =>
+            menusApi.upsert({
+              date: dateStr,
+              collation_matin: sections.collation_matin,
+              diner: sections.diner,
+              collation_apres_midi: sections.collation_apres_midi,
+            })
           )
         );
         setLocalData({});
@@ -169,7 +183,7 @@ function MenusSection() {
 
       {/* Day fields */}
       <div className="flex-1 overflow-auto px-6 py-4">
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-5">
+        <div className="space-y-6">
           {weekDates.map((date, i) => {
             const dateStr = formatDate(date);
             const isToday = dateStr === today;
@@ -192,7 +206,7 @@ function MenusSection() {
                   {tj(`days.${WEEK_DAYS[i]}`)}
                 </div>
                 <div
-                  className={`text-sm font-medium mb-3 flex items-center gap-1.5 ${
+                  className={`text-sm font-medium mb-4 flex items-center gap-1.5 ${
                     isToday ? "text-amber-700" : "text-slate-700"
                   }`}
                 >
@@ -201,12 +215,42 @@ function MenusSection() {
                     <span className="w-1.5 h-1.5 rounded-full bg-orange-400 flex-shrink-0" />
                   )}
                 </div>
-                <TextareaField
-                  value={getMenuForDate(dateStr)}
-                  onChange={(v) => updateMenu(dateStr, v)}
-                  placeholder={t("placeholder")}
-                  rows={5}
-                />
+
+                {/* 3 Menu Sections */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Collation Matin */}
+                  <div className="flex flex-col">
+                    <label className="text-xs font-semibold text-slate-700 mb-2">🌅 Collation matin</label>
+                    <TextareaField
+                      value={getMenuForDate(dateStr, "collation_matin")}
+                      onChange={(v) => updateMenu(dateStr, "collation_matin", v)}
+                      placeholder={t("placeholder")}
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* Dîner */}
+                  <div className="flex flex-col">
+                    <label className="text-xs font-semibold text-slate-700 mb-2">🍽️ Dîner</label>
+                    <TextareaField
+                      value={getMenuForDate(dateStr, "diner")}
+                      onChange={(v) => updateMenu(dateStr, "diner", v)}
+                      placeholder={t("placeholder")}
+                      rows={3}
+                    />
+                  </div>
+
+                  {/* Collation Après-midi */}
+                  <div className="flex flex-col">
+                    <label className="text-xs font-semibold text-slate-700 mb-2">🌙 Collation après-midi</label>
+                    <TextareaField
+                      value={getMenuForDate(dateStr, "collation_apres_midi")}
+                      onChange={(v) => updateMenu(dateStr, "collation_apres_midi", v)}
+                      placeholder={t("placeholder")}
+                      rows={3}
+                    />
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -221,6 +265,8 @@ function ActivitiesSection() {
   const { user } = useAuth();
   const [currentMonth, setCurrentMonth] = useState(getTodayInMontreal());
   const [showForm, setShowForm] = useState(false);
+  const [showRegistrations, setShowRegistrations] = useState(false);
+  const [selectedActivityForRegistrations, setSelectedActivityForRegistrations] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Activity> & { action?: string }>({});
   const [loading, setLoading] = useState(false);
 
@@ -230,6 +276,12 @@ function ActivitiesSection() {
     `activities-planning-${monthStr}`,
     () => activitiesApi.list(monthStr).then((r) => r.data.activities || [])
   );
+
+  const { data: groupsResponse } = useSWR(
+    "groups-planning",
+    () => groupsApi.list()
+  );
+  const groupsData = groupsResponse?.data || [];
 
   // Redirect if not admin
   if (user && user.role !== "admin_garderie") {
@@ -249,7 +301,7 @@ function ActivitiesSection() {
     if (activity) {
       setFormData({ ...activity, action: "edit" });
     } else {
-      setFormData({ action: "create", date: formatDateInMontreal(getTodayInMontreal()) });
+      setFormData({ action: "create", date: formatDateInMontreal(getTodayInMontreal()), type: "sortie" });
     }
     setShowForm(true);
   };
@@ -259,19 +311,27 @@ function ActivitiesSection() {
     setLoading(true);
 
     try {
+      const isTheme = formData.type === "theme";
+      const normalizedGroupId = formData.group_id && formData.group_id !== "" ? formData.group_id : undefined;
       if (formData.action === "create") {
         await activitiesApi.create({
           title: formData.title!,
           description: formData.description,
           date: formData.date!,
-          capacity: formData.capacity,
+          end_date: formData.end_date,
+          capacity: isTheme ? undefined : formData.capacity,
+          group_id: normalizedGroupId,
+          type: formData.type || "sortie",
         });
       } else if (formData.action === "edit") {
         await activitiesApi.update(formData.id!, {
           title: formData.title,
           description: formData.description,
           date: formData.date,
-          capacity: formData.capacity,
+          end_date: formData.end_date,
+          capacity: isTheme ? undefined : formData.capacity,
+          group_id: normalizedGroupId,
+          type: formData.type,
         });
       }
 
@@ -343,12 +403,29 @@ function ActivitiesSection() {
               className="bg-white border border-slate-200 rounded-lg p-4 flex items-start justify-between hover:shadow-md transition"
             >
               <div className="flex-1">
-                <h4 className="font-bold text-slate-800">{activity.title}</h4>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h4 className="font-bold text-slate-800">{activity.title}</h4>
+                  <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
+                    activity.type === "theme"
+                      ? "bg-violet-100 text-violet-700"
+                      : "bg-orange-100 text-orange-700"
+                  }`}>
+                    {activity.type === "theme" ? `📚 ${t("form.typeTheme")}` : `🚌 ${t("form.typeSortie")}`}
+                  </span>
+                  {activity.group_id && groupsData.find((g: any) => g.id === activity.group_id) && (
+                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                      {groupsData.find((g: any) => g.id === activity.group_id)?.name}
+                    </span>
+                  )}
+                </div>
                 {activity.description && (
                   <p className="text-slate-600 text-sm mt-1">{activity.description}</p>
                 )}
-                <div className="flex gap-4 mt-2 text-sm text-slate-600">
-                  <span>📅 {format(parse(activity.date, "yyyy-MM-dd", new Date()), "d MMMM yyyy", { locale: fr })}</span>
+                <div className="flex gap-4 mt-2 text-sm text-slate-600 flex-wrap">
+                  <span>📅 {format(parse(activity.date, "yyyy-MM-dd", new Date()), "d MMMM yyyy", { locale: fr })}
+                    {activity.end_date && activity.end_date !== activity.date &&
+                      ` – ${format(parse(activity.end_date, "yyyy-MM-dd", new Date()), "d MMMM yyyy", { locale: fr })}`}
+                  </span>
                   {activity.capacity && (
                     <span>
                       👥 {activity.registration_count || 0}/{activity.capacity} {t("registered")}
@@ -358,6 +435,18 @@ function ActivitiesSection() {
               </div>
 
               <div className="flex gap-2 ml-4">
+                {activity.type !== "theme" && (
+                  <button
+                    onClick={() => {
+                      setSelectedActivityForRegistrations(activity.id);
+                      setShowRegistrations(true);
+                    }}
+                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
+                    title={t("registrations")}
+                  >
+                    👥
+                  </button>
+                )}
                 <button
                   onClick={() => handleOpenForm(activity)}
                   className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
@@ -381,6 +470,7 @@ function ActivitiesSection() {
         <ActivityFormModal
           formData={formData}
           loading={loading}
+          groups={groupsData}
           onSubmit={handleSubmit}
           onChange={(field, value) => setFormData({ ...formData, [field]: value })}
           onClose={() => {
@@ -389,6 +479,85 @@ function ActivitiesSection() {
           }}
         />
       )}
+
+      {/* Registrations modal */}
+      {showRegistrations && selectedActivityForRegistrations && (
+        <RegistrationsModal
+          activityId={selectedActivityForRegistrations}
+          activity={activities.find((a: Activity) => a.id === selectedActivityForRegistrations)}
+          onClose={() => {
+            setShowRegistrations(false);
+            setSelectedActivityForRegistrations(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function RegistrationsModal({
+  activityId,
+  activity,
+  onClose,
+}: {
+  activityId: string;
+  activity?: Activity;
+  onClose: () => void;
+}) {
+  const t = useTranslations("activities");
+  const tc = useTranslations("common");
+
+  const { data: registrationsData = [] } = useSWR(
+    activityId ? ["registrations", activityId] : null,
+    () => activitiesApi.getRegistrations(activityId).then((r) => r.data?.registrations || [])
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-slate-800">
+            {t("registrations")} - {activity?.title}
+          </h3>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-700">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {registrationsData.length === 0 ? (
+            <p className="text-slate-600 text-center py-4">{t("noRegistrations")}</p>
+          ) : (
+            <div>
+              <p className="text-sm text-slate-600 mb-3">
+                {registrationsData.length} {t("inscribed")} {activity?.capacity ? `/ ${activity.capacity}` : ""}
+              </p>
+              {registrationsData.map((reg: any) => (
+                <div
+                  key={reg.id}
+                  className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200"
+                >
+                  <div className="flex-1">
+                    <p className="font-semibold text-slate-800">
+                      {reg.first_name} {reg.last_name}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 pt-4 mt-4 border-t border-slate-200">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition font-medium"
+          >
+            {tc("close")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -396,17 +565,20 @@ function ActivitiesSection() {
 function ActivityFormModal({
   formData,
   loading,
+  groups,
   onSubmit,
   onChange,
   onClose,
 }: {
   formData: Partial<Activity> & { action?: string };
   loading: boolean;
+  groups: any[];
   onSubmit: (e: React.FormEvent) => Promise<void>;
   onChange: (field: string, value: any) => void;
   onClose: () => void;
 }) {
   const t = useTranslations("activities");
+  const tc = useTranslations("common");
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -421,6 +593,37 @@ function ActivityFormModal({
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
+          {/* Type selector */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              {t("form.type")}
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => onChange("type", "theme")}
+                className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition font-medium text-sm ${
+                  formData.type === "theme"
+                    ? "border-violet-500 bg-violet-50 text-violet-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                }`}
+              >
+                📚 {t("form.typeTheme")}
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange("type", "sortie")}
+                className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition font-medium text-sm ${
+                  (formData.type || "sortie") === "sortie"
+                    ? "border-orange-500 bg-orange-50 text-orange-700"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                }`}
+              >
+                🚌 {t("form.typeSortie")}
+              </button>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1">
               {t("form.title")} *
@@ -446,32 +649,64 @@ function ActivityFormModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
-                {t("form.date")} *
-              </label>
-              <input
-                type="date"
-                value={formData.date || ""}
-                onChange={(e) => onChange("date", e.target.value)}
-                required
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">
+              {t("form.date")} *
+            </label>
+            <input
+              type="date"
+              value={formData.date || ""}
+              onChange={(e) => onChange("date", e.target.value)}
+              required
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">
+              {t("form.endDate")}
+            </label>
+            <input
+              type="date"
+              value={formData.end_date || ""}
+              onChange={(e) => onChange("end_date", e.target.value)}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className={`grid gap-4 ${(formData.type || "sortie") === "sortie" ? "grid-cols-2" : "grid-cols-1"}`}>
+            {(formData.type || "sortie") === "sortie" && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                  {t("form.capacity")}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={formData.capacity || ""}
+                  onChange={(e) => onChange("capacity", e.target.value ? parseInt(e.target.value) : null)}
+                  placeholder={t("form.capacityPlaceholder")}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1">
-                {t("form.capacity")}
+                {t("form.group")}
               </label>
-              <input
-                type="number"
-                min="1"
-                value={formData.capacity || ""}
-                onChange={(e) => onChange("capacity", e.target.value ? parseInt(e.target.value) : null)}
-                placeholder={t("form.capacityPlaceholder")}
+              <select
+                value={formData.group_id || ""}
+                onChange={(e) => onChange("group_id", e.target.value || null)}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              >
+                <option value="">{t("form.noGroup")}</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -489,7 +724,7 @@ function ActivityFormModal({
               disabled={loading}
               className="flex-1 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition font-medium disabled:opacity-50"
             >
-              {t("common.cancel")}
+              {tc("cancel")}
             </button>
           </div>
         </form>

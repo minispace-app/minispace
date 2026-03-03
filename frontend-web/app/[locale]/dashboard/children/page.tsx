@@ -30,7 +30,7 @@ import {
   addDays,
   getDefaultActiveDayIndex,
 } from "../../../../components/journal/journalUtils";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parseISO, getISODay } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parseISO, getISODay, startOfWeek } from "date-fns";
 import { fr } from "date-fns/locale";
 
 interface Child {
@@ -77,9 +77,18 @@ const ATTENDANCE_COLORS: Record<AttendanceStatus, { bg: string; text: string; ic
   present: { bg: "bg-green-100", text: "text-green-600", icon: "✓", label: "Présent" },
   absent: { bg: "bg-red-100", text: "text-red-600", icon: "✗", label: "Absent" },
   malade: { bg: "bg-orange-100", text: "text-orange-600", icon: "🤒", label: "Malade" },
-  vacances: { bg: "bg-blue-100", text: "text-blue-600", icon: "🏖", label: "Vacances" },
+  vacances: { bg: "bg-blue-100", text: "text-blue-600", icon: "🏖", label: "Vacances" }, // legacy, kept for display only
   present_hors_contrat: { bg: "bg-purple-100", text: "text-purple-600", icon: "✓", label: "Hors contrat" },
 };
+
+// Statuses shown in the bulk/single action bar (vacances removed)
+const STAFF_STATUSES = [
+  { key: "present", label: "Présent", icon: "✓", cls: "bg-green-100 text-green-700 hover:bg-green-200 border-green-300" },
+  { key: "absent",  label: "Absent",  icon: "✗", cls: "bg-red-100 text-red-700 hover:bg-red-200 border-red-300" },
+  { key: "malade",  label: "Malade",  icon: "🤒", cls: "bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-300" },
+  { key: "present_hors_contrat", label: "Hors contrat", icon: "✓", cls: "bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300" },
+  { key: "attendu", label: "Attendu", icon: "⏰", cls: "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300" },
+];
 
 function ChildDetails({
   child,
@@ -457,20 +466,216 @@ function TabButton({
   );
 }
 
+// ── DayDetailModalAdmin ──
+// Admin view of day details: read-only, shows attendance, journal, activities
+function DayDetailModalAdmin({
+  date,
+  child,
+  monthStr,
+  onClose,
+}: {
+  date: string;
+  child: Child;
+  monthStr: string;
+  onClose: () => void;
+}) {
+  const t = useTranslations("calendar");
+
+  const { data: attendance = {} } = useSWR(
+    `attendance-${child.id}-${monthStr}`,
+    () => attendanceApi.getMonth(child.id, monthStr).then((r) => r.data.attendance || {})
+  );
+
+  const dateObj = parseISO(date);
+  const weekStart = format(startOfWeek(dateObj, { weekStartsOn: 1 }), "yyyy-MM-dd");
+
+  const { data: journalData } = useSWR(`journal-${child.id}-${weekStart}`, () =>
+    journalApi.getWeek(child.id, weekStart)
+  );
+  const journalList = (journalData as { data: any[] } | undefined)?.data ?? [];
+  const journal = journalList.find((j: any) => j.date === date);
+
+  const { data: activitiesRaw } = useSWR(
+    `activities-${child.id}-${monthStr}`,
+    () => activitiesApi.list(monthStr, child.id).then((r) => r.data as any)
+  );
+  const activities: any[] = activitiesRaw?.activities || [];
+
+  const dayActivities = activities.filter((a: any) => {
+    const end = a.end_date || a.date;
+    return date >= a.date && date <= end;
+  });
+
+  const currentStatus = (attendance[date] || "present") as AttendanceStatus;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-t-2xl md:rounded-xl w-full md:max-w-lg max-h-[85vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0">
+          <h3 className="text-lg font-bold text-slate-800 capitalize">
+            {format(dateObj, "EEEE d MMMM", { locale: fr })}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 text-slate-400 hover:text-slate-600 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {/* ── ATTENDANCE ── */}
+          <section>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+              {t("dayDetail.attendance")}
+            </h4>
+            <div className="flex items-center gap-2">
+              <span className="text-sm">{ATTENDANCE_COLORS[currentStatus]?.icon}</span>
+              <span className="text-sm font-medium text-slate-700">
+                {ATTENDANCE_COLORS[currentStatus]?.label}
+              </span>
+            </div>
+          </section>
+
+          {/* ── JOURNAL ── */}
+          <section>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+              {t("dayDetail.journal")}
+            </h4>
+            {journal ? (
+              <div className="bg-slate-50 rounded-lg p-4 space-y-2 text-sm">
+                {journal.humeur && (
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-700">Humeur:</span>
+                    <span className="text-slate-600">{journal.humeur}</span>
+                  </div>
+                )}
+                {journal.appetit && (
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-700">Appétit:</span>
+                    <span className="text-slate-600">{journal.appetit}</span>
+                  </div>
+                )}
+                {journal.sommeil_minutes && (
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-700">Sommeil:</span>
+                    <span className="text-slate-600">{journal.sommeil_minutes} min</span>
+                  </div>
+                )}
+                {journal.message_educatrice && (
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-700">Message:</span>
+                    <span className="text-slate-600">{journal.message_educatrice}</span>
+                  </div>
+                )}
+                {journal.observations && (
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-700">Observations:</span>
+                    <span className="text-slate-600">{journal.observations}</span>
+                  </div>
+                )}
+                {journal.sante && (
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-700">Santé:</span>
+                    <span className="text-slate-600">{journal.sante}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400 italic">{t("dayDetail.noJournal")}</p>
+            )}
+          </section>
+
+          {/* ── ACTIVITIES ── */}
+          <section>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+              {t("dayDetail.activities")}
+            </h4>
+            {dayActivities.length === 0 ? (
+              <p className="text-sm text-slate-400 italic">{t("dayDetail.noActivities")}</p>
+            ) : (
+              <div className="space-y-3">
+                {dayActivities.map((activity: any) => {
+                  const isTheme = activity.type === "theme";
+                  return (
+                    <div
+                      key={activity.id}
+                      className={`rounded-xl border-2 p-4 ${
+                        isTheme
+                          ? "border-violet-200 bg-violet-50/50"
+                          : "border-orange-200 bg-orange-50/50"
+                      }`}
+                    >
+                      {/* Type badge */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-xs font-bold uppercase tracking-wide ${
+                          isTheme ? "text-violet-600" : "text-orange-600"
+                        }`}>
+                          {isTheme ? `📚 ${t("dayDetail.theme")}` : `🚌 ${t("dayDetail.sortie")}`}
+                        </span>
+                        {!isTheme && activity.capacity != null && (
+                          <span className="text-xs text-slate-500 ml-auto">
+                            {activity.registration_count || 0}/{activity.capacity}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Title */}
+                      <p className="font-semibold text-slate-800">{activity.title}</p>
+
+                      {/* Date range if multi-day */}
+                      {activity.end_date && activity.end_date !== activity.date && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          {format(parseISO(activity.date), "d MMM", { locale: fr })} – {format(parseISO(activity.end_date), "d MMM", { locale: fr })}
+                        </p>
+                      )}
+
+                      {/* Description */}
+                      {activity.description && (
+                        <p className="text-sm text-slate-600 mt-1">{activity.description}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CalendarSection({
   child,
   currentMonth,
   setCurrentMonth,
   statusModalDate,
   setStatusModalDate,
+  dayDetailDate,
+  setDayDetailDate,
 }: {
   child: Child;
   currentMonth: Date;
   setCurrentMonth: (date: Date) => void;
   statusModalDate: string | null;
   setStatusModalDate: (date: string | null) => void;
+  dayDetailDate: string | null;
+  setDayDetailDate: (date: string | null) => void;
 }) {
   const t = useTranslations("calendar");
+
+  const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const monthStr = format(currentMonth, "yyyy-MM");
   const { data: attendanceData, mutate: mutateAttendance } = useSWR(
@@ -479,6 +684,31 @@ function CalendarSection({
   );
   const attendance = attendanceData?.attendance || {};
 
+  const toggleDate = (dateStr: string) => {
+    setSelectedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateStr)) next.delete(dateStr); else next.add(dateStr);
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedDates(new Set());
+    setSelectMode(false);
+  };
+
+  const handleBulkStatus = async (status: string) => {
+    if (selectedDates.size === 0) return;
+    setBulkLoading(true);
+    try {
+      await attendanceApi.setBulkStatus(child.id, Array.from(selectedDates), status);
+      mutateAttendance();
+      clearSelection();
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
   const { data: journalsData } = useSWR(
     `journals-${child.id}-${monthStr}`,
     () => journalApi.getMonthSummary(child.id, monthStr).then((r) => r.data as { journals: JournalDay[] })
@@ -486,7 +716,7 @@ function CalendarSection({
   const journals = journalsData?.journals || [];
 
   const { data: activitiesData } = useSWR(
-    `activities-${monthStr}`,
+    `activities-${child.id}-${monthStr}`,
     () => activitiesApi.list(monthStr, child.id).then((r) => r.data as any)
   );
   const activities = activitiesData?.activities || [];
@@ -521,8 +751,13 @@ function CalendarSection({
     return acc;
   }, {});
 
-  const activitiesForDay = (date: Date) =>
-    activities.filter((a: any) => a.date === format(date, "yyyy-MM-dd"));
+  const activitiesForDay = (date: Date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return activities.filter((a: any) => {
+      const end = a.end_date || a.date;
+      return dateStr >= a.date && dateStr <= end;
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -534,15 +769,19 @@ function CalendarSection({
           </h2>
           <div className="flex gap-2">
             <button
-              onClick={handlePrevMonth}
-              className="p-2 hover:bg-slate-100 rounded-lg transition"
+              onClick={() => { setSelectMode(!selectMode); setSelectedDates(new Set()); }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+                selectMode
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
             >
+              {selectMode ? `✓ ${selectedDates.size} sélectionné(s)` : "Sélection multiple"}
+            </button>
+            <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 rounded-lg transition">
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <button
-              onClick={handleNextMonth}
-              className="p-2 hover:bg-slate-100 rounded-lg transition"
-            >
+            <button onClick={handleNextMonth} className="p-2 hover:bg-slate-100 rounded-lg transition">
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
@@ -568,14 +807,26 @@ function CalendarSection({
             const dayActivities = disabled ? [] : activitiesForDay(day);
             const colors = disabled ? { bg: "bg-slate-50", text: "text-slate-300", icon: null } : ATTENDANCE_COLORS[dayAttendance];
             const isToday = isSameDay(day, today);
+            const isSelected = selectedDates.has(dateStr);
+
+            const hasTheme = dayActivities.some((a: any) => a.type === "theme");
+            const hasSortie = dayActivities.some((a: any) => a.type !== "theme");
+
+            const handleClick = () => {
+              if (disabled) return;
+              if (selectMode) { toggleDate(dateStr); }
+              else { setDayDetailDate(dateStr); }
+            };
 
             return (
               <div
                 key={dateStr}
-                onClick={() => !disabled && setStatusModalDate(dateStr)}
+                onClick={handleClick}
                 className={`h-24 rounded-lg border-2 p-2 transition overflow-hidden flex flex-col ${
                   disabled
                     ? "bg-slate-50 border-slate-100 cursor-not-allowed opacity-40"
+                    : isSelected
+                    ? "bg-blue-100 border-blue-500 cursor-pointer ring-2 ring-blue-400/40"
                     : isToday
                     ? `${colors.bg} border-slate-900 cursor-pointer hover:shadow-md ring-2 ring-slate-900/20`
                     : `${colors.bg} border-slate-200 cursor-pointer hover:shadow-md`
@@ -583,25 +834,30 @@ function CalendarSection({
               >
                 <div className={`text-sm font-semibold ${disabled ? "text-slate-300" : "text-slate-800"} flex items-center justify-between`}>
                   {format(day, "d")}
+                  <div className="flex gap-0.5 items-center">
+                    {isSelected && <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">✓</span>}
+                    {!disabled && !isSelected && (hasTheme || hasSortie) && (
+                      <>
+                        {hasTheme && <span className="w-2 h-2 rounded-full bg-violet-500" />}
+                        {hasSortie && <span className="w-2 h-2 rounded-full bg-orange-500" />}
+                      </>
+                    )}
+                  </div>
                 </div>
                 {!disabled && (
                   <>
                     <div className="flex items-center justify-between gap-1 mt-1">
                       <span className="text-sm">{colors.icon}</span>
-                      {dayJournal && (
-                        <button className="text-xs text-blue-600 hover:text-blue-800">📋</button>
-                      )}
+                      {dayJournal && <button className="text-xs text-blue-600 hover:text-blue-800">📋</button>}
                     </div>
-                    {dayActivities.length > 0 && (
+                    {dayActivities.length > 0 && !isSelected && (
                       <div className="text-xs mt-1 space-y-0.5 flex-1 overflow-y-auto">
                         {dayActivities.slice(0, 1).map((a: any) => (
                           <div key={a.id} className="bg-white/60 px-1 py-0.5 rounded text-slate-700 truncate">
                             {a.title}
                           </div>
                         ))}
-                        {dayActivities.length > 1 && (
-                          <div className="text-slate-500">+{dayActivities.length - 1}</div>
-                        )}
+                        {dayActivities.length > 1 && <div className="text-slate-500">+{dayActivities.length - 1}</div>}
                       </div>
                     )}
                   </>
@@ -614,7 +870,7 @@ function CalendarSection({
         {/* Legend */}
         <div className="text-xs text-slate-600 space-y-1">
           <div className="font-semibold mb-2">{t("legend")}</div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             {["present", "absent"].map((status) => {
               const { icon, label } = ATTENDANCE_COLORS[status as AttendanceStatus];
               return (
@@ -625,8 +881,12 @@ function CalendarSection({
               );
             })}
             <div className="flex items-center gap-2">
-              <span>📋</span>
-              <span>{t("hasJournal")}</span>
+              <span className="w-2 h-2 rounded-full bg-violet-500" />
+              <span>{t("dayDetail.theme")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-orange-500" />
+              <span>{t("dayDetail.sortie")}</span>
             </div>
           </div>
         </div>
@@ -636,19 +896,23 @@ function CalendarSection({
       <div className="md:hidden bg-white rounded-lg shadow p-4 flex flex-col overflow-hidden">
         {/* Month navigation */}
         <div className="flex items-center justify-between mb-3 flex-shrink-0">
-          <button
-            onClick={handlePrevMonth}
-            className="p-2 hover:bg-slate-100 rounded-lg transition"
-          >
+          <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 rounded-lg transition">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <h2 className="text-sm font-semibold text-slate-800">
-            {format(currentMonth, "MMM yyyy", { locale: fr })}
-          </h2>
-          <button
-            onClick={handleNextMonth}
-            className="p-2 hover:bg-slate-100 rounded-lg transition"
-          >
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-slate-800">
+              {format(currentMonth, "MMM yyyy", { locale: fr })}
+            </h2>
+            <button
+              onClick={() => { setSelectMode(!selectMode); setSelectedDates(new Set()); }}
+              className={`px-2 py-1 rounded text-xs font-medium border transition ${
+                selectMode ? "bg-blue-600 text-white border-blue-600" : "text-slate-600 border-slate-200"
+              }`}
+            >
+              {selectMode ? `✓ ${selectedDates.size}` : "Multi"}
+            </button>
+          </div>
+          <button onClick={handleNextMonth} className="p-2 hover:bg-slate-100 rounded-lg transition">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -656,49 +920,80 @@ function CalendarSection({
         {/* Small calendar grid */}
         <div className="overflow-y-auto">
           <div className="grid grid-cols-5 gap-1">
-            {/* Day headers */}
             {["Lun", "Mar", "Mer", "Jeu", "Ven"].map((day) => (
-              <div key={day} className="text-center font-semibold text-slate-500 py-1 text-xs">
-                {day}
-              </div>
+              <div key={day} className="text-center font-semibold text-slate-500 py-1 text-xs">{day}</div>
             ))}
-
-            {/* Empty cells */}
             {Array.from({ length: firstDayOffset }).map((_, i) => (
               <div key={`empty-${i}`} />
             ))}
-
-            {/* Days */}
             {days.map((day) => {
               const dateStr = format(day, "yyyy-MM-dd");
               const disabled = isDayDisabled(day);
               const dayAttendance = disabled ? "present" : (attendance[dateStr] || "present") as AttendanceStatus;
-              const dayJournal = !disabled && journalMap[dateStr];
+              const dayActivities = disabled ? [] : activitiesForDay(day);
               const colors = disabled ? { bg: "bg-slate-50", text: "text-slate-300", icon: null } : ATTENDANCE_COLORS[dayAttendance];
               const isToday = isSameDay(day, today);
+              const isSelected = selectedDates.has(dateStr);
+              const hasTheme = dayActivities.some((a: any) => a.type === "theme");
+              const hasSortie = dayActivities.some((a: any) => a.type !== "theme");
 
               return (
                 <button
                   key={dateStr}
-                  onClick={() => !disabled && setStatusModalDate(dateStr)}
+                  onClick={() => {
+                    if (disabled) return;
+                    if (selectMode) toggleDate(dateStr);
+                    else setDayDetailDate(dateStr);
+                  }}
                   disabled={disabled}
                   className={`aspect-square rounded p-1 transition flex flex-col items-center justify-center text-xs ${
-                    disabled
-                      ? "bg-slate-50 opacity-40 cursor-not-allowed"
-                      : isToday
-                      ? `${colors.bg} border border-slate-900 cursor-pointer ring-1 ring-slate-900/20`
-                      : `${colors.bg} cursor-pointer hover:shadow-sm`
+                    disabled ? "bg-slate-50 opacity-40 cursor-not-allowed"
+                    : isSelected ? "bg-blue-100 border-2 border-blue-500"
+                    : isToday ? `${colors.bg} border border-slate-900 ring-1 ring-slate-900/20`
+                    : `${colors.bg} hover:shadow-sm`
                   }`}
                 >
                   <div className="font-semibold text-slate-800">{format(day, "d")}</div>
-                  <div className="text-xs">{colors.icon}</div>
-                  {dayJournal && <div className="text-xs">📋</div>}
+                  {isSelected
+                    ? <span className="text-blue-600 text-[10px] font-bold">✓</span>
+                    : <div className="text-xs">{colors.icon}</div>
+                  }
+                  {!isSelected && (hasTheme || hasSortie) && (
+                    <div className="flex gap-0.5 mt-0.5">
+                      {hasTheme && <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />}
+                      {hasSortie && <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />}
+                    </div>
+                  )}
                 </button>
               );
             })}
           </div>
         </div>
       </div>
+
+      {/* Bulk action bar (shared desktop + mobile) */}
+      {selectMode && selectedDates.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white rounded-xl shadow-2xl border border-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap max-w-lg w-full mx-4">
+          <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+            {selectedDates.size} jour{selectedDates.size > 1 ? "s" : ""}
+          </span>
+          <div className="flex gap-2 flex-wrap flex-1">
+            {STAFF_STATUSES.map((s) => (
+              <button
+                key={s.key}
+                onClick={() => handleBulkStatus(s.key)}
+                disabled={bulkLoading}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${s.cls} disabled:opacity-50`}
+              >
+                {bulkLoading ? <Loader2 className="w-3 h-3 animate-spin inline" /> : `${s.icon} ${s.label}`}
+              </button>
+            ))}
+          </div>
+          <button onClick={clearSelection} className="p-1 text-slate-400 hover:text-slate-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Status modal */}
       {statusModalDate && (
@@ -710,6 +1005,16 @@ function CalendarSection({
             setStatusModalDate(null);
             mutateAttendance();
           }}
+        />
+      )}
+
+      {/* Day detail modal */}
+      {dayDetailDate && (
+        <DayDetailModalAdmin
+          date={dayDetailDate}
+          child={child}
+          monthStr={monthStr}
+          onClose={() => setDayDetailDate(null)}
         />
       )}
     </div>
@@ -821,11 +1126,51 @@ function JournalsSection({
   const { data: menusData } = useSWR(["menus-week-journal-dash", weekStartStr], () =>
     menusApi.getWeek(weekStartStr)
   );
-  interface MenuEntry { date: string; menu: string; }
+  interface MenuEntry {
+    date: string;
+    menu?: string;
+    collation_matin?: string;
+    diner?: string;
+    collation_apres_midi?: string;
+  }
   const serverMenus: MenuEntry[] =
     (menusData as { data: MenuEntry[] } | undefined)?.data ?? [];
-  const getMenuForDate = (dateStr: string): string | null =>
-    serverMenus.find((m) => m.date === dateStr)?.menu ?? null;
+  const getMenuForDate = (dateStr: string) => {
+    const menuEntry = serverMenus.find((m) => m.date === dateStr);
+    if (!menuEntry) return null;
+    return {
+      collation_matin: menuEntry.collation_matin,
+      diner: menuEntry.diner,
+      collation_apres_midi: menuEntry.collation_apres_midi,
+    };
+  };
+
+  // Load activities (weekly themes)
+  const monthStr = format(weekStart, "yyyy-MM");
+  const { data: activitiesData } = useSWR(
+    child?.id ? ["activities-journal-dash", child?.id, monthStr] : null,
+    async () => {
+      if (!child?.id) return { data: { activities: [] } };
+      return activitiesApi.list(monthStr, child.id);
+    }
+  );
+  const activities = (activitiesData as { data: { activities: any[] } } | undefined)?.data?.activities ?? [];
+
+  const getWeeklyThemeForDate = (dateStr: string) => {
+    // Find theme activity that covers this date
+    try {
+      const theme = activities.find((a: any) => {
+        if (!a || a.type !== "theme") return false;
+        if (!a.date) return false;
+        const end = a.end_date || a.date;
+        return dateStr >= a.date && dateStr <= end;
+      });
+      return theme || null;
+    } catch (error) {
+      console.error("Error getting weekly theme:", error);
+      return null;
+    }
+  };
 
   const getDayData = useCallback(
     (dateStr: string): DayData => {
@@ -986,12 +1331,29 @@ function JournalsSection({
                 ) : isToday ? (
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mx-auto mt-1" />
                 ) : null}
-                {menuDuJour && (
-                  <div className="mt-1.5 flex items-center gap-1 text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 max-w-full overflow-hidden" title={menuDuJour}>
-                    <span className="flex-shrink-0">🍽</span>
-                    <span className="truncate">{menuDuJour}</span>
-                  </div>
-                )}
+                {menuDuJour && ((() => {
+                  const hasMenu = menuDuJour.collation_matin || menuDuJour.diner || menuDuJour.collation_apres_midi;
+                  if (!hasMenu) return null;
+                  return (
+                    <div className="mt-1.5 space-y-0.5">
+                      {menuDuJour.collation_matin && (
+                        <div className="text-xs text-blue-700 bg-blue-50 rounded px-1 py-0.5 truncate" title={menuDuJour.collation_matin}>
+                          🌅 {menuDuJour.collation_matin}
+                        </div>
+                      )}
+                      {menuDuJour.diner && (
+                        <div className="text-xs text-amber-700 bg-amber-50 rounded px-1 py-0.5 truncate" title={menuDuJour.diner}>
+                          🍽️ {menuDuJour.diner}
+                        </div>
+                      )}
+                      {menuDuJour.collation_apres_midi && (
+                        <div className="text-xs text-purple-700 bg-purple-50 rounded px-1 py-0.5 truncate" title={menuDuJour.collation_apres_midi}>
+                          🌙 {menuDuJour.collation_apres_midi}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })())}
               </div>
             );
           })}
@@ -1047,6 +1409,7 @@ function JournalsSection({
           <DayFieldList
             day={getDayData(formatDate(weekDates[activeDayIndex]))}
             menuDuJour={getMenuForDate(formatDate(weekDates[activeDayIndex]))}
+            weeklyTheme={getWeeklyThemeForDate(formatDate(weekDates[activeDayIndex]))}
             readOnly={false}
             onFieldChange={(field, value) =>
               updateField(formatDate(weekDates[activeDayIndex]), field as keyof DayData, value as DayData[keyof DayData])
@@ -1119,6 +1482,7 @@ export default function ChildrenPage() {
   const [activeTab, setActiveTab] = useState<"calendar" | "journals" | "profile">("calendar");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statusModalDate, setStatusModalDate] = useState<string | null>(null);
+  const [dayDetailDate, setDayDetailDate] = useState<string | null>(null);
   // Journal tab state
   const [journalWeekStart, setJournalWeekStart] = useState<Date>(() => getMonday(new Date()));
   const [journalLocalData, setJournalLocalData] = useState<Record<string, DayData>>({});
@@ -1281,6 +1645,8 @@ export default function ChildrenPage() {
                   setCurrentMonth={setCurrentMonth}
                   statusModalDate={statusModalDate}
                   setStatusModalDate={setStatusModalDate}
+                  dayDetailDate={dayDetailDate}
+                  setDayDetailDate={setDayDetailDate}
                 />
               )}
               {activeTab === "journals" && selectedChild && (
@@ -1396,6 +1762,8 @@ export default function ChildrenPage() {
                     setCurrentMonth={setCurrentMonth}
                     statusModalDate={statusModalDate}
                     setStatusModalDate={setStatusModalDate}
+                    dayDetailDate={dayDetailDate}
+                    setDayDetailDate={setDayDetailDate}
                   />
                 )}
                 {activeTab === "journals" && selectedChild && (

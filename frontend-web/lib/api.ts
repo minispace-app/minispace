@@ -130,6 +130,10 @@ export const authApi = {
     apiClient.put("/auth/consent", { photos_accepted }),
   requestAccountDeletion: () =>
     apiClient.post("/auth/account/deletion-request"),
+  validateToken: (token: string) =>
+    apiClient.get(`/auth/validate-token/${token}`, {
+      headers: { "X-Tenant": getTenantSlug() },
+    }),
 };
 
 // Messages
@@ -284,6 +288,8 @@ export const attendanceApi = {
     apiClient.get("/attendance", { params: { child_id: childId, month } }),
   setStatus: (childId: string, date: string, status: string) =>
     apiClient.put("/attendance", { child_id: childId, date, status }),
+  setBulkStatus: (childId: string, dates: string[], status: string) =>
+    apiClient.put("/attendance/bulk", { child_id: childId, dates, status }),
   getMonthAllChildren: (month: string) =>
     apiClient.get("/attendance/month", { params: { month } }),
 };
@@ -292,22 +298,24 @@ export const attendanceApi = {
 export const activitiesApi = {
   list: (month: string, childId?: string) =>
     apiClient.get("/activities", { params: { month, child_id: childId } }),
-  create: (data: { title: string; description?: string; date: string; capacity?: number }) =>
+  create: (data: { title: string; description?: string; date: string; end_date?: string; capacity?: number; group_id?: string; type?: string }) =>
     apiClient.post("/activities", data),
-  update: (id: string, data: { title?: string; description?: string; date?: string; capacity?: number }) =>
+  update: (id: string, data: { title?: string; description?: string; date?: string; end_date?: string; capacity?: number; group_id?: string; type?: string }) =>
     apiClient.put(`/activities/${id}`, data),
   delete: (id: string) => apiClient.delete(`/activities/${id}`),
   register: (activityId: string, childId: string) =>
     apiClient.post(`/activities/${activityId}/register`, { child_id: childId }),
   unregister: (activityId: string, childId: string) =>
     apiClient.delete(`/activities/${activityId}/register/${childId}`),
+  getRegistrations: (activityId: string) =>
+    apiClient.get(`/activities/${activityId}/registrations`),
 };
 
 // Menus de la garderie (un menu par jour, partagé pour tous les enfants)
 export const menusApi = {
   getWeek: (weekStart: string) =>
     apiClient.get("/menus", { params: { week_start: weekStart } }),
-  upsert: (data: { date: string; menu: string }) =>
+  upsert: (data: { date: string; menu?: string; collation_matin?: string; diner?: string; collation_apres_midi?: string }) =>
     apiClient.put("/menus", data),
 };
 
@@ -320,9 +328,9 @@ export const emailApi = {
 // Super-admin management
 export const superAdminApi = {
   listGarderies: () => superAdminClient.get("/super-admin/garderies"),
-  createGarderie: (data: { slug: string; name: string; address?: string; phone?: string; email?: string; plan?: string }) =>
+  createGarderie: (data: { slug: string; name: string; address_line1?: string; city?: string; province?: string; postal_code?: string; phone?: string; email?: string; plan?: string }) =>
     superAdminClient.post("/super-admin/garderies", data),
-  updateGarderie: (slug: string, data: { name?: string; address?: string; phone?: string; email?: string; is_active?: boolean; trial_expires_at?: string | null; remove_trial_expires?: boolean }) =>
+  updateGarderie: (slug: string, data: { name?: string; address_line1?: string; city?: string; province?: string; postal_code?: string; phone?: string; email?: string; is_active?: boolean; trial_expires_at?: string | null; remove_trial_expires?: boolean }) =>
     superAdminClient.put(`/super-admin/garderies/${slug}`, data),
   listGarderieUsers: (slug: string) =>
     superAdminClient.get(`/super-admin/garderies/${slug}/users`),
