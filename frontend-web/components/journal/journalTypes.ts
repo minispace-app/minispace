@@ -21,10 +21,10 @@ export type DayData = Omit<DailyJournal, "child_id" | "id">;
 export const WEEK_DAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"] as const;
 
 export const APPETIT_OPTIONS: EmojiOption[] = [
-  { value: "comme_habitude", emoji: "😊", label: "Comme d'habitude" },
-  { value: "peu",             emoji: "😐", label: "Peu" },
-  { value: "beaucoup",        emoji: "😄", label: "Beaucoup" },
-  { value: "refuse",          emoji: "😤", label: "Refuse" },
+  { value: "comme_habitude", emoji: "Normal", label: "Normal" },
+  { value: "peu",             emoji: "Peu", label: "Peu" },
+  { value: "beaucoup",        emoji: "Beaucoup", label: "Beaucoup" },
+  { value: "refuse",          emoji: "Refuse", label: "Refuse" },
 ];
 
 export const HUMEUR_OPTIONS: EmojiOption[] = [

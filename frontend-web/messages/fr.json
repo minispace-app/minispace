@@ -69,16 +69,6 @@
     "consentPhotos": "J'autorise la garderie à prendre et partager des photos de mon enfant.",
     "consentPhotosHint": "Optionnel — peut être modifié dans les paramètres de votre compte.",
     "consentMissing": "Vous devez accepter la politique de confidentialité pour continuer.",
-    "demoMode": "Mode Démo",
-    "demoReset": "réinitialisation toutes les 30 min",
-    "demoQuickLogin": "Connectez-vous rapidement avec un compte pré-configuré :",
-    "demoAdminFr": "Admin — Marie Tremblay",
-    "demoEducatorFr": "Éducatrice — Sophie Gagnon",
-    "demoParentFr": "Parent — Jean-François Leblanc",
-    "demoAdminEn": "Admin — John Smith",
-    "demoEducatorEn": "Éducatrice — Emma Johnson",
-    "demoParentEn": "Parent — Michael Anderson",
-    "demoLoginError": "Connexion démo échouée. Réessayez dans un instant.",
     "trialExpiredTitle": "Période d'essai terminée",
     "trialExpiredDesc": "Votre période d'essai de 30 jours est expirée. Contactez le support pour continuer à utiliser minispace.app."
   },
@@ -366,10 +356,10 @@
       "orageux": "⛈️ Orageux"
     },
     "appetit_options": {
-      "comme_habitude": "😊 Comme d'habitude",
-      "peu": "😐 Peu",
-      "beaucoup": "😄 Beaucoup",
-      "refuse": "😤 Refuse"
+      "comme_habitude": "Normal",
+      "peu": "Peu",
+      "beaucoup": "Beaucoup",
+      "refuse": "Refuse"
     },
     "humeur_options": {
       "tres_bien": "😄 Très bien",

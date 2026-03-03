@@ -1,13 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "../../../hooks/useAuth";
 import useSWR from "swr";
 import { groupsApi, childrenApi, messagesApi, attendanceApi } from "../../../lib/api";
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, getISODay } from "date-fns";
 import { fr } from "date-fns/locale";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { ChildAvatar } from "../../../components/ChildAvatar";
+import { DayTabBar } from "../../../components/journal/DayTabBar";
 
 const fetcher = (fn: () => Promise<{ data: unknown }>) => fn().then((r) => r.data);
 
@@ -21,6 +23,7 @@ export default function DashboardPage() {
   const t = useTranslations("dashboard");
   const { user } = useAuth();
   const dateLocale = fr;
+  const [activeDayIndex, setActiveDayIndex] = useState(0);
 
   const { data: messages } = useSWR("messages", () => messagesApi.list(1, 5));
   const { data: children } = useSWR("children", () => childrenApi.list());
@@ -113,8 +116,8 @@ export default function DashboardPage() {
             </h2>
           </div>
 
-          {/* Summary table with children */}
-          <div className="bg-white rounded-lg p-4 mb-6 overflow-x-auto">
+          {/* Desktop: Summary table with children */}
+          <div className="hidden md:block bg-white rounded-lg p-4 mb-6 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200">
@@ -184,6 +187,92 @@ export default function DashboardPage() {
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile: Full screen day view */}
+          <div className="md:hidden bg-white rounded-lg p-6 mb-6">
+            {/* Day navigation */}
+            <div className="flex items-center justify-center gap-4 mb-8">
+              <button
+                onClick={() => setActiveDayIndex(Math.max(0, activeDayIndex - 1))}
+                disabled={activeDayIndex === 0}
+                className="p-2 hover:bg-slate-100 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-6 h-6 text-slate-600" />
+              </button>
+
+              <div className="text-center flex-1">
+                {weekDays.length > 0 && activeDayIndex < weekDays.length && (() => {
+                  const activeDay = weekDays[activeDayIndex];
+                  return (
+                    <h3 className="text-2xl font-bold text-slate-800">
+                      {format(activeDay, "EEEE", { locale: dateLocale })}
+                      <br />
+                      <span className="text-lg font-semibold text-slate-600">
+                        {format(activeDay, "d MMMM", { locale: dateLocale })}
+                      </span>
+                    </h3>
+                  );
+                })()}
+              </div>
+
+              <button
+                onClick={() => setActiveDayIndex(Math.min(weekDays.length - 1, activeDayIndex + 1))}
+                disabled={activeDayIndex === weekDays.length - 1}
+                className="p-2 hover:bg-slate-100 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-6 h-6 text-slate-600" />
+              </button>
+            </div>
+
+            {/* Day content */}
+            {weekDays.length > 0 && activeDayIndex < weekDays.length && (() => {
+              const activeDay = weekDays[activeDayIndex];
+              const dateStr = format(activeDay, "yyyy-MM-dd");
+              const totals = totalByDay[dateStr];
+              const presentCount = (childrenList?.length ?? 0) - totals.absent;
+              const totalCount = childrenList?.length ?? 0;
+              const absentThisDay = absentByDay[dateStr] || [];
+
+              return (
+                <div className="space-y-5">
+                  {absentThisDay.length > 0 ? (
+                    <>
+                      <div className="space-y-4">
+                        {absentThisDay.map((child) => (
+                          <div
+                            key={child.id}
+                            className="flex items-center gap-4 p-4 bg-red-50 rounded-lg border border-red-100"
+                          >
+                            <ChildAvatar
+                              id={child.id}
+                              firstName={child.first_name}
+                              lastName={child.last_name}
+                              size="md"
+                            />
+                            <div className="flex-1">
+                              <span className="text-base font-semibold text-red-700">
+                                {child.first_name} {child.last_name}
+                              </span>
+                              <div className="text-sm text-red-600 mt-1">
+                                Absent
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="text-lg font-bold text-slate-700 pt-6 border-t border-red-100 text-center py-4">
+                        {presentCount}/{totalCount} présents
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-lg font-bold text-green-600 p-6 bg-green-50 rounded-lg border-2 border-green-200 text-center">
+                      ✓ {totalCount}/{totalCount} présents
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
         </div>

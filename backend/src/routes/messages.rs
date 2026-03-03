@@ -456,7 +456,6 @@ pub async fn send_to_parents(
     user: AuthenticatedUser,
     Json(body): Json<SendToParentsRequest>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
-    crate::routes::demo::deny_if_demo(&tenant)?;
     // Only educators and admins can send messages to parents
     if let UserRole::Parent = user.role {
         return Err((StatusCode::FORBIDDEN, Json(json!({ "error": "Accès refusé" }))));

@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import { LanguageSwitcher } from "../LanguageSwitcher";
 import { AnnouncementBanner } from "../AnnouncementBanner";
-import { DemoBanner } from "../DemoBanner";
 import { TrialBanner } from "../TrialBanner";
 
 const navItems = [
@@ -199,7 +198,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <span className="font-semibold text-slate-800 truncate">{garderieName}</span>
         </header>
 
-        <DemoBanner />
         <TrialBanner />
         <AnnouncementBanner />
         <main className="flex-1 overflow-auto">{children}</main>

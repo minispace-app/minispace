@@ -6,7 +6,6 @@ pub mod grafana_auth;
 pub mod metrics;
 pub mod settings;
 pub mod auth;
-pub mod demo;
 pub mod logo;
 pub mod children;
 pub mod contact;

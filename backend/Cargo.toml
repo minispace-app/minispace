@@ -16,10 +16,6 @@ name = "encrypt-existing-files"
 path = "src/bin/encrypt-existing-files.rs"
 
 [[bin]]
-name = "seed-demo"
-path = "src/bin/seed-demo.rs"
-
-[[bin]]
 name = "purge-data"
 path = "src/bin/purge-data.rs"
 

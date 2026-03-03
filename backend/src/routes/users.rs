@@ -110,7 +110,6 @@ pub async fn create_user(
     user: AuthenticatedUser,
     Json(body): Json<CreateUserRequest>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
-    crate::routes::demo::deny_if_demo(&tenant)?;
     require_admin(&user)?;
     let schema = schema_name(&tenant);
 

@@ -14,7 +14,6 @@ pub async fn send_to_parents(
     user: AuthenticatedUser,
     Json(body): Json<SendEmailRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    crate::routes::demo::deny_if_demo(&tenant)?;
     // Only admin_garderie and educateur may send emails
     if user.role == UserRole::Parent {
         return Err((

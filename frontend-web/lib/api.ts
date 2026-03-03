@@ -130,8 +130,6 @@ export const authApi = {
     apiClient.put("/auth/consent", { photos_accepted }),
   requestAccountDeletion: () =>
     apiClient.post("/auth/account/deletion-request"),
-  demoLogin: (role: "admin" | "educateur" | "parent", locale?: string) =>
-    apiClient.post("/demo/login", { role, locale }),
 };
 
 // Messages

@@ -692,14 +692,16 @@ impl EmailService {
         to_name: &str,
         html_body: &str,
         subject: &str,
+        from_name: &str,
     ) -> anyhow::Result<()> {
+        let from = Mailbox::new(Some(from_name.to_string()), self.from.email.clone());
         let to: Mailbox = format!("{to_name} <{to_email}>")
             .parse()
             .unwrap_or_else(|_| to_email.parse().expect("valid email address"));
 
         let email = Message::builder()
             .message_id(Some(self.new_message_id()))
-            .from(self.from.clone())
+            .from(from)
             .to(to)
             .subject(subject)
             .multipart(MultiPart::alternative().singlepart(SinglePart::html(html_body.to_string())))

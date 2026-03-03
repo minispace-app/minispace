@@ -131,7 +131,6 @@ async fn main() -> anyhow::Result<()> {
     let jwt_secret = JwtSecret(config.jwt_secret.clone());
 
     let app = Router::new()
-        .route("/demo/login", post(routes::demo::demo_login))
         .route("/health", get(routes::health::health_check))
         .route("/contact", post(routes::contact::submit_contact))
         .route("/signup", post(routes::signup::signup))

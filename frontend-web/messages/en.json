@@ -69,16 +69,6 @@
     "consentPhotos": "I authorize the daycare to take and share photos of my child.",
     "consentPhotosHint": "Optional — can be changed in your account settings.",
     "consentMissing": "You must accept the privacy policy to continue.",
-    "demoMode": "Demo Mode",
-    "demoReset": "reset every 30 minutes",
-    "demoQuickLogin": "Quick login with a pre-configured account:",
-    "demoAdminFr": "Admin — Marie Tremblay",
-    "demoEducatorFr": "Educator — Sophie Gagnon",
-    "demoParentFr": "Parent — Jean-François Leblanc",
-    "demoAdminEn": "Admin — John Smith",
-    "demoEducatorEn": "Educator — Emma Johnson",
-    "demoParentEn": "Parent — Michael Anderson",
-    "demoLoginError": "Demo login failed. Please try again in a moment.",
     "trialExpiredTitle": "Trial period ended",
     "trialExpiredDesc": "Your 30-day trial has expired. Contact support to continue using minispace.app."
   },
@@ -366,10 +356,10 @@
       "orageux": "⛈️ Stormy"
     },
     "appetit_options": {
-      "comme_habitude": "😊 As usual",
-      "peu": "😐 Little",
-      "beaucoup": "😄 A lot",
-      "refuse": "😤 Refused"
+      "comme_habitude": "Normal",
+      "peu": "Little",
+      "beaucoup": "A lot",
+      "refuse": "Refused"
     },
     "humeur_options": {
       "tres_bien": "😄 Very well",
