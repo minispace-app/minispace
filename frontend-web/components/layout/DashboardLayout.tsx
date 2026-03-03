@@ -31,10 +31,10 @@ import { TrialBanner } from "../TrialBanner";
 
 const navItems = [
   { key: "dashboard", icon: LayoutDashboard, href: "/dashboard", roles: null },
+  { key: "children", icon: Users, href: "/dashboard/children", roles: null },
   { key: "messages", icon: MessageSquare, href: "/dashboard/messages", roles: null },
   { key: "media", icon: Image, href: "/dashboard/media", roles: null },
   { key: "documents", icon: FileText, href: "/dashboard/documents", roles: null },
-  { key: "children", icon: Users, href: "/dashboard/children", roles: null },
   { key: "groups", icon: FolderOpen, href: "/dashboard/groups", roles: null },
   { key: "planning", icon: ClipboardList, href: "/dashboard/planning", roles: null },
   { key: "users",     icon: Settings, href: "/dashboard/users",   roles: ["admin_garderie", "super_admin"] },
