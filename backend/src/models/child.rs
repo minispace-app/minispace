@@ -13,6 +13,8 @@ pub struct Child {
     pub group_id: Option<Uuid>,
     pub notes: Option<String>,
     pub is_active: bool,
+    pub start_date: Option<NaiveDate>,
+    pub schedule_days: Option<Vec<i32>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -31,6 +33,8 @@ pub struct CreateChildRequest {
     pub birth_date: NaiveDate,
     pub group_id: Option<Uuid>,
     pub notes: Option<String>,
+    pub start_date: Option<NaiveDate>,
+    pub schedule_days: Option<Vec<i32>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -41,6 +45,8 @@ pub struct UpdateChildRequest {
     pub group_id: Option<Uuid>,
     pub notes: Option<String>,
     pub is_active: Option<bool>,
+    pub start_date: Option<NaiveDate>,
+    pub schedule_days: Option<Vec<i32>>,
 }
 
 #[derive(Debug, Deserialize)]

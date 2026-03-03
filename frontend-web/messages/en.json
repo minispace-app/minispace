@@ -22,6 +22,7 @@
     "saving": "Saving...",
     "deleting": "Deleting...",
     "visibility": "Visibility",
+    "visPrivate": "Private",
     "visPublic": "Public",
     "visGroup": "Group",
     "visChild": "Child"
@@ -59,7 +60,17 @@
     "twoFaInvalid": "Invalid code",
     "registerTitle": "Create your account",
     "registerDesc": "You have been invited to join {name}.",
-    "registerNoToken": "This invitation link is invalid or has expired. Please contact your administrator."
+    "registerNoToken": "This invitation link is invalid or has expired. Please contact your administrator.",
+    "consentTitle": "Privacy and consent",
+    "consentPrivacyBefore": "I have read and accept the ",
+    "consentPrivacyLink": "privacy policy",
+    "consentPrivacyAfter": " of minispace.app, including the collection and processing of my child's personal information in compliance with Law 25.",
+    "consentRequired": "Required",
+    "consentPhotos": "I authorize the daycare to take and share photos of my child.",
+    "consentPhotosHint": "Optional — can be changed in your account settings.",
+    "consentMissing": "You must accept the privacy policy to continue.",
+    "trialExpiredTitle": "Trial period ended",
+    "trialExpiredDesc": "Your 30-day trial has expired. Contact support to continue using minispace.app."
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -69,10 +80,13 @@
     "documents": "Documents",
     "children": "Children",
     "groups": "Groups",
+    "planning": "Planning",
     "journal": "Daily Journal",
     "settings": "Settings",
     "users": "Users",
-    "myProfile": "My profile"
+    "auditLog": "Audit Log",
+    "myProfile": "My profile",
+    "privacy": "Privacy & data"
   },
   "dashboard": {
     "welcome": "Welcome, {name}!",
@@ -102,7 +116,17 @@
     "passwordMismatch": "New passwords do not match",
     "passwordTooShort": "Password must be at least 8 characters",
     "invalidEmail": "Invalid email",
-    "updateError": "Error updating"
+    "updateError": "Error updating",
+    "logoSection": "Daycare logo",
+    "logoHint": "PNG, JPG, WebP or GIF — max 5 MB",
+    "logoUploadButton": "Upload",
+    "logoUpdated": "Logo updated successfully",
+    "logoDeleted": "Logo removed",
+    "logoDelete": "Remove logo",
+    "journalAutoSend": "Automatic journal send",
+    "journalAutoSendDesc": "Daily journals are automatically sent to parents every weekday at {time}.",
+    "journalAutoSendTime": "Auto-send time",
+    "journalAutoSendSaved": "Send time updated"
   },
   "messages": {
     "title": "Messages",
@@ -194,6 +218,7 @@
     "birthDate": "Birth date",
     "group": "Group",
     "noChildren": "No children registered",
+    "selectChild": "Select a child",
     "assignParent": "Assign parent",
     "months": "months",
     "years": "years",
@@ -297,7 +322,7 @@
     "noChild": "Please select a child",
     "sendSuccess": "Journal sent successfully to parents",
     "sendError": "Error sending",
-    "menuPlaceholder": "Today's menu...",
+    "menuNotePlaceholder": "Exception for this child...",
     "healthPlaceholder": "Health...",
     "medicationsPlaceholder": "Medications...",
     "messagePlaceholder": "Message...",
@@ -314,7 +339,7 @@
     },
     "fields": {
       "temperature": "Weather",
-      "menu": "Menu",
+      "menu": "Food note",
       "appetit": "Appetite",
       "humeur": "Mood",
       "sommeil": "Sleep",
@@ -331,10 +356,10 @@
       "orageux": "⛈️ Stormy"
     },
     "appetit_options": {
-      "comme_habitude": "😊 As usual",
-      "peu": "😐 Little",
-      "beaucoup": "😄 A lot",
-      "refuse": "😤 Refused"
+      "comme_habitude": "Normal",
+      "peu": "Little",
+      "beaucoup": "A lot",
+      "refuse": "Refused"
     },
     "humeur_options": {
       "tres_bien": "😄 Very well",
@@ -350,6 +375,130 @@
       "120": "2h",
       "150": "2h30",
       "180": "3h+"
+    },
+    "noEntryForDay": "No entry for this day"
+  },
+  "menus": {
+    "title": "Weekly Menus",
+    "prevWeek": "Previous week",
+    "nextWeek": "Next week",
+    "placeholder": "Today's menu...",
+    "menuOfDay": "Today's menu"
+  },
+  "planning": {
+    "title": "Planning"
+  },
+  "auditLog": {
+    "title": "Audit Log",
+    "subtitle": "Sensitive action history — Law 25 compliance",
+    "empty": "No entries in the audit log.",
+    "colDate": "Date / Time",
+    "colUser": "User",
+    "colAction": "Action",
+    "colResource": "Resource",
+    "colIp": "IP Address",
+    "systemAction": "System",
+    "filterAll": "All",
+    "filterAuth": "Authentication",
+    "filterChild": "Children",
+    "filterUser": "Users",
+    "filterMedia": "Photos",
+    "filterDocument": "Documents",
+    "paginationInfo": "Page {current} / {total} · {count} entries",
+    "actionLogin":          "Login",
+    "actionLoginFailure":   "Failed login",
+    "actionPasswordChange": "Password change",
+    "actionChildCreate":    "Child added",
+    "actionChildUpdate":    "Child updated",
+    "actionChildDelete":    "Child deleted",
+    "actionUserCreate":     "User created",
+    "actionUserUpdate":     "User updated",
+    "actionUserDeactivate": "User deactivated",
+    "actionUserDelete":     "User deleted",
+    "actionMediaUpload":    "Photo uploaded",
+    "actionMediaDelete":    "Photo deleted",
+    "actionDocumentUpload": "Document uploaded",
+    "actionDocumentDelete": "Document deleted"
+  },
+  "privacy": {
+    "title": "Privacy & Personal Data",
+    "subtitle": "Exercise your rights under Law 25 — right to data portability",
+    "childrenSection": "Your children",
+    "noChildren": "No children associated with your account.",
+    "exportBtn": "Export data",
+    "exporting": "Exporting...",
+    "exportSuccess": "Data exported successfully",
+    "exportError": "Error during export",
+    "exportHint": "The JSON file will contain the profile, journals, photos (metadata) and consents.",
+    "law25Info": "Under Law 25, you have the right to obtain a copy of the personal information we hold about your child.",
+    "consentTitle": "My consents",
+    "consentPrivacy": "Privacy policy",
+    "consentPhotosLabel": "Photo authorization",
+    "consentPhotosDesc": "The daycare may take and share photos of your child.",
+    "consentPhotosOn": "Authorized",
+    "consentPhotosOff": "Not authorized",
+    "consentSince": "Since {date} (policy v{version})",
+    "consentSave": "Save preferences",
+    "consentSaved": "Preferences saved",
+    "consentSaveError": "Error updating preferences",
+    "deleteTitle": "Account deletion",
+    "deleteDesc": "To delete your account and data under Law 25 (right to be forgotten), send a request to your daycare administrator.",
+    "deleteBtn": "Request deletion",
+    "deleteConfirmTitle": "Confirm request",
+    "deleteConfirmDesc": "Your request will be sent to your daycare administrator. This does not delete your account immediately.",
+    "deleteConfirm": "Send request",
+    "deleteCancel": "Cancel",
+    "deleteSent": "Request sent to administrator",
+    "deleteError": "Error sending request",
+    "contactTitle": "Additional requests",
+    "contactDesc": "For any data rectification or deletion requests, please contact your daycare administrator."
+  },
+  "calendar": {
+    "title": "Calendar",
+    "selectChild": "Select a child",
+    "legend": "Legend",
+    "hasJournal": "Journal entry",
+    "activities": "Activities",
+    "changeStatus": "Change status",
+    "viewJournal": "View journal",
+    "day_sun": "Sun",
+    "day_mon": "Mon",
+    "day_tue": "Tue",
+    "day_wed": "Wed",
+    "day_thu": "Thu",
+    "day_fri": "Fri",
+    "day_sat": "Sat",
+    "statusModal": {
+      "title": "Change Status",
+      "present": "Present",
+      "vacation": "Vacation"
+    },
+    "journalModal": {
+      "title": "Journal Entry",
+      "noData": "No data for this day"
+    }
+  },
+  "activities": {
+    "title": "Activities",
+    "create": "New Activity",
+    "empty": "No activities this month",
+    "registered": "registered",
+    "error": {
+      "unauthorized": "Only administrators can access this page"
+    },
+    "confirm": {
+      "delete": "Are you sure you want to delete this activity?"
+    },
+    "form": {
+      "create": "Create Activity",
+      "edit": "Edit Activity",
+      "title": "Title",
+      "description": "Description",
+      "date": "Date",
+      "capacity": "Capacity (number of spots)",
+      "capacityPlaceholder": "Unlimited",
+      "save": "Save",
+      "saving": "Saving..."
     }
   }
 }

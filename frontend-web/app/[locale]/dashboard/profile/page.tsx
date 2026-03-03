@@ -1,17 +1,100 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
+import useSWR from "swr";
 import { useAuth } from "../../../../hooks/useAuth";
-import { authApi } from "../../../../lib/api";
-import { Eye, EyeOff, Save, AlertCircle, Check } from "lucide-react";
+import { useTenantInfo } from "../../../../hooks/useTenantInfo";
+import { authApi, tenantApi, settingsApi } from "../../../../lib/api";
+import { Eye, EyeOff, Save, AlertCircle, Check, Upload, Trash2, Clock } from "lucide-react";
 
 export default function ProfilePage() {
   const t = useTranslations("profile");
   const { user } = useAuth();
+  const { logo_url: currentLogoUrl } = useTenantInfo();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const isAdmin = user?.role === "admin_garderie" || user?.role === "super_admin";
+  const isStaff = isAdmin || user?.role === "educateur";
+
+  // Journal auto-send settings
+  const { data: settingsData, mutate: mutateSettings } = useSWR(
+    isStaff ? "settings" : null,
+    () => settingsApi.get().then((r) => r.data as { journal_auto_send_time: string })
+  );
+  const [sendTime, setSendTime] = useState("16:30");
+  const [savingTime, setSavingTime] = useState(false);
+
+  useEffect(() => {
+    if (settingsData?.journal_auto_send_time) {
+      setSendTime(settingsData.journal_auto_send_time);
+    }
+  }, [settingsData]);
+
+  const handleSaveTime = async () => {
+    setSavingTime(true);
+    setError("");
+    try {
+      await settingsApi.update({ journal_auto_send_time: sendTime });
+      mutateSettings();
+      setSuccess(t("journalAutoSendSaved"));
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e?.response?.data?.error || t("updateError"));
+    } finally {
+      setSavingTime(false);
+    }
+  };
+
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoLoading, setLogoLoading] = useState(false);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleUploadLogo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!logoFile) return;
+    setError("");
+    setSuccess("");
+    setLogoLoading(true);
+    try {
+      await tenantApi.uploadLogo(logoFile);
+      setSuccess(t("logoUpdated"));
+      setLogoFile(null);
+      setLogoPreview(null);
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e?.response?.data?.error || t("updateError"));
+    } finally {
+      setLogoLoading(false);
+    }
+  };
+
+  const handleDeleteLogo = async () => {
+    setError("");
+    setSuccess("");
+    setLogoLoading(true);
+    try {
+      await tenantApi.deleteLogo();
+      setSuccess(t("logoDeleted"));
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e?.response?.data?.error || t("updateError"));
+    } finally {
+      setLogoLoading(false);
+    }
+  };
   const [showPasswords, setShowPasswords] = useState(false);
 
   const [passwordForm, setPasswordForm] = useState({
@@ -232,6 +315,94 @@ export default function ProfilePage() {
           </form>
         </div>
       </div>
+
+      {isStaff && (
+        <div className="mt-6 bg-white rounded-xl border border-slate-200 p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Clock className="w-5 h-5 text-slate-600" />
+            <h2 className="text-xl font-bold text-slate-800">{t("journalAutoSend")}</h2>
+          </div>
+          {isAdmin ? (
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-slate-500">
+                {t("journalAutoSendDesc", { time: sendTime })}
+              </p>
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-slate-700 whitespace-nowrap">
+                  {t("journalAutoSendTime")}
+                </label>
+                <input
+                  type="time"
+                  value={sendTime}
+                  onChange={(e) => setSendTime(e.target.value)}
+                  className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveTime}
+                  disabled={savingTime}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition text-sm"
+                >
+                  <Save className="w-4 h-4" />
+                  {savingTime ? "..." : t("update")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-slate-500">
+              {t("journalAutoSendDesc", { time: settingsData?.journal_auto_send_time ?? "16:30" })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {(user?.role === "admin_garderie" || user?.role === "super_admin") && (
+        <div className="mt-6 bg-white rounded-xl border border-slate-200 p-6">
+          <h2 className="text-xl font-bold text-slate-800 mb-4">{t("logoSection")}</h2>
+          <div className="flex flex-col sm:flex-row gap-6 items-start">
+            <div className="flex-shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logoPreview || currentLogoUrl || "/logo.png"}
+                alt="Logo"
+                className="w-32 h-32 object-contain rounded-lg border border-slate-200 bg-slate-50"
+              />
+            </div>
+            <form onSubmit={handleUploadLogo} className="flex-1 space-y-3">
+              <div>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={handleLogoChange}
+                  className="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                <p className="text-xs text-slate-400 mt-1">{t("logoHint")}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={!logoFile || logoLoading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition flex items-center gap-2 text-sm"
+                >
+                  <Upload className="w-4 h-4" />
+                  {logoLoading ? "..." : t("logoUploadButton")}
+                </button>
+                {currentLogoUrl && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteLogo}
+                    disabled={logoLoading}
+                    className="px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 disabled:opacity-50 transition flex items-center gap-2 text-sm"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    {t("logoDelete")}
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-700">

@@ -9,6 +9,7 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::{
+    db::tenant::schema_name,
     middleware::tenant::TenantSlug,
     models::{
         auth::AuthenticatedUser,
@@ -54,6 +55,105 @@ pub async fn get_week(
                 Json(json!({ "error": e.to_string() })),
             )
         })
+}
+
+/// GET /journals/month?child_id=...&month=YYYY-MM
+/// Returns dates that have a journal entry in a given month (summary only)
+pub async fn get_month_summary(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    user: AuthenticatedUser,
+    Query(params): Query<MonthSummaryQuery>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    // Parents may only read journals for their own children.
+    if let UserRole::Parent = user.role {
+        let linked =
+            JournalService::assert_parent_access(&state.db, &tenant, params.child_id, user.user_id)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(json!({ "error": e.to_string() })),
+                    )
+                })?;
+        if !linked {
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(json!({ "error": "Accès refusé" })),
+            ));
+        }
+    }
+
+    // Parse month
+    let month_parts: Vec<&str> = params.month.split('-').collect();
+    if month_parts.len() != 2 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Invalid month format. Use YYYY-MM" })),
+        ));
+    }
+
+    let year = month_parts[0]
+        .parse::<i32>()
+        .map_err(|_| (StatusCode::BAD_REQUEST, Json(json!({ "error": "Invalid year" }))))?;
+    let month = month_parts[1]
+        .parse::<u32>()
+        .map_err(|_| (StatusCode::BAD_REQUEST, Json(json!({ "error": "Invalid month" }))))?;
+
+    if month < 1 || month > 12 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Month must be 1-12" })),
+        ));
+    }
+
+    let start_date = NaiveDate::from_ymd_opt(year, month, 1).ok_or_else(|| {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Invalid date" })),
+        )
+    })?;
+
+    let end_date = if month == 12 {
+        NaiveDate::from_ymd_opt(year + 1, 1, 1).unwrap()
+    } else {
+        NaiveDate::from_ymd_opt(year, month + 1, 1).unwrap()
+    };
+
+    let schema = schema_name(&tenant);
+
+    let records = sqlx::query_as::<_, (NaiveDate, bool)>(
+        &format!(
+            "SELECT date, sent_at IS NOT NULL as sent FROM {}.daily_journals
+             WHERE child_id = $1 AND date >= $2 AND date < $3
+             ORDER BY date ASC",
+            schema
+        ),
+    )
+    .bind(params.child_id)
+    .bind(start_date)
+    .bind(end_date)
+    .fetch_all(&state.db)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let journal_dates: Vec<serde_json::Value> = records
+        .into_iter()
+        .map(|(date, sent)| json!({ "date": date.to_string(), "sent": sent }))
+        .collect();
+
+    Ok(Json(json!({ "journals": journal_dates })))
+}
+
+#[derive(Deserialize)]
+pub struct MonthSummaryQuery {
+    pub child_id: Uuid,
+    pub month: String, // YYYY-MM
 }
 
 /// PUT /journals — staff only

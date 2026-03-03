@@ -1,0 +1,342 @@
+{
+  "title": "minispace.app — Vue d'ensemble",
+  "uid": "minispace-overview",
+  "schemaVersion": 38,
+  "version": 3,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "timezone": "browser",
+  "tags": ["minispace"],
+  "panels": [
+    {
+      "id": 1,
+      "title": "Tenants actifs",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" }, "unit": "short" } },
+      "targets": [{ "expr": "garderie_tenants_active_total", "legendFormat": "", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 2,
+      "title": "Utilisateurs actifs",
+      "type": "stat",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" }, "unit": "short" } },
+      "targets": [{ "expr": "sum(garderie_users_total)", "legendFormat": "", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 3,
+      "title": "Enfants actifs",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "orange" }, "unit": "short" } },
+      "targets": [{ "expr": "sum(garderie_children_active_total)", "legendFormat": "", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 4,
+      "title": "Emails journal envoyés",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "purple" }, "unit": "short" } },
+      "targets": [{ "expr": "sum(garderie_journals_sent_total)", "legendFormat": "", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 5,
+      "title": "Messages totaux",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "text" }, "unit": "short" } },
+      "targets": [{ "expr": "sum(garderie_messages_total)", "legendFormat": "", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 6,
+      "title": "Fichiers média",
+      "type": "stat",
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "text" }, "unit": "short" } },
+      "targets": [{ "expr": "sum(garderie_media_files_total)", "legendFormat": "", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+
+    {
+      "id": 10,
+      "title": "Utilisateurs par tenant",
+      "type": "bargauge",
+      "gridPos": { "x": 0, "y": 4, "w": 8, "h": 8 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "displayMode": "gradient", "valueMode": "color" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short", "min": 0 } },
+      "targets": [{ "expr": "sum by (tenant) (garderie_users_total)", "legendFormat": "{{tenant}}", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 11,
+      "title": "Enfants actifs par tenant",
+      "type": "bargauge",
+      "gridPos": { "x": 8, "y": 4, "w": 8, "h": 8 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "displayMode": "gradient", "valueMode": "color" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short", "min": 0 } },
+      "targets": [{ "expr": "garderie_children_active_total", "legendFormat": "{{tenant}}", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 12,
+      "title": "Emails journal par tenant",
+      "type": "bargauge",
+      "gridPos": { "x": 16, "y": 4, "w": 8, "h": 8 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "displayMode": "gradient", "valueMode": "color" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short", "min": 0 } },
+      "targets": [{ "expr": "garderie_journals_sent_total", "legendFormat": "{{tenant}}", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+
+    {
+      "id": 20,
+      "title": "Utilisateurs par tenant et rôle",
+      "type": "table",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "options": { "sortBy": [{ "displayName": "tenant", "desc": false }] },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "transformations": [
+        { "id": "labelsToFields", "options": { "mode": "columns" } },
+        { "id": "organize", "options": { "renameByName": { "Value": "Utilisateurs", "tenant": "Tenant", "role": "Rôle" } } }
+      ],
+      "targets": [{ "expr": "garderie_users_total", "legendFormat": "{{tenant}} — {{role}}", "refId": "A", "instant": true }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 21,
+      "title": "Documents par tenant",
+      "type": "bargauge",
+      "gridPos": { "x": 12, "y": 12, "w": 6, "h": 8 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "displayMode": "gradient" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short", "min": 0 } },
+      "targets": [{ "expr": "garderie_documents_total", "legendFormat": "{{tenant}}", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 22,
+      "title": "Médias par tenant",
+      "type": "bargauge",
+      "gridPos": { "x": 18, "y": 12, "w": 6, "h": 8 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "displayMode": "gradient" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "unit": "short", "min": 0 } },
+      "targets": [{ "expr": "garderie_media_files_total", "legendFormat": "{{tenant}}", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+
+    {
+      "id": 30,
+      "title": "Utilisation CPU",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 20, "w": 8, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "color": { "mode": "palette-classic" } } },
+      "targets": [{
+        "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[2m])) * 100)",
+        "legendFormat": "CPU %", "refId": "A"
+      }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 31,
+      "title": "Utilisation mémoire",
+      "type": "timeseries",
+      "gridPos": { "x": 8, "y": 20, "w": 8, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "color": { "mode": "fixed", "fixedColor": "orange" } } },
+      "targets": [{
+        "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+        "legendFormat": "Mémoire %", "refId": "A"
+      }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 32,
+      "title": "Espace disque — /data/media",
+      "type": "gauge",
+      "gridPos": { "x": 16, "y": 20, "w": 8, "h": 8 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "showThresholdLabels": true, "showThresholdMarkers": true },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent", "min": 0, "max": 100,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 70 },
+            { "color": "red", "value": 90 }
+          ]}
+        }
+      },
+      "targets": [{
+        "expr": "(1 - (node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})) * 100",
+        "legendFormat": "Disque %", "refId": "A"
+      }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+
+    {
+      "id": 50,
+      "title": "Activité",
+      "type": "row",
+      "gridPos": { "x": 0, "y": 35, "w": 24, "h": 1 },
+      "collapsed": false
+    },
+    {
+      "id": 51,
+      "title": "Logins réussis",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 36, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["last"] }, "colorMode": "background", "graphMode": "area", "noValue": "0" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "color": { "mode": "fixed", "fixedColor": "green" } } },
+      "targets": [{ "expr": "sum(api_logins_total{status=\"success\"})", "legendFormat": "Succès", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 52,
+      "title": "Logins échoués",
+      "type": "stat",
+      "gridPos": { "x": 4, "y": 36, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["last"] }, "colorMode": "background", "graphMode": "area", "noValue": "0" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "color": { "mode": "fixed", "fixedColor": "red" } } },
+      "targets": [{ "expr": "sum(api_logins_total{status=\"failed\"})", "legendFormat": "Échecs", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 53,
+      "title": "Emails 2FA",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 36, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["last"] }, "colorMode": "background", "graphMode": "area", "noValue": "0" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "color": { "mode": "fixed", "fixedColor": "blue" } } },
+      "targets": [{ "expr": "sum(api_2fa_emails_total)", "legendFormat": "2FA", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 54,
+      "title": "Invitations",
+      "type": "stat",
+      "gridPos": { "x": 12, "y": 36, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["last"] }, "colorMode": "background", "graphMode": "area", "noValue": "0" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "color": { "mode": "fixed", "fixedColor": "purple" } } },
+      "targets": [{ "expr": "sum(api_invitations_total)", "legendFormat": "Invitations", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 55,
+      "title": "Médias uploadés",
+      "type": "stat",
+      "gridPos": { "x": 16, "y": 36, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["last"] }, "colorMode": "background", "graphMode": "area", "noValue": "0" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "color": { "mode": "fixed", "fixedColor": "orange" } } },
+      "targets": [{ "expr": "sum(api_media_uploads_total)", "legendFormat": "Médias", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 56,
+      "title": "Documents uploadés",
+      "type": "stat",
+      "gridPos": { "x": 20, "y": 36, "w": 4, "h": 4 },
+      "options": { "reduceOptions": { "calcs": ["last"] }, "colorMode": "background", "graphMode": "area", "noValue": "0" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "color": { "mode": "fixed", "fixedColor": "text" } } },
+      "targets": [{ "expr": "sum(api_document_uploads_total)", "legendFormat": "Documents", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 57,
+      "title": "Logins par heure",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 40, "w": 12, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "decimals": 0, "custom": { "fillOpacity": 10 } } },
+      "targets": [
+        { "expr": "increase(api_logins_total{status=\"success\"}[1h])", "legendFormat": "{{tenant}} — succès", "refId": "A" },
+        { "expr": "increase(api_logins_total{status=\"failed\"}[1h])", "legendFormat": "{{tenant}} — échec", "refId": "B" }
+      ],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 58,
+      "title": "Emails & uploads par heure",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 40, "w": 12, "h": 8 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "decimals": 0, "custom": { "fillOpacity": 10 } } },
+      "targets": [
+        { "expr": "increase(api_2fa_emails_total[1h])", "legendFormat": "{{tenant}} — 2FA", "refId": "A" },
+        { "expr": "increase(api_media_uploads_total[1h])", "legendFormat": "{{tenant}} — médias", "refId": "B" },
+        { "expr": "increase(api_messages_sent_total[1h])", "legendFormat": "{{tenant}} — messages", "refId": "C" }
+      ],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 59,
+      "title": "Messages envoyés (24h) par tenant",
+      "type": "bargauge",
+      "gridPos": { "x": 0, "y": 48, "w": 12, "h": 6 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "displayMode": "gradient" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "color": { "mode": "palette-classic" } } },
+      "targets": [{ "expr": "api_messages_sent_total", "legendFormat": "{{tenant}}", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 60,
+      "title": "Réinitialisations mot de passe (24h) par tenant",
+      "type": "bargauge",
+      "gridPos": { "x": 12, "y": 48, "w": 12, "h": 6 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "horizontal", "displayMode": "gradient" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "color": { "mode": "palette-classic" } } },
+      "targets": [{ "expr": "api_password_resets_total", "legendFormat": "{{tenant}}", "refId": "A" }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+
+    {
+      "id": 40,
+      "title": "Connexions DB actives",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 28, "w": 8, "h": 7 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0, "color": { "mode": "fixed", "fixedColor": "blue" } } },
+      "targets": [{
+        "expr": "pg_stat_database_numbackends{datname=\"minispace\"}",
+        "legendFormat": "Connexions", "refId": "A"
+      }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 41,
+      "title": "Taille base de données",
+      "type": "stat",
+      "gridPos": { "x": 8, "y": 28, "w": 4, "h": 7 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "unit": "bytes", "color": { "mode": "fixed", "fixedColor": "text" } } },
+      "targets": [{
+        "expr": "pg_database_size_bytes{datname=\"minispace\"}",
+        "legendFormat": "Taille DB", "refId": "A"
+      }],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    },
+    {
+      "id": 42,
+      "title": "Transactions DB/sec",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 28, "w": 12, "h": 7 },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "fieldConfig": { "defaults": { "unit": "ops", "min": 0, "color": { "mode": "palette-classic" } } },
+      "targets": [
+        { "expr": "rate(pg_stat_database_xact_commit_total{datname=\"minispace\"}[2m])", "legendFormat": "Commits/s", "refId": "A" },
+        { "expr": "rate(pg_stat_database_xact_rollback_total{datname=\"minispace\"}[2m])", "legendFormat": "Rollbacks/s", "refId": "B" }
+      ],
+      "datasource": { "type": "prometheus", "uid": "prometheus" }
+    }
+  ]
+}

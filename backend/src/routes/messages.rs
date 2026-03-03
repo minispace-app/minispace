@@ -105,6 +105,8 @@ pub async fn send_message(
     let _ = state.redis.publish::<_, _, ()>(&channel, &payload).await;
 
     // Email notifications asynchrones avec cooldown par fil (15 min)
+    // Désactivé pour le tenant demo (adresses email fictives)
+    if tenant != "demo" {
     if let Some(email_svc) = state.email.clone() {
         let pool = state.db.clone();
         let tenant_c = tenant.clone();
@@ -123,15 +125,16 @@ pub async fn send_message(
         tokio::spawn(async move {
             let s = schema_name(&tenant_c);
 
-            // Nom de la garderie pour le champ From des emails
-            let garderie_name: String = sqlx::query_scalar(
-                "SELECT name FROM public.garderies WHERE slug = $1"
+            // Nom et logo de la garderie pour les emails
+            let (garderie_name, logo_url): (String, Option<String>) = sqlx::query_as(
+                "SELECT name, logo_url FROM public.garderies WHERE slug = $1"
             )
             .bind(&tenant_c)
             .fetch_optional(&pool)
             .await
             .unwrap_or_default()
-            .unwrap_or_else(|| tenant_c.clone());
+            .unwrap_or_else(|| (tenant_c.clone(), None));
+            let logo_url = logo_url.unwrap_or_default();
 
             // Clé cooldown unique par fil — empêche les doublons pendant 15 min
             let cooldown_key = match msg_clone.message_type.as_str() {
@@ -184,6 +187,7 @@ pub async fn send_message(
                                 "Tous les parents",
                                 &app_url,
                                 &garderie_name,
+                                &logo_url,
                             )
                             .await;
                     }
@@ -220,6 +224,7 @@ pub async fn send_message(
                                     &group_name,
                                     &app_url,
                                     &garderie_name,
+                                    &logo_url,
                                 )
                                 .await;
                         }
@@ -246,6 +251,7 @@ pub async fn send_message(
                                     "Message privé",
                                     &app_url,
                                     &garderie_name,
+                                    &logo_url,
                                 )
                                 .await;
                         }
@@ -269,6 +275,7 @@ pub async fn send_message(
                                     "Message privé",
                                     &app_url,
                                     &garderie_name,
+                                    &logo_url,
                                 )
                                 .await;
                         }
@@ -278,7 +285,9 @@ pub async fn send_message(
             }
         });
     }
+    } // end if tenant != "demo"
 
+    crate::services::metrics::MESSAGES_COUNTER.with_label_values(&[&tenant]).inc();
     Ok((
         StatusCode::CREATED,
         Json(serde_json::to_value(msg).unwrap()),
@@ -354,7 +363,7 @@ pub async fn get_conversations(
     let result = if matches!(user.role, UserRole::Parent) {
         MessageService::get_conversations_parent(&state.db, &tenant, user.user_id).await
     } else {
-        MessageService::get_conversations_admin(&state.db, &tenant).await
+        MessageService::get_conversations_admin(&state.db, &tenant, user.user_id).await
     };
 
     result
@@ -462,13 +471,22 @@ pub async fn send_to_parents(
         })?;
 
     // Send emails asynchronously
-    if let Some(email_svc) = state.email.as_ref() {
-        let email_svc_clone = email_svc.clone();
-        let garderie_name = tenant.clone();
+    if let Some(email_svc) = state.email.clone() {
+        let pool = state.db.clone();
+        let tenant_c = tenant.clone();
         let subject = body.subject.clone();
         let content = body.content.clone();
         tokio::spawn(async move {
-            let _ = email_svc_clone.send_to_parents(recipients, &subject, &content, &garderie_name).await;
+            let (garderie_name, logo_url): (String, Option<String>) = sqlx::query_as(
+                "SELECT name, logo_url FROM public.garderies WHERE slug = $1",
+            )
+            .bind(&tenant_c)
+            .fetch_optional(&pool)
+            .await
+            .unwrap_or_default()
+            .unwrap_or_else(|| (tenant_c.clone(), None));
+            let logo_url = logo_url.unwrap_or_default();
+            let _ = email_svc.send_to_parents(recipients, &subject, &content, &garderie_name, &logo_url).await;
         });
     }
 

@@ -1,0 +1,379 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "templating": {
+    "list": [
+      {
+        "name": "status",
+        "label": "Status Code",
+        "type": "custom",
+        "query": "all : .*,2xx : 2[0-9]{2},3xx : 3[0-9]{2},4xx : 4[0-9]{2},5xx : 5[0-9]{2},200 : 200,201 : 201,204 : 204,301 : 301,302 : 302,304 : 304,400 : 400,401 : 401,403 : 403,404 : 404,405 : 405,429 : 429,500 : 500,502 : 502,503 : 503,504 : 504",
+        "current": { "text": "all", "value": ".*" },
+        "options": [
+          { "text": "all",  "value": ".*",          "selected": true },
+          { "text": "2xx",  "value": "2[0-9]{2}" },
+          { "text": "3xx",  "value": "3[0-9]{2}" },
+          { "text": "4xx",  "value": "4[0-9]{2}" },
+          { "text": "5xx",  "value": "5[0-9]{2}" },
+          { "text": "200",  "value": "200" },
+          { "text": "201",  "value": "201" },
+          { "text": "204",  "value": "204" },
+          { "text": "301",  "value": "301" },
+          { "text": "302",  "value": "302" },
+          { "text": "304",  "value": "304" },
+          { "text": "400",  "value": "400" },
+          { "text": "401",  "value": "401" },
+          { "text": "403",  "value": "403" },
+          { "text": "404",  "value": "404" },
+          { "text": "405",  "value": "405" },
+          { "text": "429",  "value": "429" },
+          { "text": "500",  "value": "500" },
+          { "text": "502",  "value": "502" },
+          { "text": "503",  "value": "503" },
+          { "text": "504",  "value": "504" }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "hide": 0
+      },
+      {
+        "name": "method",
+        "label": "Méthode",
+        "type": "custom",
+        "query": "all : .*,GET : GET,POST : POST,PUT : PUT,PATCH : PATCH,DELETE : DELETE,HEAD : HEAD,OPTIONS : OPTIONS",
+        "current": { "text": "all", "value": ".*" },
+        "options": [
+          { "text": "all",     "value": ".*",      "selected": true },
+          { "text": "GET",     "value": "GET" },
+          { "text": "POST",    "value": "POST" },
+          { "text": "PUT",     "value": "PUT" },
+          { "text": "PATCH",   "value": "PATCH" },
+          { "text": "DELETE",  "value": "DELETE" },
+          { "text": "HEAD",    "value": "HEAD" },
+          { "text": "OPTIONS", "value": "OPTIONS" }
+        ],
+        "includeAll": false,
+        "multi": false,
+        "hide": 0
+      },
+      {
+        "name": "uri_filter",
+        "label": "URI contient",
+        "type": "textbox",
+        "query": "",
+        "current": { "text": "", "value": "" },
+        "hide": 0
+      },
+      {
+        "name": "ip_filter",
+        "label": "IP client",
+        "type": "textbox",
+        "query": "",
+        "current": { "text": "", "value": "" },
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{service=\"nginx\"} | pattern `<remote_ip> - <user> [<time>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\"` | status =~ `${status:raw}` | method =~ `${method:raw}` | uri =~ `.*${uri_filter}.*` | remote_ip =~ `.*${ip_filter}.*`",
+          "refId": "A"
+        }
+      ],
+      "title": "Logs Nginx filtrés",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 100,
+            "lineWidth": 1,
+            "stacking": { "group": "A", "mode": "normal" }
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "^2" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "^3" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "^4" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "^5" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "id": 2,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(rate({service=\"nginx\"} | pattern `<remote_ip> - <user> [<time>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\"` | status =~ `${status:raw}` | method =~ `${method:raw}` | uri =~ `.*${uri_filter}.*` | remote_ip =~ `.*${ip_filter}.*` [2m])) by (status)",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Requêtes par Code HTTP",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 100,
+            "lineWidth": 1,
+            "stacking": { "group": "A", "mode": "normal" }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
+      "id": 3,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(rate({service=\"nginx\"} | pattern `<remote_ip> - <user> [<time>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\"` | status =~ `${status:raw}` | method =~ `${method:raw}` | uri =~ `.*${uri_filter}.*` | remote_ip =~ `.*${ip_filter}.*` [2m])) by (method)",
+          "legendFormat": "{{method}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Requêtes par Méthode HTTP",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 10 },
+              { "color": "red", "value": 50 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 17 },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service=\"nginx\"} | pattern `<remote_ip> - <user> [<time>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\"` | status =~ `[45][0-9]{2}` | method =~ `${method:raw}` | uri =~ `.*${uri_filter}.*` | remote_ip =~ `.*${ip_filter}.*` [$__range]))",
+          "legendFormat": "Erreurs",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "Total Erreurs (4xx/5xx)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 17 },
+      "id": 5,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service=\"nginx\"} | pattern `<remote_ip> - <user> [<time>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\"` | status =~ `${status:raw}` | method =~ `${method:raw}` | uri =~ `.*${uri_filter}.*` | remote_ip =~ `.*${ip_filter}.*` [$__range]))",
+          "legendFormat": "Total",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "Total Requêtes",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "hideFrom": { "tooltip": false, "viz": false, "legend": false } },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "id": 6,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right", "showLegend": true },
+        "pieType": "pie",
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(count_over_time({service=\"nginx\"} | pattern `<remote_ip> - <user> [<time>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\"` | status =~ `${status:raw}` | method =~ `${method:raw}` | uri =~ `.*${uri_filter}.*` | remote_ip =~ `.*${ip_filter}.*` [$__range])) by (status)",
+          "legendFormat": "{{status}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "Distribution des Codes HTTP",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "id": 7,
+      "options": {
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Value", "desc": true }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "topk(10, sum(count_over_time({service=\"nginx\"} | pattern `<remote_ip> - <user> [<time>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\"` | status =~ `${status:raw}` | method =~ `${method:raw}` | uri =~ `.*${uri_filter}.*` | remote_ip =~ `.*${ip_filter}.*` [$__range])) by (uri))",
+          "instant": true,
+          "legendFormat": "{{uri}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Top 10 URLs",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "id": 8,
+      "options": {
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Value", "desc": true }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "topk(10, sum(count_over_time({service=\"nginx\"} | pattern `<remote_ip> - <user> [<time>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\"` | status =~ `[45][0-9]{2}` | method =~ `${method:raw}` | uri =~ `.*${uri_filter}.*` | remote_ip =~ `.*${ip_filter}.*` [$__range])) by (uri))",
+          "instant": true,
+          "legendFormat": "{{uri}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Top URLs avec Erreurs",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 33 },
+      "id": 9,
+      "options": {
+        "footer": { "show": false },
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Value", "desc": true }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "topk(15, sum(count_over_time({service=\"nginx\"} | pattern `<remote_ip> - <user> [<time>] \"<method> <uri> <_>\" <status> <bytes> \"<referer>\" \"<agent>\"` | status =~ `${status:raw}` | method =~ `${method:raw}` | uri =~ `.*${uri_filter}.*` [$__range])) by (remote_ip))",
+          "instant": true,
+          "legendFormat": "{{remote_ip}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Top 15 IPs Clientes",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["nginx", "logs", "loki"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Nginx Logs",
+  "uid": "nginx-logs",
+  "version": 3
+}

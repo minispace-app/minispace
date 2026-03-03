@@ -22,6 +22,7 @@
     "saving": "Enregistrement...",
     "deleting": "Suppression...",
     "visibility": "Visibilité",
+    "visPrivate": "Privé",
     "visPublic": "Public",
     "visGroup": "Groupe",
     "visChild": "Enfant"
@@ -59,7 +60,17 @@
     "twoFaInvalid": "Code invalide",
     "registerTitle": "Créer votre compte",
     "registerDesc": "Vous avez été invité(e) à rejoindre {name}.",
-    "registerNoToken": "Ce lien d'invitation est invalide ou a expiré. Contactez votre administrateur."
+    "registerNoToken": "Ce lien d'invitation est invalide ou a expiré. Contactez votre administrateur.",
+    "consentTitle": "Confidentialité et consentement",
+    "consentPrivacyBefore": "J'ai lu et j'accepte la ",
+    "consentPrivacyLink": "politique de confidentialité",
+    "consentPrivacyAfter": " de minispace.app, incluant la collecte et le traitement des renseignements personnels de mon enfant conformément à la Loi 25.",
+    "consentRequired": "Requis",
+    "consentPhotos": "J'autorise la garderie à prendre et partager des photos de mon enfant.",
+    "consentPhotosHint": "Optionnel — peut être modifié dans les paramètres de votre compte.",
+    "consentMissing": "Vous devez accepter la politique de confidentialité pour continuer.",
+    "trialExpiredTitle": "Période d'essai terminée",
+    "trialExpiredDesc": "Votre période d'essai de 30 jours est expirée. Contactez le support pour continuer à utiliser minispace.app."
   },
   "nav": {
     "dashboard": "Tableau de bord",
@@ -69,10 +80,13 @@
     "documents": "Documents",
     "children": "Enfants",
     "groups": "Groupes",
+    "planning": "Planification",
     "journal": "Journal de bord",
     "settings": "Paramètres",
     "users": "Utilisateurs",
-    "myProfile": "Mon profil"
+    "auditLog": "Journal d'audit",
+    "myProfile": "Mon profil",
+    "privacy": "Confidentialité & données"
   },
   "dashboard": {
     "welcome": "Bienvenue, {name}!",
@@ -102,7 +116,17 @@
     "passwordMismatch": "Les nouveaux mots de passe ne correspondent pas",
     "passwordTooShort": "Le mot de passe doit contenir au moins 8 caractères",
     "invalidEmail": "Courriel invalide",
-    "updateError": "Erreur lors de la modification"
+    "updateError": "Erreur lors de la modification",
+    "logoSection": "Logo de la garderie",
+    "logoHint": "PNG, JPG, WebP ou GIF — max 5 Mo",
+    "logoUploadButton": "Télécharger",
+    "logoUpdated": "Logo mis à jour avec succès",
+    "logoDeleted": "Logo supprimé",
+    "logoDelete": "Supprimer le logo",
+    "journalAutoSend": "Envoi automatique du journal",
+    "journalAutoSendDesc": "Les journaux de bord sont envoyés automatiquement aux parents chaque jour de semaine à {time}.",
+    "journalAutoSendTime": "Heure d'envoi automatique",
+    "journalAutoSendSaved": "Heure d'envoi mise à jour"
   },
   "messages": {
     "title": "Messages",
@@ -194,6 +218,7 @@
     "birthDate": "Date de naissance",
     "group": "Groupe",
     "noChildren": "Aucun enfant enregistré",
+    "selectChild": "Choisir un enfant",
     "assignParent": "Associer un parent",
     "months": "mois",
     "years": "ans",
@@ -297,7 +322,7 @@
     "noChild": "Veuillez sélectionner un enfant",
     "sendSuccess": "Journal envoyé avec succès aux parents",
     "sendError": "Erreur lors de l'envoi",
-    "menuPlaceholder": "Menu du jour...",
+    "menuNotePlaceholder": "Exception pour cet enfant...",
     "healthPlaceholder": "Santé...",
     "medicationsPlaceholder": "Médicaments...",
     "messagePlaceholder": "Message...",
@@ -314,7 +339,7 @@
     },
     "fields": {
       "temperature": "Température",
-      "menu": "Menu",
+      "menu": "Note alimentaire",
       "appetit": "Appétit",
       "humeur": "Humeur",
       "sommeil": "Sommeil",
@@ -331,10 +356,10 @@
       "orageux": "⛈️ Orageux"
     },
     "appetit_options": {
-      "comme_habitude": "😊 Comme d'habitude",
-      "peu": "😐 Peu",
-      "beaucoup": "😄 Beaucoup",
-      "refuse": "😤 Refuse"
+      "comme_habitude": "Normal",
+      "peu": "Peu",
+      "beaucoup": "Beaucoup",
+      "refuse": "Refuse"
     },
     "humeur_options": {
       "tres_bien": "😄 Très bien",
@@ -350,6 +375,130 @@
       "120": "2h",
       "150": "2h30",
       "180": "3h+"
+    },
+    "noEntryForDay": "Aucune saisie pour ce jour"
+  },
+  "menus": {
+    "title": "Menus de la semaine",
+    "prevWeek": "Semaine précédente",
+    "nextWeek": "Semaine suivante",
+    "placeholder": "Menu du jour...",
+    "menuOfDay": "Menu du jour"
+  },
+  "planning": {
+    "title": "Planification"
+  },
+  "auditLog": {
+    "title": "Journal d'audit",
+    "subtitle": "Historique des actions sensibles — Loi 25",
+    "empty": "Aucune entrée dans le journal d'audit.",
+    "colDate": "Date / Heure",
+    "colUser": "Utilisateur",
+    "colAction": "Action",
+    "colResource": "Ressource",
+    "colIp": "Adresse IP",
+    "systemAction": "Système",
+    "filterAll": "Toutes",
+    "filterAuth": "Authentification",
+    "filterChild": "Enfants",
+    "filterUser": "Utilisateurs",
+    "filterMedia": "Photos",
+    "filterDocument": "Documents",
+    "paginationInfo": "Page {current} / {total} · {count} entrées",
+    "actionLogin":          "Connexion",
+    "actionLoginFailure":   "Échec connexion",
+    "actionPasswordChange": "Changement mot de passe",
+    "actionChildCreate":    "Ajout enfant",
+    "actionChildUpdate":    "Modification enfant",
+    "actionChildDelete":    "Suppression enfant",
+    "actionUserCreate":     "Création utilisateur",
+    "actionUserUpdate":     "Modification utilisateur",
+    "actionUserDeactivate": "Désactivation utilisateur",
+    "actionUserDelete":     "Suppression utilisateur",
+    "actionMediaUpload":    "Téléversement photo",
+    "actionMediaDelete":    "Suppression photo",
+    "actionDocumentUpload": "Téléversement document",
+    "actionDocumentDelete": "Suppression document"
+  },
+  "privacy": {
+    "title": "Confidentialité & données personnelles",
+    "subtitle": "Exercez vos droits conformément à la Loi 25 — droit à la portabilité des données",
+    "childrenSection": "Vos enfants",
+    "noChildren": "Aucun enfant associé à votre compte.",
+    "exportBtn": "Exporter les données",
+    "exporting": "Export en cours...",
+    "exportSuccess": "Données exportées avec succès",
+    "exportError": "Erreur lors de l'export",
+    "exportHint": "Le fichier JSON contiendra le profil, les journaux, les photos (métadonnées) et les consentements.",
+    "law25Info": "Conformément à la Loi 25, vous avez le droit d'obtenir une copie des renseignements personnels que nous détenons sur votre enfant.",
+    "consentTitle": "Mes consentements",
+    "consentPrivacy": "Politique de confidentialité",
+    "consentPhotosLabel": "Autorisation photos",
+    "consentPhotosDesc": "La garderie peut prendre et partager des photos de votre enfant.",
+    "consentPhotosOn": "Autorisées",
+    "consentPhotosOff": "Non autorisées",
+    "consentSince": "Depuis le {date} (politique v{version})",
+    "consentSave": "Enregistrer les préférences",
+    "consentSaved": "Préférences enregistrées",
+    "consentSaveError": "Erreur lors de la mise à jour",
+    "deleteTitle": "Suppression de compte",
+    "deleteDesc": "Pour supprimer votre compte et vos données conformément à la Loi 25 (droit à l'oubli), envoyez une demande à l'administrateur de votre garderie.",
+    "deleteBtn": "Demander la suppression",
+    "deleteConfirmTitle": "Confirmer la demande",
+    "deleteConfirmDesc": "Votre demande sera envoyée à l'administrateur de votre garderie. Cette action ne supprime pas votre compte immédiatement.",
+    "deleteConfirm": "Envoyer la demande",
+    "deleteCancel": "Annuler",
+    "deleteSent": "Demande envoyée à l'administrateur",
+    "deleteError": "Erreur lors de l'envoi de la demande",
+    "contactTitle": "Demandes supplémentaires",
+    "contactDesc": "Pour toute demande de rectification ou de suppression, contactez l'administrateur de votre garderie."
+  },
+  "calendar": {
+    "title": "Calendrier",
+    "selectChild": "Sélectionner un enfant",
+    "legend": "Légende",
+    "hasJournal": "Journal fait",
+    "activities": "Activités",
+    "changeStatus": "Changer le statut",
+    "viewJournal": "Voir le journal",
+    "day_sun": "Dim",
+    "day_mon": "Lun",
+    "day_tue": "Mar",
+    "day_wed": "Mer",
+    "day_thu": "Jeu",
+    "day_fri": "Ven",
+    "day_sat": "Sam",
+    "statusModal": {
+      "title": "Changer le statut",
+      "present": "Présent",
+      "vacation": "Vacances"
+    },
+    "journalModal": {
+      "title": "Journal de bord",
+      "noData": "Aucune donnée pour ce jour"
+    }
+  },
+  "activities": {
+    "title": "Activités",
+    "create": "Nouvelle activité",
+    "empty": "Aucune activité pour ce mois",
+    "registered": "inscrits",
+    "error": {
+      "unauthorized": "Seul l'administrateur peut accéder à cette page"
+    },
+    "confirm": {
+      "delete": "Êtes-vous sûr de vouloir supprimer cette activité?"
+    },
+    "form": {
+      "create": "Créer une activité",
+      "edit": "Modifier l'activité",
+      "title": "Titre",
+      "description": "Description",
+      "date": "Date",
+      "capacity": "Capacité (nombre de places)",
+      "capacityPlaceholder": "Illimité",
+      "save": "Enregistrer",
+      "saving": "Enregistrement..."
     }
   }
 }

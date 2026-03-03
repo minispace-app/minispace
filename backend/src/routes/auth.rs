@@ -5,6 +5,8 @@ use axum::{
     response::Response,
     Json,
 };
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use serde_json::{json, Value};
 
@@ -21,6 +23,19 @@ use crate::{
     services::{auth::{AuthService, LoginOutcome}, notifications::NotificationService},
     AppState,
 };
+
+/// Extract the real client IP from nginx-forwarded headers.
+fn real_client_ip(headers: &HeaderMap) -> String {
+    if let Some(ip) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
+        return ip.to_string();
+    }
+    if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+        if let Some(first) = xff.split(',').next() {
+            return first.trim().to_string();
+        }
+    }
+    "unknown".to_string()
+}
 
 /// Extract a named cookie value from request headers.
 fn get_cookie(headers: &HeaderMap, name: &str) -> Option<String> {
@@ -83,15 +98,38 @@ pub async fn login(
     .await
     {
         Ok(LoginOutcome::TwoFactorRequired(step1)) => {
+            crate::services::metrics::TWO_FA_COUNTER.with_label_values(&[&tenant]).inc();
             Ok(json_response_with_cookie(&serde_json::to_value(step1).unwrap(), None))
         }
         Ok(LoginOutcome::Authenticated { response, device_token }) => {
+            crate::services::metrics::LOGINS_COUNTER.with_label_values(&[&tenant, "success"]).inc();
+            crate::services::audit::log(state.db.clone(), &tenant, crate::services::audit::AuditEntry {
+                user_id:        None,
+                user_name:      Some(body.email.clone()),
+                action:         "auth.login".to_string(),
+                resource_type:  None,
+                resource_id:    None,
+                resource_label: Some(body.email.clone()),
+                ip_address:     real_client_ip(&headers),
+            });
             Ok(json_response_with_cookie(
                 &serde_json::to_value(response).unwrap(),
                 Some(&device_token),
             ))
         }
-        Err(e) => Err((StatusCode::UNAUTHORIZED, Json(json!({ "error": e.to_string() })))),
+        Err(e) => {
+            crate::services::metrics::LOGINS_COUNTER.with_label_values(&[&tenant, "failed"]).inc();
+            crate::services::audit::log(state.db.clone(), &tenant, crate::services::audit::AuditEntry {
+                user_id:        None,
+                user_name:      Some(body.email.clone()),
+                action:         "auth.login_failure".to_string(),
+                resource_type:  None,
+                resource_id:    None,
+                resource_label: Some(body.email.clone()),
+                ip_address:     real_client_ip(&headers),
+            });
+            Err((StatusCode::UNAUTHORIZED, Json(json!({ "error": e.to_string() }))))
+        }
     }
 }
 
@@ -117,10 +155,12 @@ pub async fn verify_2fa(
     )
     .await
     .map(|(res, device_token)| {
+        crate::services::metrics::LOGINS_COUNTER.with_label_values(&[&tenant, "success"]).inc();
         let cookie_ref: Option<&str> = if device_token.is_empty() { None } else { Some(&device_token) };
         json_response_with_cookie(&serde_json::to_value(res).unwrap(), cookie_ref)
     })
     .map_err(|e| {
+        crate::services::metrics::LOGINS_COUNTER.with_label_values(&[&tenant, "failed"]).inc();
         (
             StatusCode::UNAUTHORIZED,
             Json(json!({ "error": e.to_string() })),
@@ -201,7 +241,10 @@ pub async fn invite_user(
         &state.config.app_base_url,
     )
     .await
-    .map(|_| Json(json!({ "message": format!("Invitation envoyée à {}", body.email) })))
+    .map(|_| {
+        crate::services::metrics::INVITATIONS_COUNTER.with_label_values(&[&tenant]).inc();
+        Json(json!({ "message": format!("Invitation envoyée à {}", body.email) }))
+    })
     .map_err(|e| {
         (
             StatusCode::BAD_REQUEST,
@@ -213,8 +256,11 @@ pub async fn invite_user(
 pub async fn register_from_invite(
     State(state): State<AppState>,
     TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
     Json(body): Json<RegisterFromInviteRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let ip = real_client_ip(&headers);
+
     AuthService::register_from_invite(
         &state.db,
         &tenant,
@@ -223,6 +269,8 @@ pub async fn register_from_invite(
         &body.last_name,
         &body.password,
         body.preferred_locale.as_deref().unwrap_or("fr"),
+        body.consent.as_ref(),
+        &ip,
     )
     .await
     .map(|profile| Json(serde_json::to_value(profile).unwrap()))
@@ -279,7 +327,10 @@ pub async fn forgot_password(
         &state.config.app_base_url,
     )
     .await
-    .map(|_| Json(json!({ "message": "Si un compte existe, un email a été envoyé." })))
+    .map(|_| {
+        crate::services::metrics::PASSWORD_RESETS_COUNTER.with_label_values(&[&tenant]).inc();
+        Json(json!({ "message": "Si un compte existe, un email a été envoyé." }))
+    })
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -330,24 +381,34 @@ pub async fn register_push_token(
 pub async fn change_password(
     State(state): State<AppState>,
     TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
     user: AuthenticatedUser,
     Json(body): Json<ChangePasswordRequest>,
 ) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
-    AuthService::change_password(
+    let result = AuthService::change_password(
         &state.db,
         &tenant,
         user.user_id,
         &body.current_password,
         &body.new_password,
     )
-    .await
-    .map(|_| Json(json!({ "message": "Mot de passe modifié avec succès" })))
-    .map_err(|e| {
-        (
-            StatusCode::BAD_REQUEST,
-            Json(json!({ "error": e.to_string() })),
-        )
-    })
+    .await;
+
+    if result.is_ok() {
+        crate::services::audit::log(state.db.clone(), &tenant, crate::services::audit::AuditEntry {
+            user_id:        Some(user.user_id),
+            user_name:      None,
+            action:         "auth.password_change".to_string(),
+            resource_type:  Some("user".to_string()),
+            resource_id:    Some(user.user_id.to_string()),
+            resource_label: None,
+            ip_address:     real_client_ip(&headers),
+        });
+    }
+
+    result
+        .map(|_| Json(json!({ "message": "Mot de passe modifié avec succès" })))
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({ "error": e.to_string() }))))
 }
 
 pub async fn update_email(
@@ -389,6 +450,27 @@ pub async fn list_pending_invitations(
         })
 }
 
+pub async fn resend_invitation(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    _user: AuthenticatedUser,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    match AuthService::resend_invitation(&state.db, state.email.as_deref(), &tenant, id, &state.config.app_base_url).await {
+        Ok(()) => Ok(Json(json!({ "success": true, "message": "Invitation renvoyée avec succès" }))),
+        Err(e) => {
+            let status = if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else if e.to_string().contains("email non configuré") {
+                StatusCode::SERVICE_UNAVAILABLE
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            Err((status, Json(json!({ "error": e.to_string() }))))
+        }
+    }
+}
+
 pub async fn delete_invitation(
     State(state): State<AppState>,
     TenantSlug(tenant): TenantSlug,
@@ -406,5 +488,284 @@ pub async fn delete_invitation(
             Json(json!({ "error": e.to_string() })),
         )),
     }
+}
+
+// --- Consent Management ---
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct ConsentRecord {
+    pub id: Uuid,
+    pub privacy_accepted: bool,
+    pub photos_accepted: bool,
+    pub accepted_at: DateTime<Utc>,
+    pub policy_version: String,
+    pub language: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateConsentRequest {
+    pub photos_accepted: bool,
+}
+
+pub async fn get_consent(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    user: AuthenticatedUser,
+) -> Result<Json<ConsentRecord>, (StatusCode, Json<Value>)> {
+    use crate::db::tenant::schema_name;
+
+    // Only parents can access their own consent
+    use crate::models::user::UserRole;
+    if user.role != UserRole::Parent {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "Only parents can access consent records" })),
+        ));
+    }
+
+    let schema = schema_name(&tenant);
+    let query = format!(
+        "SELECT id, privacy_accepted, photos_accepted, accepted_at, policy_version, language
+         FROM {}.consent_records WHERE user_id = $1
+         ORDER BY accepted_at DESC LIMIT 1",
+        schema
+    );
+
+    match sqlx::query_as::<_, ConsentRecord>(&query)
+        .bind(user.user_id)
+        .fetch_optional(&state.db)
+        .await
+    {
+        Ok(Some(record)) => Ok(Json(record)),
+        Ok(None) => Err((
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "No consent record found" })),
+        )),
+        Err(e) => {
+            tracing::error!("Failed to fetch consent: {}", e);
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to fetch consent" })),
+            ))
+        }
+    }
+}
+
+pub async fn update_consent(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    user: AuthenticatedUser,
+    Json(body): Json<UpdateConsentRequest>,
+) -> Result<Json<ConsentRecord>, (StatusCode, Json<Value>)> {
+    use crate::db::tenant::schema_name;
+
+    // Only parents can update their consent
+    use crate::models::user::UserRole;
+    if user.role != UserRole::Parent {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "Only parents can update consent records" })),
+        ));
+    }
+
+    let schema = schema_name(&tenant);
+    let query = format!(
+        "INSERT INTO {}.consent_records
+            (user_id, privacy_accepted, photos_accepted, accepted_at, policy_version, language)
+         VALUES ($1, TRUE, $2, NOW(), '1.0', $3)
+         RETURNING id, privacy_accepted, photos_accepted, accepted_at, policy_version, language",
+        schema
+    );
+
+    // Get user's preferred locale
+    let user_query = format!(
+        "SELECT preferred_locale FROM {}.users WHERE id = $1",
+        schema
+    );
+    let user_record = sqlx::query_scalar::<_, String>(&user_query)
+        .bind(user.user_id)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch user locale: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to update consent" })),
+            )
+        })?;
+
+    let language = user_record.unwrap_or_else(|| "fr".to_string());
+
+    match sqlx::query_as::<_, ConsentRecord>(&query)
+        .bind(user.user_id)
+        .bind(body.photos_accepted)
+        .bind(&language)
+        .fetch_one(&state.db)
+        .await
+    {
+        Ok(record) => {
+            // Log audit event
+            crate::services::audit::log(
+                state.db.clone(),
+                &tenant,
+                crate::services::audit::AuditEntry {
+                    user_id: Some(user.user_id),
+                    user_name: None,
+                    action: "consent.update".to_string(),
+                    resource_type: Some("user".to_string()),
+                    resource_id: Some(user.user_id.to_string()),
+                    resource_label: None,
+                    ip_address: "".to_string(),
+                },
+            );
+            Ok(Json(record))
+        }
+        Err(e) => {
+            tracing::error!("Failed to update consent: {}", e);
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to update consent" })),
+            ))
+        }
+    }
+}
+
+pub async fn request_account_deletion(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    user: AuthenticatedUser,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    use crate::db::tenant::schema_name;
+
+    // Check if email service is configured
+    let email_service = match state.email.as_ref() {
+        Some(service) => service,
+        None => {
+            return Err((
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(json!({ "error": "Email non configuré" })),
+            ))
+        }
+    };
+
+    let schema = schema_name(&tenant);
+
+    // Get current user info
+    let user_query = format!(
+        "SELECT first_name, last_name, email FROM {}.users WHERE id = $1",
+        schema
+    );
+    let user_info = sqlx::query_as::<_, (String, String, String)>(&user_query)
+        .bind(user.user_id)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch user info: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to process request" })),
+            )
+        })?;
+
+    let (first_name, last_name, user_email) = match user_info {
+        Some(info) => info,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "User not found" })),
+            ))
+        }
+    };
+
+    // Get garderie info and admin email
+    let garderie_query = "SELECT g.name, g.email FROM public.garderies g WHERE g.slug = $1";
+    let garderie_info = sqlx::query_as::<_, (String, Option<String>)>(garderie_query)
+        .bind(&tenant)
+        .fetch_optional(&state.db)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to fetch garderie info: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to process request" })),
+            )
+        })?;
+
+    let (_, garderie_email) = match garderie_info {
+        Some(info) => info,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Garderie not found" })),
+            ))
+        }
+    };
+
+    // Get admin user email if no garderie email
+    let admin_email = if let Some(email) = garderie_email {
+        email
+    } else {
+        let admin_query = format!(
+            "SELECT email FROM {}.users WHERE role = 'admin_garderie' LIMIT 1",
+            schema
+        );
+        sqlx::query_scalar::<_, String>(&admin_query)
+            .fetch_optional(&state.db)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch admin email: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": "Failed to process request" })),
+                )
+            })?
+            .unwrap_or_default()
+    };
+
+    if admin_email.is_empty() {
+        return Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({ "error": "Admin email not configured" })),
+        ));
+    }
+
+    // Send email to admin
+    let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
+    email_service
+        .send_account_deletion_request(
+            &admin_email,
+            &first_name,
+            &last_name,
+            &user_email,
+            &user.user_id.to_string(),
+            &now,
+            &tenant,
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to send deletion request email: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": "Failed to send request" })),
+            )
+        })?;
+
+    // Log audit event
+    crate::services::audit::log(
+        state.db.clone(),
+        &tenant,
+        crate::services::audit::AuditEntry {
+            user_id: Some(user.user_id),
+            user_name: Some(user_email.clone()),
+            action: "user.deletion_requested".to_string(),
+            resource_type: Some("user".to_string()),
+            resource_id: Some(user.user_id.to_string()),
+            resource_label: Some(format!("{} {} ({})", first_name, last_name, user_email)),
+            ip_address: "".to_string(),
+        },
+    );
+
+    Ok(Json(json!({ "message": "Demande envoyée" })))
 }
 

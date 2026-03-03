@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import { mediaApi, childrenApi, groupsApi } from "../../../../lib/api";
@@ -97,6 +97,22 @@ export default function ParentMediaPage() {
     if (e.key === "ArrowRight") setLightboxIndex((i) => i !== null ? Math.min(i + 1, mediaItems.length - 1) : null);
     if (e.key === "ArrowLeft") setLightboxIndex((i) => i !== null ? Math.max(i - 1, 0) : null);
   }, [lightboxIndex, mediaItems.length]);
+
+  // Swipe navigation for lightbox (mobile)
+  const touchStartX = useRef<number>(0);
+  const handleLightboxTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const handleLightboxTouchEnd = (e: React.TouchEvent) => {
+    const diff = touchStartX.current - e.changedTouches[0].clientX;
+    if (Math.abs(diff) < 50) return;
+    e.preventDefault();
+    if (diff > 0) {
+      setLightboxIndex((i) => i !== null ? Math.min(i + 1, mediaItems.length - 1) : null);
+    } else {
+      setLightboxIndex((i) => i !== null ? Math.max(i - 1, 0) : null);
+    }
+  };
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
@@ -216,6 +232,8 @@ export default function ParentMediaPage() {
         <div
           className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
           onClick={() => setLightboxIndex(null)}
+          onTouchStart={handleLightboxTouchStart}
+          onTouchEnd={handleLightboxTouchEnd}
         >
           {/* Prev */}
           {lightboxIndex > 0 && (

@@ -52,8 +52,12 @@ pub struct Document {
     pub size_bytes: i64,
     pub group_id: Option<Uuid>,
     pub child_id: Option<Uuid>,
+    pub visibility: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub is_encrypted: bool,
+    pub encryption_iv: Option<Vec<u8>>,
+    pub encryption_tag: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,7 +73,7 @@ pub struct DocumentQuery {
 pub struct UpdateDocumentRequest {
     pub title: String,
     pub category: String,
-    /// "public" | "group" | "child"
+    /// "private" | "public" | "group" | "child"
     pub visibility: String,
     pub group_id: Option<Uuid>,
     pub child_id: Option<Uuid>,

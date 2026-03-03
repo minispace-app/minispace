@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import { documentsApi, childrenApi, groupsApi } from "../../../../lib/api";
-import { Upload, FileText, Download, X, Globe, Users, Baby, Pencil, Trash2 } from "lucide-react";
+import { Upload, FileText, Download, X, Globe, Users, Baby, Pencil, Trash2, Lock } from "lucide-react";
 
 interface Doc {
   id: string;
@@ -15,13 +15,14 @@ interface Doc {
   size_bytes: number;
   group_id: string | null;
   child_id: string | null;
+  visibility: string;
   created_at: string;
 }
 
 interface Child { id: string; first_name: string; last_name: string; }
 interface Group { id: string; name: string; }
 
-type Visibility = "public" | "group" | "child";
+type Visibility = "private" | "public" | "group" | "child";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost/api";
 
@@ -32,14 +33,14 @@ export default function DocumentsPage() {
   const [uploading, setUploading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [form, setForm] = useState({ title: "", category: "autre" });
-  const [visibility, setVisibility] = useState<Visibility>("public");
+  const [visibility, setVisibility] = useState<Visibility>("private");
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [selectedChildId, setSelectedChildId] = useState("");
 
   // Edit state
   const [editDoc, setEditDoc] = useState<Doc | null>(null);
   const [editForm, setEditForm] = useState({ title: "", category: "autre" });
-  const [editVisibility, setEditVisibility] = useState<Visibility>("public");
+  const [editVisibility, setEditVisibility] = useState<Visibility>("private");
   const [editGroupId, setEditGroupId] = useState("");
   const [editChildId, setEditChildId] = useState("");
   const [saving, setSaving] = useState(false);
@@ -67,11 +68,12 @@ export default function DocumentsPage() {
       fd.append("file", files[0]);
       fd.append("title", form.title || files[0].name);
       fd.append("category", form.category);
+      fd.append("visibility", visibility);
       if (visibility === "group" && selectedGroupId) fd.append("group_id", selectedGroupId);
       if (visibility === "child" && selectedChildId) fd.append("child_id", selectedChildId);
       await documentsApi.upload(fd);
       setForm({ title: "", category: "autre" });
-      setVisibility("public");
+      setVisibility("private");
       setSelectedGroupId("");
       setSelectedChildId("");
       setShowUpload(false);
@@ -84,19 +86,10 @@ export default function DocumentsPage() {
   const openEdit = (doc: Doc) => {
     setEditDoc(doc);
     setEditForm({ title: doc.title, category: doc.category });
-    if (doc.child_id) {
-      setEditVisibility("child");
-      setEditChildId(doc.child_id);
-      setEditGroupId("");
-    } else if (doc.group_id) {
-      setEditVisibility("group");
-      setEditGroupId(doc.group_id);
-      setEditChildId("");
-    } else {
-      setEditVisibility("public");
-      setEditGroupId("");
-      setEditChildId("");
-    }
+    const vis = doc.visibility as Visibility;
+    setEditVisibility(vis);
+    setEditGroupId(vis === "group" ? (doc.group_id ?? "") : "");
+    setEditChildId(vis === "child" ? (doc.child_id ?? "") : "");
   };
 
   const handleSave = async () => {
@@ -335,11 +328,23 @@ export default function DocumentsPage() {
 
 function VisibilitySelector({ value, onChange }: { value: Visibility; onChange: (v: Visibility) => void }) {
   const tc = useTranslations("common");
+  const icons: Record<Visibility, React.ReactNode> = {
+    private: <Lock className="w-3.5 h-3.5" />,
+    public: <Globe className="w-3.5 h-3.5" />,
+    group: <Users className="w-3.5 h-3.5" />,
+    child: <Baby className="w-3.5 h-3.5" />,
+  };
+  const labels: Record<Visibility, string> = {
+    private: tc("visPrivate"),
+    public: tc("visPublic"),
+    group: tc("visGroup"),
+    child: tc("visChild"),
+  };
   return (
     <div>
       <label className="block text-xs font-medium text-slate-500 mb-1.5">{tc("visibility")}</label>
-      <div className="flex gap-2">
-        {(["public", "group", "child"] as Visibility[]).map((v) => (
+      <div className="flex gap-2 flex-wrap">
+        {(["private", "public", "group", "child"] as Visibility[]).map((v) => (
           <button
             key={v}
             type="button"
@@ -350,10 +355,8 @@ function VisibilitySelector({ value, onChange }: { value: Visibility; onChange: 
                 : "border-slate-200 text-slate-600 hover:bg-slate-50"
             }`}
           >
-            {v === "public" && <Globe className="w-3.5 h-3.5" />}
-            {v === "group" && <Users className="w-3.5 h-3.5" />}
-            {v === "child" && <Baby className="w-3.5 h-3.5" />}
-            {v === "public" ? tc("visPublic") : v === "group" ? tc("visGroup") : tc("visChild")}
+            {icons[v]}
+            {labels[v]}
           </button>
         ))}
       </div>
@@ -384,49 +387,56 @@ function DocRow({
     autre: "bg-slate-100 text-slate-600",
   };
 
-  const visibilityBadge = doc.child_id
-    ? { label: `👶 ${childMap[doc.child_id] ?? "Enfant"}`, color: "bg-orange-100 text-orange-700" }
-    : doc.group_id
-    ? { label: `👥 ${groupMap[doc.group_id] ?? "Groupe"}`, color: "bg-blue-100 text-blue-700" }
-    : { label: "🌍 Public", color: "bg-green-100 text-green-700" };
+  const visibilityBadge =
+    doc.visibility === "private"
+      ? { label: "🔒 Privé", color: "bg-slate-100 text-slate-600" }
+      : doc.visibility === "child" && doc.child_id
+      ? { label: `👶 ${childMap[doc.child_id] ?? "Enfant"}`, color: "bg-orange-100 text-orange-700" }
+      : doc.visibility === "group" && doc.group_id
+      ? { label: `👥 ${groupMap[doc.group_id] ?? "Groupe"}`, color: "bg-blue-100 text-blue-700" }
+      : { label: "🌍 Public", color: "bg-green-100 text-green-700" };
 
   const sizeKb = (doc.size_bytes / 1024).toFixed(0);
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl px-5 py-4 flex items-center gap-4">
-      <FileText className="w-8 h-8 text-slate-400 flex-shrink-0" />
+    <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center gap-3">
+      <FileText className="w-7 h-7 text-slate-400 flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-slate-800 truncate">{doc.title}</p>
-        <p className="text-xs text-slate-400 mt-0.5">
-          {new Date(doc.created_at).toLocaleDateString()} · {sizeKb} KB
-        </p>
+        <p className="font-medium text-slate-800 break-words leading-snug">{doc.title}</p>
+        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+          <span className="text-xs text-slate-400">
+            {new Date(doc.created_at).toLocaleDateString()} · {sizeKb} KB
+          </span>
+          <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${categoryColor[doc.category] || categoryColor.autre}`}>
+            {t(`categories.${doc.category}` as keyof ReturnType<typeof useTranslations>)}
+          </span>
+          <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${visibilityBadge.color}`}>
+            {visibilityBadge.label}
+          </span>
+        </div>
       </div>
-      <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${categoryColor[doc.category] || categoryColor.autre}`}>
-        {t(`categories.${doc.category}` as keyof ReturnType<typeof useTranslations>)}
-      </span>
-      <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${visibilityBadge.color}`}>
-        {visibilityBadge.label}
-      </span>
-      <a
-        href={`${API_URL}/media/files/${doc.storage_path}`}
-        target="_blank"
-        rel="noreferrer"
-        className="p-2 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition"
-      >
-        <Download className="w-4 h-4" />
-      </a>
-      <button
-        onClick={onEdit}
-        className="p-2 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition"
-      >
-        <Pencil className="w-4 h-4" />
-      </button>
-      <button
-        onClick={onDelete}
-        className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <a
+          href={`${API_URL}/media/files/${doc.storage_path}`}
+          target="_blank"
+          rel="noreferrer"
+          className="p-2 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition"
+        >
+          <Download className="w-4 h-4" />
+        </a>
+        <button
+          onClick={onEdit}
+          className="p-2 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition"
+        >
+          <Pencil className="w-4 h-4" />
+        </button>
+        <button
+          onClick={onDelete}
+          className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }

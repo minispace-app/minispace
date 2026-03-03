@@ -277,33 +277,60 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     .execute(pool)
     .await?;
 
+    // --- Enum: doc_visibility ---
+    sqlx::raw_sql(&format!(
+        "DO $$ BEGIN
+           IF NOT EXISTS (
+             SELECT 1 FROM pg_type t
+             JOIN pg_namespace n ON n.oid = t.typnamespace
+             WHERE t.typname = 'doc_visibility' AND n.nspname = '{schema}'
+           ) THEN
+             CREATE TYPE \"{schema}\".doc_visibility AS ENUM
+               ('private','public','group','child');
+           END IF;
+         END $$"
+    ))
+    .execute(pool)
+    .await?;
+
     // --- Media ---
     sqlx::raw_sql(&format!(
         r#"CREATE TABLE IF NOT EXISTS "{schema}".media (
-            id                UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
-            uploader_id       UUID NOT NULL REFERENCES "{schema}".users(id),
-            media_type        "{schema}".media_type NOT NULL,
-            original_filename TEXT NOT NULL,
-            storage_path      TEXT NOT NULL,
-            thumbnail_path    TEXT,
-            content_type      VARCHAR(128) NOT NULL,
-            size_bytes        BIGINT NOT NULL,
-            width             INT,
-            height            INT,
-            duration_secs     DOUBLE PRECISION,
-            group_id          UUID REFERENCES "{schema}".groups(id),
-            child_id          UUID REFERENCES "{schema}".children(id) ON DELETE SET NULL,
-            caption           TEXT,
-            created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            id                       UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            uploader_id              UUID NOT NULL REFERENCES "{schema}".users(id),
+            media_type               "{schema}".media_type NOT NULL,
+            original_filename        TEXT NOT NULL,
+            storage_path             TEXT NOT NULL,
+            thumbnail_path           TEXT,
+            content_type             VARCHAR(128) NOT NULL,
+            size_bytes               BIGINT NOT NULL,
+            width                    INT,
+            height                   INT,
+            duration_secs            DOUBLE PRECISION,
+            group_id                 UUID REFERENCES "{schema}".groups(id),
+            child_id                 UUID REFERENCES "{schema}".children(id) ON DELETE SET NULL,
+            caption                  TEXT,
+            visibility               "{schema}".media_visibility NOT NULL DEFAULT 'private',
+            is_encrypted             BOOLEAN NOT NULL DEFAULT false,
+            encryption_iv            BYTEA,
+            encryption_tag           BYTEA,
+            thumbnail_encryption_iv  BYTEA,
+            thumbnail_encryption_tag BYTEA,
+            created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )"#
     ))
     .execute(pool)
     .await?;
 
-    // Idempotent: add visibility column for existing schemas
+    // Idempotent: add columns for existing schemas
     sqlx::raw_sql(&format!(
         r#"ALTER TABLE "{schema}".media
-           ADD COLUMN IF NOT EXISTS visibility "{schema}".media_visibility NOT NULL DEFAULT 'private'"#
+           ADD COLUMN IF NOT EXISTS visibility "{schema}".media_visibility NOT NULL DEFAULT 'private',
+           ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN NOT NULL DEFAULT false,
+           ADD COLUMN IF NOT EXISTS encryption_iv BYTEA,
+           ADD COLUMN IF NOT EXISTS encryption_tag BYTEA,
+           ADD COLUMN IF NOT EXISTS thumbnail_encryption_iv BYTEA,
+           ADD COLUMN IF NOT EXISTS thumbnail_encryption_tag BYTEA"#
     ))
     .execute(pool)
     .await?;
@@ -346,9 +373,38 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
             size_bytes        BIGINT NOT NULL,
             group_id          UUID REFERENCES "{schema}".groups(id),
             child_id          UUID REFERENCES "{schema}".children(id) ON DELETE SET NULL,
+            visibility        "{schema}".doc_visibility NOT NULL DEFAULT 'private',
+            is_encrypted      BOOLEAN NOT NULL DEFAULT false,
+            encryption_iv     BYTEA,
+            encryption_tag    BYTEA,
             created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // Idempotent: add columns for existing schemas
+    sqlx::raw_sql(&format!(
+        r#"ALTER TABLE "{schema}".documents
+           ADD COLUMN IF NOT EXISTS visibility "{schema}".doc_visibility NOT NULL DEFAULT 'public',
+           ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN NOT NULL DEFAULT false,
+           ADD COLUMN IF NOT EXISTS encryption_iv BYTEA,
+           ADD COLUMN IF NOT EXISTS encryption_tag BYTEA"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // Idempotent: fix visibility for existing rows based on group_id/child_id
+    sqlx::raw_sql(&format!(
+        r#"UPDATE "{schema}".documents
+           SET visibility = CASE
+             WHEN child_id IS NOT NULL THEN 'child'::"{schema}".doc_visibility
+             WHEN group_id IS NOT NULL THEN 'group'::"{schema}".doc_visibility
+             ELSE 'public'::"{schema}".doc_visibility
+           END
+           WHERE visibility = 'public'
+             AND (child_id IS NOT NULL OR group_id IS NOT NULL)"#
     ))
     .execute(pool)
     .await?;
@@ -468,15 +524,95 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
             appetit            "{schema}".appetit_level,
             humeur             "{schema}".humeur_level,
             sommeil_minutes    SMALLINT CHECK (sommeil_minutes >= 0 AND sommeil_minutes <= 180),
+            absent             BOOLEAN NOT NULL DEFAULT FALSE,
             sante              TEXT,
             medicaments        TEXT,
             message_educatrice TEXT,
             observations       TEXT,
+            sent_at            TIMESTAMPTZ,
             created_by         UUID NOT NULL REFERENCES "{schema}".users(id),
             created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             UNIQUE (child_id, date)
         )"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // --- Daily menus (garderie-level, one entry per date) ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE TABLE IF NOT EXISTS "{schema}".daily_menus (
+            id         UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            date       DATE NOT NULL UNIQUE,
+            menu       TEXT NOT NULL,
+            created_by UUID NOT NULL REFERENCES "{schema}".users(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // --- Audit log (Loi 25 + security traceability) ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE TABLE IF NOT EXISTS "{schema}".audit_log (
+            id             UUID        PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            user_id        UUID        REFERENCES "{schema}".users(id) ON DELETE SET NULL,
+            user_name      TEXT,
+            action         TEXT        NOT NULL,
+            resource_type  TEXT,
+            resource_id    TEXT,
+            resource_label TEXT,
+            ip_address     VARCHAR(64),
+            created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS audit_log_created_at_idx ON "{schema}".audit_log (created_at DESC);
+        CREATE INDEX IF NOT EXISTS audit_log_user_id_idx    ON "{schema}".audit_log (user_id)"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // --- Consent records (Loi 25) ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE TABLE IF NOT EXISTS "{schema}".consent_records (
+            id               UUID        PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            user_id          UUID        NOT NULL REFERENCES "{schema}".users(id) ON DELETE CASCADE,
+            privacy_accepted BOOLEAN     NOT NULL DEFAULT TRUE,
+            photos_accepted  BOOLEAN     NOT NULL DEFAULT FALSE,
+            accepted_at      TIMESTAMPTZ NOT NULL,
+            policy_version   VARCHAR(32) NOT NULL,
+            language         VARCHAR(8)  NOT NULL DEFAULT 'fr',
+            ip_address       VARCHAR(64),
+            created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // --- Retention tracking columns (soft-delete + scheduled hard-delete per privacy policy) ---
+    // Retention periods: children=1yr, media=6mo, messages=2yr, documents=7yr, audit_logs=90d
+    sqlx::raw_sql(&format!(
+        r#"ALTER TABLE "{schema}".children ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+           ALTER TABLE "{schema}".children ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+           ALTER TABLE "{schema}".media ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+           ALTER TABLE "{schema}".media ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+           ALTER TABLE "{schema}".messages ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+           ALTER TABLE "{schema}".messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+           ALTER TABLE "{schema}".documents ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+           ALTER TABLE "{schema}".documents ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+           ALTER TABLE "{schema}".audit_log ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+           ALTER TABLE "{schema}".audit_log ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // --- Indexes for retention purge queries ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE INDEX IF NOT EXISTS children_deleted_at_idx ON "{schema}".children(deleted_at) WHERE is_deleted = TRUE;
+           CREATE INDEX IF NOT EXISTS media_deleted_at_idx ON "{schema}".media(deleted_at) WHERE is_deleted = TRUE;
+           CREATE INDEX IF NOT EXISTS messages_deleted_at_idx ON "{schema}".messages(deleted_at) WHERE is_deleted = TRUE;
+           CREATE INDEX IF NOT EXISTS documents_deleted_at_idx ON "{schema}".documents(deleted_at) WHERE is_deleted = TRUE;
+           CREATE INDEX IF NOT EXISTS audit_log_deleted_at_idx ON "{schema}".audit_log(deleted_at) WHERE is_deleted = TRUE"#
     ))
     .execute(pool)
     .await?;
@@ -492,7 +628,7 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     .await?;
 
     // --- Triggers (one per table, idempotent via DROP IF EXISTS + CREATE) ---
-    for table in &["users", "children", "groups", "messages", "documents", "daily_journals"] {
+    for table in &["users", "children", "groups", "messages", "documents", "daily_journals", "daily_menus"] {
         let trigger = format!("{table}_updated_at");
         sqlx::raw_sql(&format!(
             r#"DROP TRIGGER IF EXISTS "{trigger}" ON "{schema}"."{table}";

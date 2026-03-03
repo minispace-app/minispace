@@ -3,7 +3,7 @@ import Cookies from "js-cookie";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost/api";
 
-function getTenantSlug(): string {
+export function getTenantSlug(): string {
   if (typeof window === "undefined") return "";
   const parts = window.location.hostname.split(".");
   return parts.length >= 2 ? parts[0] : "";
@@ -35,11 +35,20 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Auto-refresh on 401
+// Auto-refresh on 401, redirect on 402 (trial expired)
 apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
+
+    if (error.response?.status === 402) {
+      const locale = window.location.pathname.split('/')[1] || 'fr';
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = `/${locale}/login?reason=trial_expired`;
+      }
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
       try {
@@ -80,6 +89,8 @@ export const authApi = {
     }),
   listPendingInvitations: () =>
     apiClient.get("/auth/invitations"),
+  resendInvitation: (id: string) =>
+    apiClient.post(`/auth/invitations/${id}/resend`),
   deleteInvitation: (id: string) =>
     apiClient.delete(`/auth/invitations/${id}`),
   register: (data: {
@@ -88,6 +99,13 @@ export const authApi = {
     last_name: string;
     password: string;
     preferred_locale?: string;
+    consent?: {
+      privacy_accepted: boolean;
+      photos_accepted: boolean;
+      accepted_at: string;
+      policy_version: string;
+      language: string;
+    };
   }) => apiClient.post("/auth/register", data),
   registerPushToken: (platform: string, token: string) =>
     apiClient.post("/auth/push-token", { platform, token }),
@@ -107,6 +125,11 @@ export const authApi = {
     apiClient.post("/auth/verify-2fa", { email, code }, {
       headers: { "X-Tenant": getTenantSlug() },
     }),
+  getConsent: () => apiClient.get("/auth/consent"),
+  updateConsent: (photos_accepted: boolean) =>
+    apiClient.put("/auth/consent", { photos_accepted }),
+  requestAccountDeletion: () =>
+    apiClient.post("/auth/account/deletion-request"),
 };
 
 // Messages
@@ -157,6 +180,18 @@ export const mediaApi = {
     apiClient.post("/media/bulk", data),
 };
 
+// Tenant settings
+export const tenantApi = {
+  uploadLogo: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return apiClient.post("/tenant/logo", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  deleteLogo: () => apiClient.delete("/tenant/logo"),
+};
+
 // Documents
 export const documentsApi = {
   list: (params?: { category?: string; group_id?: string; page?: number }) =>
@@ -191,8 +226,10 @@ export const childrenApi = {
     birth_date: string;
     group_id?: string;
     notes?: string;
+    start_date?: string;
+    schedule_days?: number[];
   }) => apiClient.post("/children", data),
-  update: (id: string, data: Partial<{ first_name: string; last_name: string; birth_date: string; group_id: string | null; is_active: boolean }>) =>
+  update: (id: string, data: Partial<{ first_name: string; last_name: string; birth_date: string; group_id: string | null; is_active: boolean; start_date: string; schedule_days: number[] }>) =>
     apiClient.put(`/children/${id}`, data),
   listParents: (childId: string) => apiClient.get(`/children/${childId}/parents`),
   assignParent: (childId: string, userId: string, relationship: string) =>
@@ -200,6 +237,7 @@ export const childrenApi = {
   removeParent: (childId: string, userId: string) =>
     apiClient.delete(`/children/${childId}/parents/${userId}`),
   delete: (childId: string) => apiClient.delete(`/children/${childId}`),
+  export: (childId: string) => apiClient.get(`/children/${childId}/export`),
 };
 
 // Tenant user management (admin_garderie)
@@ -219,6 +257,8 @@ export const usersApi = {
 export const journalApi = {
   getWeek: (childId: string, weekStart: string) =>
     apiClient.get("/journals", { params: { child_id: childId, week_start: weekStart } }),
+  getMonthSummary: (childId: string, month: string) =>
+    apiClient.get("/journals/month", { params: { child_id: childId, month } }),
   upsert: (data: {
     child_id: string;
     date: string;
@@ -238,6 +278,39 @@ export const journalApi = {
     apiClient.post("/journals/send-all-to-parents", { week_start: weekStart }),
 };
 
+// Attendance
+export const attendanceApi = {
+  getMonth: (childId: string, month: string) =>
+    apiClient.get("/attendance", { params: { child_id: childId, month } }),
+  setStatus: (childId: string, date: string, status: string) =>
+    apiClient.put("/attendance", { child_id: childId, date, status }),
+  getMonthAllChildren: (month: string) =>
+    apiClient.get("/attendance/month", { params: { month } }),
+};
+
+// Activities
+export const activitiesApi = {
+  list: (month: string, childId?: string) =>
+    apiClient.get("/activities", { params: { month, child_id: childId } }),
+  create: (data: { title: string; description?: string; date: string; capacity?: number }) =>
+    apiClient.post("/activities", data),
+  update: (id: string, data: { title?: string; description?: string; date?: string; capacity?: number }) =>
+    apiClient.put(`/activities/${id}`, data),
+  delete: (id: string) => apiClient.delete(`/activities/${id}`),
+  register: (activityId: string, childId: string) =>
+    apiClient.post(`/activities/${activityId}/register`, { child_id: childId }),
+  unregister: (activityId: string, childId: string) =>
+    apiClient.delete(`/activities/${activityId}/register/${childId}`),
+};
+
+// Menus de la garderie (un menu par jour, partagé pour tous les enfants)
+export const menusApi = {
+  getWeek: (weekStart: string) =>
+    apiClient.get("/menus", { params: { week_start: weekStart } }),
+  upsert: (data: { date: string; menu: string }) =>
+    apiClient.put("/menus", data),
+};
+
 // Email (admin/educateur → parents)
 export const emailApi = {
   sendToParents: (data: { subject: string; body: string; recipient_id?: string }) =>
@@ -249,7 +322,7 @@ export const superAdminApi = {
   listGarderies: () => superAdminClient.get("/super-admin/garderies"),
   createGarderie: (data: { slug: string; name: string; address?: string; phone?: string; email?: string; plan?: string }) =>
     superAdminClient.post("/super-admin/garderies", data),
-  updateGarderie: (slug: string, data: { name?: string; address?: string; phone?: string; email?: string; is_active?: boolean }) =>
+  updateGarderie: (slug: string, data: { name?: string; address?: string; phone?: string; email?: string; is_active?: boolean; trial_expires_at?: string | null; remove_trial_expires?: boolean }) =>
     superAdminClient.put(`/super-admin/garderies/${slug}`, data),
   listGarderieUsers: (slug: string) =>
     superAdminClient.get(`/super-admin/garderies/${slug}/users`),
@@ -267,6 +340,26 @@ export const superAdminApi = {
     superAdminClient.get(`/super-admin/backups`),
   triggerRestore: (db_file: string, media_file?: string) =>
     superAdminClient.post(`/super-admin/restore`, { db_file, media_file }),
+  getAnnouncement: () =>
+    superAdminClient.get("/announcement"),
+  setAnnouncement: (message: string, color: "yellow" | "red") =>
+    superAdminClient.put("/super-admin/announcement", { message, color }),
+  deleteAnnouncement: () =>
+    superAdminClient.delete("/super-admin/announcement"),
+  getAuditLog: (slug: string, params?: { page?: number; limit?: number; action?: string }) =>
+    superAdminClient.get(`/super-admin/audit-log/${slug}`, { params }),
+  getGlobalAuditLog: (params?: { page?: number; limit?: number; action?: string; tenant?: string }) =>
+    superAdminClient.get(`/super-admin/audit-log`, { params }),
+};
+
+export const auditApi = {
+  list: (params?: { page?: number; limit?: number; action?: string }) =>
+    apiClient.get("/audit-log", { params }),
+};
+
+export const settingsApi = {
+  get: () => apiClient.get("/settings"),
+  update: (data: { journal_auto_send_time: string }) => apiClient.put("/settings", data),
 };
 
 export const userApi = {

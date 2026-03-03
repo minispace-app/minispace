@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, State, Query},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     Json,
 };
 use serde::Deserialize;
@@ -12,8 +12,17 @@ use crate::{
     middleware::tenant::TenantSlug,
     models::auth::AuthenticatedUser,
     models::user::UserRole,
+    services::audit::{self, AuditEntry},
     AppState,
 };
+
+fn client_ip(h: &HeaderMap) -> String {
+    h.get("x-real-ip").and_then(|v| v.to_str().ok())
+        .or_else(|| h.get("x-forwarded-for").and_then(|v| v.to_str().ok())
+            .and_then(|s| s.split(',').next()).map(|s| s.trim()))
+        .unwrap_or("unknown")
+        .to_string()
+}
 
 fn require_admin(user: &AuthenticatedUser) -> Result<(), (StatusCode, Json<Value>)> {
     match user.role {
@@ -32,27 +41,50 @@ pub async fn list_users(
     let schema = schema_name(&tenant);
 
     let rows = sqlx::query(&format!(
-        "SELECT id, email, first_name, last_name, role::TEXT as role,
-                is_active, preferred_locale, created_at, updated_at
-         FROM {schema}.users
-         ORDER BY role, last_name, first_name"
+        "SELECT u.id, u.email, u.first_name, u.last_name, u.role::TEXT as role,
+                u.is_active, u.preferred_locale, u.created_at, u.updated_at,
+                COALESCE(c.privacy_accepted, false) as privacy_accepted,
+                COALESCE(c.photos_accepted, false) as photos_accepted
+         FROM {schema}.users u
+         LEFT JOIN (
+           SELECT DISTINCT ON (user_id) user_id, privacy_accepted, photos_accepted
+           FROM {schema}.consent_records
+           ORDER BY user_id, accepted_at DESC
+         ) c ON u.id = c.user_id
+         ORDER BY u.role, u.last_name, u.first_name"
     ))
     .fetch_all(&state.db)
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
 
+    // Get deletion requests from audit log
+    let deletion_requests = sqlx::query_scalar::<_, String>(&format!(
+        "SELECT DISTINCT resource_id FROM {schema}.audit_log
+         WHERE action = 'user.deletion_requested'
+         AND created_at > NOW() - INTERVAL '30 days'"
+    ))
+    .fetch_all(&state.db)
+    .await
+    .unwrap_or_default();
+
+    let deletion_set: std::collections::HashSet<String> = deletion_requests.into_iter().collect();
+
     let result: Vec<Value> = rows
         .iter()
         .map(|row| {
             use sqlx::Row;
+            let user_id = row.get::<Uuid, _>("id").to_string();
             json!({
-                "id": row.get::<Uuid, _>("id").to_string(),
+                "id": user_id.clone(),
                 "email": row.get::<String, _>("email"),
                 "first_name": row.get::<String, _>("first_name"),
                 "last_name": row.get::<String, _>("last_name"),
                 "role": row.get::<String, _>("role"),
                 "is_active": row.get::<bool, _>("is_active"),
                 "preferred_locale": row.get::<String, _>("preferred_locale"),
+                "privacy_accepted": row.get::<bool, _>("privacy_accepted"),
+                "photos_accepted": row.get::<bool, _>("photos_accepted"),
+                "deletion_requested": deletion_set.contains(&user_id),
             })
         })
         .collect();
@@ -74,6 +106,7 @@ pub struct CreateUserRequest {
 pub async fn create_user(
     State(state): State<AppState>,
     TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
     user: AuthenticatedUser,
     Json(body): Json<CreateUserRequest>,
 ) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
@@ -105,6 +138,16 @@ pub async fn create_user(
     .fetch_one(&state.db)
     .await
     .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({ "error": e.to_string() }))))?;
+
+    audit::log(state.db.clone(), &tenant, AuditEntry {
+        user_id:        Some(user.user_id),
+        user_name:      None,
+        action:         "user.create".to_string(),
+        resource_type:  Some("user".to_string()),
+        resource_id:    Some(user_id.to_string()),
+        resource_label: Some(format!("{} {} ({})", body.first_name, body.last_name, body.email)),
+        ip_address:     client_ip(&headers),
+    });
 
     Ok((StatusCode::CREATED, Json(json!({
         "id": user_id.to_string(),
@@ -190,6 +233,16 @@ pub async fn update_user(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?
         .ok_or((StatusCode::NOT_FOUND, Json(json!({ "error": "Utilisateur introuvable" }))))?;
 
+    audit::log(state.db.clone(), &tenant, AuditEntry {
+        user_id:        Some(user.user_id),
+        user_name:      None,
+        action:         "user.update".to_string(),
+        resource_type:  Some("user".to_string()),
+        resource_id:    Some(target_id.to_string()),
+        resource_label: body.role.as_deref().map(|r| format!("role → {r}")),
+        ip_address:     "unknown".to_string(),
+    });
+
     Ok(Json(json!({ "message": "Utilisateur mis à jour" })))
 }
 
@@ -245,6 +298,27 @@ pub async fn deactivate_user(
         }
     }
 
+    // Fetch target user info before deletion (for audit log)
+    let target_info: Option<(String, String, String)> = sqlx::query_as(&format!(
+        "SELECT first_name, last_name, email FROM {schema}.users WHERE id = $1"
+    ))
+    .bind(target_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    let (first_name, last_name, email) = match target_info {
+        Some(info) => info,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "Utilisateur non trouvé" })),
+            ))
+        }
+    };
+
+    let resource_label = format!("{} {} ({})", first_name, last_name, email);
+
     if query.hard.unwrap_or(false) {
         // Permanent deletion within tenant schema — FK ON DELETE CASCADE will handle most related rows.
         sqlx::query(&format!(
@@ -255,6 +329,15 @@ pub async fn deactivate_user(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
 
+        audit::log(state.db.clone(), &tenant, AuditEntry {
+            user_id:        Some(user.user_id),
+            user_name:      Some(email.clone()),
+            action:         "user.delete".to_string(),
+            resource_type:  Some("user".to_string()),
+            resource_id:    Some(target_id.to_string()),
+            resource_label: Some(resource_label),
+            ip_address:     "unknown".to_string(),
+        });
         Ok(Json(json!({ "message": "Utilisateur supprimé définitivement" })))
     } else {
         sqlx::query(&format!(
@@ -265,6 +348,15 @@ pub async fn deactivate_user(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
 
+        audit::log(state.db.clone(), &tenant, AuditEntry {
+            user_id:        Some(user.user_id),
+            user_name:      Some(email.clone()),
+            action:         "user.deactivate".to_string(),
+            resource_type:  Some("user".to_string()),
+            resource_id:    Some(target_id.to_string()),
+            resource_label: Some(resource_label),
+            ip_address:     "unknown".to_string(),
+        });
         Ok(Json(json!({ "message": "Utilisateur désactivé" })))
     }
 }

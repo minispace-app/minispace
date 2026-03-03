@@ -4,8 +4,11 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
+import useSWR from "swr";
 import { useAuth } from "../../hooks/useAuth";
 import { getGarderieName } from "../../lib/auth";
+import { useTenantInfo } from "../../hooks/useTenantInfo";
+import { messagesApi } from "../../lib/api";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -19,19 +22,22 @@ import {
   Menu,
   X,
   User,
+  ClipboardList,
 } from "lucide-react";
 import { LanguageSwitcher } from "../LanguageSwitcher";
+import { AnnouncementBanner } from "../AnnouncementBanner";
+import { TrialBanner } from "../TrialBanner";
 
 const navItems = [
   { key: "dashboard", icon: LayoutDashboard, href: "/dashboard", roles: null },
+  { key: "children", icon: Users, href: "/dashboard/children", roles: null },
   { key: "messages", icon: MessageSquare, href: "/dashboard/messages", roles: null },
   { key: "media", icon: Image, href: "/dashboard/media", roles: null },
   { key: "documents", icon: FileText, href: "/dashboard/documents", roles: null },
-  { key: "children", icon: Users, href: "/dashboard/children", roles: null },
   { key: "groups", icon: FolderOpen, href: "/dashboard/groups", roles: null },
-  { key: "journal", icon: BookOpen, href: "/dashboard/journal", roles: null },
-  { key: "users", icon: Settings, href: "/dashboard/users", roles: ["admin_garderie", "super_admin"] },
-  { key: "myProfile", icon: User, href: "/dashboard/profile", roles: null },
+  { key: "planning", icon: ClipboardList, href: "/dashboard/planning", roles: null },
+  { key: "users",     icon: Settings, href: "/dashboard/users",   roles: ["admin_garderie", "super_admin"] },
+  { key: "myProfile", icon: User,    href: "/dashboard/profile", roles: null },
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -42,6 +48,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const locale = params.locale as string;
   const garderieName = getGarderieName() || tc("appName");
+  const { logo_url: tenantLogoUrl } = useTenantInfo();
+  const { data: conversations } = useSWR(
+    "conversations",
+    () => messagesApi.getConversations().then((r) => r.data as { unread_count: number }[]),
+    { refreshInterval: 30000 }
+  );
+  const totalUnread = (conversations ?? []).reduce((sum, c) => sum + (c.unread_count || 0), 0);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const filteredItems = navItems.filter(
@@ -66,14 +79,19 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               }`}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
-              {t(key as Parameters<typeof t>[0])}
+              <span className="flex-1">{t(key as Parameters<typeof t>[0])}</span>
+              {key === "messages" && totalUnread > 0 && (
+                <span className="flex-shrink-0 min-w-[1.25rem] h-5 px-1 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                  {totalUnread > 99 ? "99+" : totalUnread}
+                </span>
+              )}
             </Link>
           );
         })}
       </nav>
 
       <div className="px-3 py-4 border-t border-slate-100 space-y-2">
-        <div className="flex justify-center">
+<div className="flex justify-center">
           <LanguageSwitcher />
         </div>
         <button
@@ -83,6 +101,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <LogOut className="w-4 h-4" />
           {tc("logout")}
         </button>
+        <a
+          href={locale === "fr" ? "https://docs.minispace.app/fr/" : "https://docs.minispace.app"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-blue-500 transition-colors group"
+        >
+          <BookOpen className="w-3 h-3" />
+          <span className="group-hover:underline underline-offset-2">Documentation</span>
+        </a>
         {process.env.NEXT_PUBLIC_APP_VERSION && (
           <p className="text-center text-xs text-slate-400 pt-1">
             v{process.env.NEXT_PUBLIC_APP_VERSION}
@@ -93,12 +120,18 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex h-screen bg-slate-50">
+    <div className="flex h-screen bg-slate-50" style={{ height: "100dvh" }}>
       {/* ── Desktop sidebar ── */}
       <aside className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col flex-shrink-0">
         <div className="px-6 py-5 border-b border-slate-100 flex flex-col items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="minispace.app" className="w-28 mb-2" />
+          <img src={tenantLogoUrl || "/logo.png"} alt="minispace.app" className="w-28 mb-2" />
+          {!tenantLogoUrl && (
+            <div className="mb-3 text-center">
+              <span className="text-sm font-semibold" style={{ color: '#001F3F' }}>minispace</span>
+              <span className="text-sm font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
+            </div>
+          )}
           <h1 className="font-bold text-lg text-slate-800 text-center">{garderieName}</h1>
           {user && (
             <p className="text-sm text-slate-500 mt-0.5">
@@ -126,7 +159,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
           <div className="flex flex-col items-center flex-1 min-w-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="GarderieConnect" className="w-24 mb-1" />
+            <img src={tenantLogoUrl || "/logo.png"} alt="GarderieConnect" className="w-24 mb-1" />
+            {!tenantLogoUrl && (
+              <div className="mb-2 text-center">
+                <span className="text-xs font-semibold" style={{ color: '#001F3F' }}>minispace</span>
+                <span className="text-xs font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
+              </div>
+            )}
             <h1 className="font-bold text-slate-800 text-center text-sm truncate w-full">
               {garderieName}
             </h1>
@@ -159,6 +198,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <span className="font-semibold text-slate-800 truncate">{garderieName}</span>
         </header>
 
+        <TrialBanner />
+        <AnnouncementBanner />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>

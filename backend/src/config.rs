@@ -24,6 +24,7 @@ pub struct Config {
     pub smtp_username: Option<String>,
     pub smtp_password: Option<String>,
     pub smtp_from: Option<String>,
+    pub encryption_master_key: String,
 }
 
 impl Config {
@@ -59,6 +60,7 @@ impl Config {
             smtp_username: env::var("SMTP_USERNAME").ok().filter(|s| !s.is_empty()),
             smtp_password: env::var("SMTP_PASSWORD").ok().filter(|s| !s.is_empty()),
             smtp_from: env::var("SMTP_FROM").ok().filter(|s| !s.is_empty()),
+            encryption_master_key: required("ENCRYPTION_MASTER_KEY")?,
         })
     }
 }

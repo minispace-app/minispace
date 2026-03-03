@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { superAdminApi } from "../../../lib/api";
-import { Plus, Users, ChevronRight, Eye, EyeOff, Building2, UserPlus, Mail, Pencil, X, Trash2, AlertTriangle, Save, RotateCcw } from "lucide-react";
+import { Plus, Users, ChevronRight, Eye, EyeOff, Building2, UserPlus, Mail, Pencil, X, Trash2, AlertTriangle, Save, RotateCcw, Megaphone, BarChart2, Shield, ChevronDown } from "lucide-react";
 
 interface Garderie {
   id: string;
@@ -13,6 +13,7 @@ interface Garderie {
   email: string | null;
   plan: string;
   is_active: boolean;
+  trial_expires_at: string | null;
   created_at: string;
 }
 
@@ -51,12 +52,26 @@ export default function SuperAdminPage() {
   const [garderieUsers, setGarderieUsers] = useState<TenantUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
+  // Right panel
+  type RightPanel = "users";
+  const [rightPanel, setRightPanel] = useState<RightPanel>("users");
+
+  // Global audit log
+  interface GlobalAuditEntry { id: string; tenant: string; user_name: string | null; action: string; resource_label: string | null; ip_address: string | null; created_at: string; }
+  interface GlobalAuditResponse { entries: GlobalAuditEntry[]; total: number; page: number; limit: number; }
+  const [globalAudit, setGlobalAudit] = useState<GlobalAuditResponse | null>(null);
+  const [globalAuditPage, setGlobalAuditPage] = useState(1);
+  const [globalAuditAction, setGlobalAuditAction] = useState("");
+  const [globalAuditTenant, setGlobalAuditTenant] = useState("");
+  const [loadingGlobalAudit, setLoadingGlobalAudit] = useState(false);
+  const [expandGlobalAudit, setExpandGlobalAudit] = useState(false);
+
   // Forms
   const [showCreateGarderie, setShowCreateGarderie] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [editGarderie, setEditGarderie] = useState<Garderie | null>(null);
 
-  const [garderieForm, setGarderieForm] = useState({ slug: "", name: "", address: "", phone: "", email: "", plan: "free" });
+  const [garderieForm, setGarderieForm] = useState({ slug: "", name: "", address: "", phone: "", email: "", plan: "free", trial_expires_at: "", remove_trial_expires: false });
   const [userForm, setUserForm] = useState({ email: "", first_name: "", last_name: "", password: "", role: "admin_garderie", preferred_locale: "fr" });
    const [saving, setSaving] = useState(false);
    const [formError, setFormError] = useState("");
@@ -83,6 +98,13 @@ export default function SuperAdminPage() {
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  // Announcement
+  interface AnnouncementData { message: string; color: string; }
+  const [currentAnnouncement, setCurrentAnnouncement] = useState<AnnouncementData | null>(null);
+  const [announcementMsg, setAnnouncementMsg] = useState("");
+  const [announcementColor, setAnnouncementColor] = useState<"yellow" | "red">("yellow");
+  const [announcementSaving, setAnnouncementSaving] = useState(false);
+
   // Check stored key on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -90,10 +112,45 @@ export default function SuperAdminPage() {
       if (stored) {
         setAuthenticated(true);
         loadGarderies();
+        loadAnnouncement();
+        loadGlobalAudit();
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const loadAnnouncement = async () => {
+    try {
+      const res = await superAdminApi.getAnnouncement();
+      setCurrentAnnouncement(res.data || null);
+      if (res.data) {
+        setAnnouncementMsg(res.data.message);
+        setAnnouncementColor(res.data.color as "yellow" | "red");
+      }
+    } catch {
+      setCurrentAnnouncement(null);
+    }
+  };
+
+  const handleSetAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!announcementMsg.trim()) return;
+    setAnnouncementSaving(true);
+    try {
+      await superAdminApi.setAnnouncement(announcementMsg.trim(), announcementColor);
+      await loadAnnouncement();
+    } finally {
+      setAnnouncementSaving(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async () => {
+    if (!confirm("Retirer l'annonce en cours ?")) return;
+    await superAdminApi.deleteAnnouncement();
+    setCurrentAnnouncement(null);
+    setAnnouncementMsg("");
+    setAnnouncementColor("yellow");
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,12 +186,28 @@ export default function SuperAdminPage() {
     }
   }, []);
 
+  const loadGlobalAudit = useCallback(async (page = 1, action = "", tenant = "") => {
+    setLoadingGlobalAudit(true);
+    try {
+      const res = await superAdminApi.getGlobalAuditLog({
+        page,
+        limit: 50,
+        action: action || undefined,
+        tenant: tenant || undefined,
+      });
+      setGlobalAudit(res.data);
+    } finally {
+      setLoadingGlobalAudit(false);
+    }
+  }, []);
+
   const selectGarderie = (slug: string) => {
     if (selectedSlug === slug) {
       setSelectedSlug(null);
       setGarderieUsers([]);
     } else {
       setSelectedSlug(slug);
+      setRightPanel("users");
       loadGarderieUsers(slug);
     }
     setShowCreateUser(false);
@@ -154,7 +227,7 @@ export default function SuperAdminPage() {
         plan: garderieForm.plan,
       });
       setShowCreateGarderie(false);
-      setGarderieForm({ slug: "", name: "", address: "", phone: "", email: "", plan: "free" });
+      setGarderieForm({ slug: "", name: "", address: "", phone: "", email: "", plan: "free", trial_expires_at: "", remove_trial_expires: false });
       loadGarderies();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -175,8 +248,11 @@ export default function SuperAdminPage() {
         address: garderieForm.address || undefined,
         phone: garderieForm.phone || undefined,
         email: garderieForm.email || undefined,
+        trial_expires_at: garderieForm.trial_expires_at ? new Date(garderieForm.trial_expires_at).toISOString() : undefined,
+        remove_trial_expires: garderieForm.remove_trial_expires || undefined,
       });
       setEditGarderie(null);
+      setGarderieForm({ slug: "", name: "", address: "", phone: "", email: "", plan: "free", trial_expires_at: "", remove_trial_expires: false });
       loadGarderies();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -373,6 +449,23 @@ export default function SuperAdminPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
+            onClick={async () => {
+              const key = typeof window !== "undefined" ? localStorage.getItem("super_admin_key") || "" : "";
+              try {
+                await fetch("/api/super-admin/grafana-access", {
+                  method: "POST",
+                  credentials: "include",
+                  headers: { "X-Super-Admin-Key": key },
+                });
+              } catch { /* ignore */ }
+              window.open("/grafana/", "_blank");
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 text-white text-xs font-medium rounded-lg hover:bg-violet-700 transition"
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            Monitoring
+          </button>
+          <button
             onClick={handleBackup}
             disabled={backupLoading}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition"
@@ -395,6 +488,91 @@ export default function SuperAdminPage() {
           </button>
         </div>
       </header>
+
+      {/* ── Announcement banner ── */}
+      <div className="max-w-7xl mx-auto px-6 pt-6">
+        <div className="bg-white rounded-xl border border-slate-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Megaphone className="w-4 h-4 text-purple-600" />
+            <h2 className="font-semibold text-slate-800">Annonce globale</h2>
+            {currentAnnouncement && (
+              <span className={`ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                currentAnnouncement.color === "red"
+                  ? "bg-red-100 text-red-700"
+                  : "bg-yellow-100 text-yellow-700"
+              }`}>
+                Active
+              </span>
+            )}
+          </div>
+
+          {currentAnnouncement && (
+            <div className={`mb-4 px-4 py-3 rounded-lg border text-sm flex items-start gap-2 ${
+              currentAnnouncement.color === "red"
+                ? "bg-red-50 border-red-200 text-red-800"
+                : "bg-yellow-50 border-yellow-200 text-yellow-800"
+            }`}>
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <p className="flex-1">{currentAnnouncement.message}</p>
+              <button
+                onClick={handleDeleteAnnouncement}
+                className="flex-shrink-0 text-slate-400 hover:text-red-500 transition"
+                title="Retirer l'annonce"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={handleSetAnnouncement} className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="text-xs font-medium text-slate-500 mb-1 block">
+                {currentAnnouncement ? "Remplacer l'annonce" : "Nouvelle annonce"}
+              </label>
+              <input
+                value={announcementMsg}
+                onChange={(e) => setAnnouncementMsg(e.target.value)}
+                placeholder="Ex : Maintenance planifiée ce dimanche de 8h à 12h."
+                className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Couleur</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAnnouncementColor("yellow")}
+                  className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
+                    announcementColor === "yellow"
+                      ? "bg-yellow-400 border-yellow-400 text-white"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Jaune
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAnnouncementColor("red")}
+                  className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
+                    announcementColor === "red"
+                      ? "bg-red-500 border-red-500 text-white"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Rouge
+                </button>
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={announcementSaving || !announcementMsg.trim()}
+              className="px-4 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 transition"
+            >
+              {announcementSaving ? "Envoi..." : "Publier"}
+            </button>
+          </form>
+        </div>
+      </div>
 
       <div className="max-w-7xl mx-auto p-6 flex gap-6">
 
@@ -497,6 +675,27 @@ export default function SuperAdminPage() {
                   <input value={garderieForm.address} onChange={e => setGarderieForm(f => ({...f, address: e.target.value}))}
                     className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
                 </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600">Fin d&apos;essai</label>
+                  <input
+                    type="datetime-local"
+                    value={garderieForm.remove_trial_expires ? "" : garderieForm.trial_expires_at}
+                    disabled={garderieForm.remove_trial_expires}
+                    onChange={e => setGarderieForm(f => ({...f, trial_expires_at: e.target.value}))}
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex items-end pb-0.5">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={garderieForm.remove_trial_expires}
+                      onChange={e => setGarderieForm(f => ({...f, remove_trial_expires: e.target.checked, trial_expires_at: e.target.checked ? "" : f.trial_expires_at}))}
+                      className="rounded"
+                    />
+                    Convertir en compte permanent (supprimer l&apos;essai)
+                  </label>
+                </div>
                 <div className="col-span-2 flex justify-end">
                   <button type="submit" disabled={saving}
                     className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition">
@@ -522,6 +721,7 @@ export default function SuperAdminPage() {
                     <th className="text-left px-4 py-3 font-medium text-slate-600">Slug</th>
                     <th className="text-left px-4 py-3 font-medium text-slate-600">Plan</th>
                     <th className="text-left px-4 py-3 font-medium text-slate-600">Statut</th>
+                    <th className="text-left px-4 py-3 font-medium text-slate-600">Essai</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
@@ -542,11 +742,27 @@ export default function SuperAdminPage() {
                           {g.is_active ? "Actif" : "Inactif"}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        {g.trial_expires_at === null ? null : (
+                          new Date(g.trial_expires_at) < new Date() ? (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                              Expiré
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                              Essai jusqu&apos;au {new Date(g.trial_expires_at).toLocaleDateString("fr-CA")}
+                            </span>
+                          )
+                        )}
+                      </td>
                       <td className="px-4 py-3 flex items-center gap-2 justify-end" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => {
                             setEditGarderie(g);
-                            setGarderieForm({ slug: g.slug, name: g.name, address: g.address || "", phone: g.phone || "", email: g.email || "", plan: g.plan });
+                            const trialDate = g.trial_expires_at
+                              ? new Date(g.trial_expires_at).toISOString().slice(0, 16)
+                              : "";
+                            setGarderieForm({ slug: g.slug, name: g.name, address: g.address || "", phone: g.phone || "", email: g.email || "", plan: g.plan, trial_expires_at: trialDate, remove_trial_expires: false });
                             setShowCreateGarderie(false);
                             setFormError("");
                           }}
@@ -769,10 +985,19 @@ export default function SuperAdminPage() {
           </div>
         )}
 
-        {/* Right: Users panel */}
+        {/* Right: Users / Audit panel */}
         {selectedSlug && (
           <div className="w-96 flex-shrink-0">
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+
+              {/* Header */}
+              <div className="border-b border-slate-100 px-5 py-3">
+                <h3 className="font-semibold text-slate-800">Utilisateurs</h3>
+              </div>
+
+              {/* Users panel — header + form + list */}
+              {rightPanel === "users" && (
+              <>
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold text-slate-800 flex items-center gap-2">
@@ -893,10 +1118,172 @@ export default function SuperAdminPage() {
                   ))}
                 </div>
               )}
+              </>
+              )}
+
             </div>
           </div>
         )}
       </div>
+
+      {/* Global Audit Log — Bottom section below garderies */}
+      {authenticated && (
+        <div className="max-w-7xl mx-auto px-6 pt-6">
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            {/* Header */}
+            <div
+              onClick={() => setExpandGlobalAudit(!expandGlobalAudit)}
+              className="px-6 py-4 border-b border-slate-100 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition"
+            >
+              <div className="flex items-center gap-3">
+                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${expandGlobalAudit ? 'rotate-180' : ''}`} />
+                <Shield className="w-5 h-5 text-slate-500" />
+                <h2 className="font-semibold text-slate-800">Journal d&apos;audit global</h2>
+                {globalAudit && <span className="text-xs text-slate-400 font-medium">({globalAudit.total} entrées)</span>}
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  loadGlobalAudit(globalAuditPage, globalAuditAction, globalAuditTenant);
+                }}
+                disabled={loadingGlobalAudit}
+                className="px-3 py-1.5 text-sm rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition"
+              >
+                {loadingGlobalAudit ? "..." : "↻"}
+              </button>
+            </div>
+
+            {/* Content — Collapsible */}
+            {expandGlobalAudit && (
+            <>
+            {/* Filters */}
+            <div className="px-6 py-4 border-b border-slate-100 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {[["", "Toutes"], ["auth", "Auth"], ["child", "Enfants"], ["user", "Utilisateurs"], ["media", "Photos"], ["document", "Documents"]].map(([val, label]) => (
+                  <button
+                    key={val}
+                    onClick={() => {
+                      setGlobalAuditAction(val);
+                      setGlobalAuditPage(1);
+                      loadGlobalAudit(1, val, globalAuditTenant);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${globalAuditAction === val ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tenant filter */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-slate-600">Garderie:</label>
+                <select
+                  value={globalAuditTenant}
+                  onChange={(e) => {
+                    setGlobalAuditTenant(e.target.value);
+                    setGlobalAuditPage(1);
+                    loadGlobalAudit(1, globalAuditAction, e.target.value);
+                  }}
+                  className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-slate-300"
+                >
+                  <option value="">Toutes</option>
+                  {garderies.map((g) => (
+                    <option key={g.slug} value={g.slug}>
+                      {g.name} ({g.slug})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Entries */}
+            {loadingGlobalAudit ? (
+              <div className="p-8 text-center text-slate-400 text-sm">Chargement…</div>
+            ) : !globalAudit || globalAudit.entries.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-sm">Aucune entrée.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 bg-slate-50">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Garderie</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Action</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Utilisateur</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">IP</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {globalAudit.entries.map((entry) => {
+                      const prefix = entry.action.split(".")[0];
+                      const colors: Record<string, string> = { auth: "bg-blue-100 text-blue-700", child: "bg-green-100 text-green-700", user: "bg-orange-100 text-orange-700", media: "bg-purple-100 text-purple-700", document: "bg-yellow-100 text-yellow-700" };
+                      return (
+                        <tr key={entry.id} className="border-b border-slate-50 hover:bg-slate-50 transition">
+                          <td className="px-6 py-3 text-sm font-medium text-slate-700">
+                            <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+                              {entry.tenant}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-sm">
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${colors[prefix] ?? "bg-slate-100 text-slate-600"}`}>
+                              {entry.action}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3 text-sm text-slate-600">
+                            {entry.user_name ?? "—"}
+                            {entry.resource_label ? <div className="text-xs text-slate-400 mt-0.5">{entry.resource_label}</div> : ""}
+                          </td>
+                          <td className="px-6 py-3 text-sm font-mono text-slate-400">
+                            {entry.ip_address ?? "—"}
+                          </td>
+                          <td className="px-6 py-3 text-sm text-slate-400 whitespace-nowrap">
+                            {new Date(entry.created_at).toLocaleString("fr-CA", { dateStyle: "short", timeStyle: "short" })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {globalAudit && globalAudit.total > 50 && (
+              <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+                <span className="text-xs text-slate-400">
+                  Page {globalAuditPage} · {globalAudit.total} entrées
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const p = Math.max(1, globalAuditPage - 1);
+                      setGlobalAuditPage(p);
+                      loadGlobalAudit(p, globalAuditAction, globalAuditTenant);
+                    }}
+                    disabled={globalAuditPage === 1}
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition"
+                  >
+                    ◀ Précédent
+                  </button>
+                  <button
+                    onClick={() => {
+                      const p = globalAuditPage + 1;
+                      setGlobalAuditPage(p);
+                      loadGlobalAudit(p, globalAuditAction, globalAuditTenant);
+                    }}
+                    disabled={globalAudit.entries.length < 50}
+                    className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-40 transition"
+                  >
+                    Suivant ▶
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

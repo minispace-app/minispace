@@ -1,21 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useTenantInfo } from "../../../hooks/useTenantInfo";
 import { TenantNotFound } from "../../../components/TenantNotFound";
 import { LanguageSwitcher } from "../../../components/LanguageSwitcher";
 import { authApi } from "../../../lib/api";
 import { storeAuthData } from "../../../lib/auth";
+import { AnnouncementBanner } from "../../../components/AnnouncementBanner";
+import { BookOpen } from "lucide-react";
 
 export default function LoginPage() {
   const t = useTranslations("auth");
   const tc = useTranslations("common");
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const locale = params.locale as string;
-  const { name: tenantName, notFound } = useTenantInfo();
+  const { name: tenantName, logo_url: tenantLogoUrl, notFound } = useTenantInfo();
+
+  const trialExpired = searchParams.get("reason") === "trial_expired";
 
   // Step 1 state
   const [email, setEmail] = useState("");
@@ -90,22 +95,37 @@ export default function LoginPage() {
     }
   };
 
-  if (notFound) return <TenantNotFound />;
+  if (notFound && !trialExpired) return <TenantNotFound />;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="absolute top-4 right-4">
+    <div className="min-h-screen flex flex-col bg-slate-50">
+      <AnnouncementBanner />
+      <div className="flex justify-end px-4 py-2">
         <LanguageSwitcher />
       </div>
+      <div className="flex-1 flex items-center justify-center">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
         <div className="text-center mb-8">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="minispace.app" className="w-40 mx-auto mb-3" />
+          <img src={tenantLogoUrl || "/logo.png"} alt="minispace.app" className="w-40 mx-auto mb-3" />
+          {!tenantLogoUrl && (
+            <div className="mb-3 text-center">
+              <span className="text-sm font-semibold" style={{ color: '#001F3F' }}>minispace</span>
+              <span className="text-sm font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
+            </div>
+          )}
           <h1 className="text-2xl font-bold text-slate-800">{tenantName || tc("appName")}</h1>
           <p className="text-slate-500 mt-1">
             {step === 1 ? t("login") : t("twoFaTitle")}
           </p>
         </div>
+
+        {trialExpired && (
+          <div className="mb-5 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <p className="text-sm font-semibold text-amber-800">{t("trialExpiredTitle")}</p>
+            <p className="text-xs text-amber-700 mt-1">{t("trialExpiredDesc")}</p>
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
@@ -200,6 +220,18 @@ export default function LoginPage() {
           </form>
         )}
 
+        <div className="mt-6 pt-4 border-t border-slate-100 text-center">
+          <a
+            href={locale === "fr" ? "https://docs.minispace.app/fr/" : "https://docs.minispace.app"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors group"
+          >
+            <BookOpen className="w-3 h-3 group-hover:text-blue-500 transition-colors" />
+            <span className="group-hover:underline underline-offset-2">Documentation</span>
+          </a>
+        </div>
+      </div>
       </div>
     </div>
   );

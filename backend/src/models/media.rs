@@ -46,6 +46,11 @@ pub struct Media {
     pub visibility: String,
     pub child_ids: Vec<Uuid>,
     pub created_at: DateTime<Utc>,
+    pub is_encrypted: bool,
+    pub encryption_iv: Option<Vec<u8>>,
+    pub encryption_tag: Option<Vec<u8>>,
+    pub thumbnail_encryption_iv: Option<Vec<u8>>,
+    pub thumbnail_encryption_tag: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Deserialize)]

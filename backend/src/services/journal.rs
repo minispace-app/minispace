@@ -28,6 +28,7 @@ impl JournalService {
                       appetit::TEXT     AS appetit,
                       humeur::TEXT      AS humeur,
                       sommeil_minutes,
+                      absent,
                       sante, medicaments, message_educatrice, observations,
                       created_by, created_at, updated_at
                FROM "{schema}".daily_journals
@@ -79,20 +80,21 @@ impl JournalService {
         let entry = sqlx::query_as::<_, DailyJournal>(&format!(
             r#"INSERT INTO "{schema}".daily_journals
                    (child_id, date, temperature, menu, appetit, humeur,
-                    sommeil_minutes, sante, medicaments, message_educatrice,
+                    sommeil_minutes, absent, sante, medicaments, message_educatrice,
                     observations, created_by)
                VALUES ($1, $2,
                        $3::"{schema}".weather_condition,
                        $4,
                        $5::"{schema}".appetit_level,
                        $6::"{schema}".humeur_level,
-                       $7, $8, $9, $10, $11, $12)
+                       $7, $8, $9, $10, $11, $12, $13)
                ON CONFLICT (child_id, date) DO UPDATE SET
                    temperature        = EXCLUDED.temperature,
                    menu               = EXCLUDED.menu,
                    appetit            = EXCLUDED.appetit,
                    humeur             = EXCLUDED.humeur,
                    sommeil_minutes    = EXCLUDED.sommeil_minutes,
+                   absent             = EXCLUDED.absent,
                    sante              = EXCLUDED.sante,
                    medicaments        = EXCLUDED.medicaments,
                    message_educatrice = EXCLUDED.message_educatrice,
@@ -104,6 +106,7 @@ impl JournalService {
                    appetit::TEXT     AS appetit,
                    humeur::TEXT      AS humeur,
                    sommeil_minutes,
+                   absent,
                    sante, medicaments, message_educatrice, observations,
                    created_by, created_at, updated_at"#
         ))
@@ -114,6 +117,7 @@ impl JournalService {
         .bind(&req.appetit)
         .bind(&req.humeur)
         .bind(req.sommeil_minutes)
+        .bind(req.absent)
         .bind(&req.sante)
         .bind(&req.medicaments)
         .bind(&req.message_educatrice)
@@ -122,6 +126,167 @@ impl JournalService {
         .fetch_one(pool)
         .await?;
         Ok(entry)
+    }
+
+    /// Auto-send today's journal entries for all children of a tenant.
+    /// Groups journals by parent email to send one email per parent with all their children's journals.
+    /// Only sends entries that have content (or are absent) and haven't been sent yet.
+    /// Returns the number of emails sent.
+    pub async fn auto_send_today(
+        pool: &PgPool,
+        email_svc: Option<&crate::services::email::EmailService>,
+        tenant: &str,
+        today: NaiveDate,
+    ) -> anyhow::Result<usize> {
+        let schema = schema_name(tenant);
+
+        // Find child_ids with unsent entries that have content or are absent
+        let child_ids: Vec<Uuid> = sqlx::query_scalar(&format!(
+            r#"SELECT child_id FROM "{schema}".daily_journals
+               WHERE date = $1
+                 AND sent_at IS NULL
+                 AND (absent = true
+                      OR temperature IS NOT NULL OR menu IS NOT NULL
+                      OR appetit IS NOT NULL     OR humeur IS NOT NULL
+                      OR sommeil_minutes IS NOT NULL
+                      OR sante IS NOT NULL        OR medicaments IS NOT NULL
+                      OR message_educatrice IS NOT NULL
+                      OR observations IS NOT NULL)"#
+        ))
+        .bind(today)
+        .fetch_all(pool)
+        .await?;
+
+        if child_ids.is_empty() {
+            return Ok(0);
+        }
+
+        let garderie_name: String = sqlx::query_scalar(
+            "SELECT name FROM public.garderies WHERE slug = $1",
+        )
+        .bind(tenant)
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| tenant.to_string());
+
+        // Build a map of child_id -> (first_name, last_name, DailyJournal)
+        let mut child_data: std::collections::HashMap<Uuid, (String, String, DailyJournal)> =
+            std::collections::HashMap::new();
+
+        for child_id in &child_ids {
+            let child_name: Option<(String, String)> = sqlx::query_as(&format!(
+                r#"SELECT first_name, last_name FROM "{schema}".children WHERE id = $1"#
+            ))
+            .bind(child_id)
+            .fetch_optional(pool)
+            .await?;
+
+            let (first, last) = match child_name {
+                Some(n) => n,
+                None => continue,
+            };
+
+            // Fetch the entry for today
+            let entry: Option<DailyJournal> = sqlx::query_as(&format!(
+                r#"SELECT id, child_id, date,
+                          temperature::TEXT AS temperature,
+                          menu,
+                          appetit::TEXT     AS appetit,
+                          humeur::TEXT      AS humeur,
+                          sommeil_minutes,
+                          absent,
+                          sante, medicaments, message_educatrice, observations,
+                          created_by, created_at, updated_at
+                   FROM "{schema}".daily_journals
+                   WHERE child_id = $1 AND date = $2"#
+            ))
+            .bind(child_id)
+            .bind(today)
+            .fetch_optional(pool)
+            .await?;
+
+            if let Some(e) = entry {
+                child_data.insert(*child_id, (first, last, e));
+            }
+        }
+
+        if child_data.is_empty() {
+            return Ok(0);
+        }
+
+        // Fetch all parent-child relationships for the children we have entries for
+        let parent_child_rows: Vec<(String, String, Uuid)> = sqlx::query_as(&format!(
+            r#"SELECT u.email, CONCAT(u.first_name, ' ', u.last_name), cp.child_id
+               FROM "{schema}".users u
+               INNER JOIN "{schema}".child_parents cp ON u.id = cp.user_id
+               WHERE cp.child_id = ANY($1) AND u.is_active = TRUE"#
+        ))
+        .bind(&child_ids)
+        .fetch_all(pool)
+        .await?;
+
+        // Group by parent_email
+        let mut parent_children: std::collections::HashMap<String, (String, Vec<(String, String, DailyJournal)>)> =
+            std::collections::HashMap::new();
+
+        for (parent_email, parent_name, child_id) in parent_child_rows {
+            if let Some((child_first, child_last, entry)) = child_data.get(&child_id) {
+                parent_children
+                    .entry(parent_email)
+                    .or_insert_with(|| (parent_name.clone(), Vec::new()))
+                    .1
+                    .push((child_first.clone(), child_last.clone(), entry.clone()));
+            }
+        }
+
+        let mut total_sent = 0usize;
+
+        // Send one email per parent with all their children's journals
+        if let Some(svc) = email_svc {
+            for (parent_email, (parent_name, children_entries)) in parent_children {
+                // Build subject: if 1 child, use child's name; if multiple, use first names
+                let subject = if children_entries.len() == 1 {
+                    format!(
+                        "Journal de bord de {} {} — {}",
+                        children_entries[0].0, children_entries[0].1,
+                        today.format("%d/%m/%Y")
+                    )
+                } else {
+                    let first_names: Vec<&str> =
+                        children_entries.iter().map(|(f, _, _)| f.as_str()).collect();
+                    format!(
+                        "Journal de bord de {} — {}",
+                        first_names.join(" et "),
+                        today.format("%d/%m/%Y")
+                    )
+                };
+
+                // Build HTML with all children's journals
+                let html = build_journal_email_html_multi(&children_entries, today, &garderie_name);
+
+                let _ = svc
+                    .send_journal(&parent_email, &parent_name, &html, &subject, &garderie_name)
+                    .await;
+                total_sent += 1;
+            }
+        }
+
+        // Mark all entries as sent
+        for child_id in child_ids {
+            let _ = sqlx::query(&format!(
+                r#"UPDATE "{schema}".daily_journals
+                   SET sent_at = NOW()
+                   WHERE child_id = $1 AND date = $2"#
+            ))
+            .bind(child_id)
+            .bind(today)
+            .execute(pool)
+            .await;
+        }
+
+        Ok(total_sent)
     }
 
     /// Returns true if the given user is a parent of the child.
@@ -211,7 +376,7 @@ impl JournalService {
                     week_start.format("%d/%m/%Y")
                 );
                 for (parent_email, parent_name) in &parents {
-                    let _ = svc.send_journal(parent_email, parent_name, &html, &subject).await;
+                    let _ = svc.send_journal(parent_email, parent_name, &html, &subject, &garderie_name).await;
                     total_sent += 1;
                 }
             }
@@ -289,7 +454,7 @@ impl JournalService {
                 );
 
                 // Ignore send errors — graceful degradation
-                let _ = svc.send_journal(parent_email, parent_name, &html, &subject).await;
+                let _ = svc.send_journal(parent_email, parent_name, &html, &subject, &garderie_name).await;
             }
         }
 
@@ -297,6 +462,54 @@ impl JournalService {
             "Journal envoyé à {} parent(s)",
             parents.len()
         ))
+    }
+}
+
+fn fmt_temperature(v: &str) -> &str {
+    match v {
+        "ensoleille" => "☀️ Ensoleillé",
+        "nuageux"    => "⛅ Nuageux",
+        "pluie"      => "🌧️ Pluie",
+        "neige"      => "❄️ Neige",
+        "orageux"    => "⛈️ Orageux",
+        _ => v,
+    }
+}
+
+fn fmt_appetit(v: &str) -> &str {
+    match v {
+        "comme_habitude" => "Normal",
+        "peu"            => "Peu",
+        "beaucoup"       => "Beaucoup",
+        "refuse"         => "Refuse",
+        _ => v,
+    }
+}
+
+fn fmt_humeur(v: &str) -> &str {
+    match v {
+        "tres_bien" => "😄 Très bien",
+        "bien"      => "🙂 Bien",
+        "difficile" => "😕 Difficile",
+        "pleurs"    => "😢 Pleurs",
+        _ => v,
+    }
+}
+
+fn fmt_date_fr(date: NaiveDate) -> String {
+    let days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+    let months = ["janvier", "février", "mars", "avril", "mai", "juin",
+                  "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+    use chrono::Datelike;
+    let day_name = days[date.weekday().num_days_from_monday() as usize];
+    let month = months[date.month0() as usize];
+    format!("{} {} {} {}", day_name, date.day(), month, date.year())
+}
+
+fn opt_str(v: Option<&str>) -> &str {
+    match v {
+        Some(s) if !s.trim().is_empty() => s,
+        _ => "—",
     }
 }
 
@@ -308,68 +521,196 @@ fn build_journal_email_html(
     entries: &[crate::models::journal::DailyJournal],
     garderie_name: &str,
 ) -> String {
+    let period = if week_start == week_end {
+        format!("Journal du {} — {}", fmt_date_fr(week_start), garderie_name)
+    } else {
+        format!(
+            "Semaine du {} au {} — {}",
+            week_start.format("%d/%m/%Y"),
+            week_end.format("%d/%m/%Y"),
+            garderie_name
+        )
+    };
+
     let mut html = format!(
         r#"<html><body style="font-family:sans-serif;max-width:800px;margin:auto;background:#f9fafb">
         <div style="background:white;border-radius:8px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-            <h2 style="color:#1f2937;margin-bottom:8px">Journal de bord - {first} {last}</h2>
-            <p style="color:#6b7280;margin-bottom:24px;font-size:14px">
-                Semaine du {start} au {end} — {garderie}
-            </p>"#,
+            <h2 style="color:#1f2937;margin-bottom:8px">Journal de bord — {first} {last}</h2>
+            <p style="color:#6b7280;margin-bottom:24px;font-size:14px">{period}</p>"#,
         first = child_first,
         last = child_last,
-        start = week_start.format("%d/%m/%Y"),
-        end = week_end.format("%d/%m/%Y"),
-        garderie = garderie_name
+        period = period,
     );
 
     for entry in entries {
+        let date_fr = fmt_date_fr(entry.date);
+
+        if entry.absent {
+            html.push_str(&format!(
+                r#"<div style="border:1px solid #e5e7eb;border-radius:6px;padding:16px;margin-bottom:12px;background:#f9fafb">
+                <h3 style="color:#6b7280;margin:0 0 8px 0;font-size:16px">{date}</h3>
+                <span style="display:inline-block;background:#fee2e2;color:#b91c1c;font-size:13px;font-weight:600;padding:4px 12px;border-radius:20px">🏠 Absent ce jour</span>
+                </div>"#,
+                date = date_fr
+            ));
+            continue;
+        }
+
+        let sommeil = match entry.sommeil_minutes {
+            Some(m) if m > 0 => format!("{} min", m),
+            _ => "—".to_string(),
+        };
+
         html.push_str(&format!(
             r#"<div style="border:1px solid #e5e7eb;border-radius:6px;padding:16px;margin-bottom:12px">
             <h3 style="color:#2563eb;margin:0 0 12px 0;font-size:16px">{date}</h3>
-            <table style="width:100%;font-size:14px;color:#374151">
-                <tr><td style="padding:4px 0"><strong>Température:</strong></td><td>{temp}</td></tr>
-                <tr><td style="padding:4px 0"><strong>Menu:</strong></td><td>{menu}</td></tr>
-                <tr><td style="padding:4px 0"><strong>Appétit:</strong></td><td>{appetit}</td></tr>
-                <tr><td style="padding:4px 0"><strong>Humeur:</strong></td><td>{humeur}</td></tr>
-                <tr><td style="padding:4px 0"><strong>Sommeil:</strong></td><td>{sleep} min</td></tr>
-                <tr><td style="padding:4px 0"><strong>Santé:</strong></td><td>{sante}</td></tr>
-                <tr><td style="padding:4px 0"><strong>Médicaments:</strong></td><td>{med}</td></tr>
+            <table style="width:100%;font-size:14px;color:#374151;border-collapse:collapse">
+                <tr><td style="padding:5px 8px 5px 0;width:140px;color:#6b7280"><strong>Température</strong></td><td style="padding:5px 0">{temp}</td></tr>
+                <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Menu</strong></td><td style="padding:5px 0">{menu}</td></tr>
+                <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Appétit</strong></td><td style="padding:5px 0">{appetit}</td></tr>
+                <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Humeur</strong></td><td style="padding:5px 0">{humeur}</td></tr>
+                <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Sommeil</strong></td><td style="padding:5px 0">{sommeil}</td></tr>
+                <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Santé</strong></td><td style="padding:5px 0">{sante}</td></tr>
+                <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Médicaments</strong></td><td style="padding:5px 0">{med}</td></tr>
             </table>"#,
-            date = entry.date,
-            temp = entry.temperature.as_deref().unwrap_or("—"),
-            menu = entry.menu.as_deref().unwrap_or("—"),
-            appetit = entry.appetit.as_deref().unwrap_or("—"),
-            humeur = entry.humeur.as_deref().unwrap_or("—"),
-            sleep = entry.sommeil_minutes.unwrap_or(0),
-            sante = entry.sante.as_deref().unwrap_or("—"),
-            med = entry.medicaments.as_deref().unwrap_or("—")
+            date    = date_fr,
+            temp    = entry.temperature.as_deref().map(fmt_temperature).unwrap_or("—"),
+            menu    = opt_str(entry.menu.as_deref()),
+            appetit = entry.appetit.as_deref().map(fmt_appetit).unwrap_or("—"),
+            humeur  = entry.humeur.as_deref().map(fmt_humeur).unwrap_or("—"),
+            sommeil = sommeil,
+            sante   = opt_str(entry.sante.as_deref()),
+            med     = opt_str(entry.medicaments.as_deref()),
         ));
 
         if let Some(msg) = &entry.message_educatrice {
-            html.push_str(&format!(
-                r#"<div style="background:#eff6ff;border-left:3px solid #2563eb;padding:8px;margin-top:8px;font-size:13px">
-                <strong>Message de l'éducateur:</strong><br>{msg}
-            </div>"#
-            ));
+            if !msg.trim().is_empty() {
+                html.push_str(&format!(
+                    r#"<div style="background:#eff6ff;border-left:3px solid #2563eb;padding:8px 12px;margin-top:10px;font-size:13px;border-radius:0 4px 4px 0">
+                    <strong style="color:#1d4ed8">💬 Message de l'éducatrice :</strong><br><span style="color:#374151">{msg}</span>
+                </div>"#
+                ));
+            }
         }
 
         if let Some(obs) = &entry.observations {
-            html.push_str(&format!(
-                r#"<div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:8px;margin-top:8px;font-size:13px">
-                <strong>Observations:</strong><br>{obs}
-            </div>"#
-            ));
+            if !obs.trim().is_empty() {
+                html.push_str(&format!(
+                    r#"<div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:8px 12px;margin-top:8px;font-size:13px;border-radius:0 4px 4px 0">
+                    <strong style="color:#15803d">📝 Observations :</strong><br><span style="color:#374151">{obs}</span>
+                </div>"#
+                ));
+            }
         }
 
         html.push_str("</div>");
     }
 
-    html.push_str(
+    html.push_str(&format!(
         r#"<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280">
-        <p style="margin:0">Cordialement,<br><strong>minispace.app</strong></p>
+        <p style="margin:0">Cordialement,<br><strong>{}</strong></p>
     </div>
-    </div></body></html>"#
+    </div></body></html>"#,
+        garderie_name
+    ));
+
+    html
+}
+
+/// Builds email HTML for multiple children's journals (grouped by parent).
+/// Each child is displayed in its own section.
+fn build_journal_email_html_multi(
+    children_entries: &[(String, String, crate::models::journal::DailyJournal)],
+    today: NaiveDate,
+    garderie_name: &str,
+) -> String {
+    let period = format!("Journal du {} — {}", fmt_date_fr(today), garderie_name);
+
+    let mut html = format!(
+        r#"<html><body style="font-family:sans-serif;max-width:800px;margin:auto;background:#f9fafb">
+        <div style="background:white;border-radius:8px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
+            <h2 style="color:#1f2937;margin-bottom:8px">Journal de bord</h2>
+            <p style="color:#6b7280;margin-bottom:24px;font-size:14px">{period}</p>"#,
+        period = period,
     );
+
+    for (child_first, child_last, entry) in children_entries {
+        // Child header
+        html.push_str(&format!(
+            r#"<h3 style="color:#1f2937;margin-top:20px;margin-bottom:12px;font-size:16px;border-bottom:2px solid #e5e7eb;padding-bottom:8px">👶 {first} {last}</h3>"#,
+            first = child_first,
+            last = child_last,
+        ));
+
+        let date_fr = fmt_date_fr(entry.date);
+
+        if entry.absent {
+            html.push_str(&format!(
+                r#"<div style="border:1px solid #e5e7eb;border-radius:6px;padding:16px;margin-bottom:12px;background:#f9fafb">
+                <h4 style="color:#6b7280;margin:0 0 8px 0;font-size:14px">{date}</h4>
+                <span style="display:inline-block;background:#fee2e2;color:#b91c1c;font-size:13px;font-weight:600;padding:4px 12px;border-radius:20px">🏠 Absent ce jour</span>
+                </div>"#,
+                date = date_fr
+            ));
+        } else {
+            let sommeil = match entry.sommeil_minutes {
+                Some(m) if m > 0 => format!("{} min", m),
+                _ => "—".to_string(),
+            };
+
+            html.push_str(&format!(
+                r#"<div style="border:1px solid #e5e7eb;border-radius:6px;padding:16px;margin-bottom:12px">
+                <h4 style="color:#2563eb;margin:0 0 12px 0;font-size:14px">{date}</h4>
+                <table style="width:100%;font-size:13px;color:#374151;border-collapse:collapse">
+                    <tr><td style="padding:4px 8px 4px 0;width:120px;color:#6b7280"><strong>Température</strong></td><td style="padding:4px 0">{temp}</td></tr>
+                    <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Menu</strong></td><td style="padding:4px 0">{menu}</td></tr>
+                    <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Appétit</strong></td><td style="padding:4px 0">{appetit}</td></tr>
+                    <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Humeur</strong></td><td style="padding:4px 0">{humeur}</td></tr>
+                    <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Sommeil</strong></td><td style="padding:4px 0">{sommeil}</td></tr>
+                    <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Santé</strong></td><td style="padding:4px 0">{sante}</td></tr>
+                    <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Médicaments</strong></td><td style="padding:4px 0">{med}</td></tr>
+                </table>"#,
+                date    = date_fr,
+                temp    = entry.temperature.as_deref().map(fmt_temperature).unwrap_or("—"),
+                menu    = opt_str(entry.menu.as_deref()),
+                appetit = entry.appetit.as_deref().map(fmt_appetit).unwrap_or("—"),
+                humeur  = entry.humeur.as_deref().map(fmt_humeur).unwrap_or("—"),
+                sommeil = sommeil,
+                sante   = opt_str(entry.sante.as_deref()),
+                med     = opt_str(entry.medicaments.as_deref()),
+            ));
+
+            if let Some(msg) = &entry.message_educatrice {
+                if !msg.trim().is_empty() {
+                    html.push_str(&format!(
+                        r#"<div style="background:#eff6ff;border-left:3px solid #2563eb;padding:8px 12px;margin-top:10px;font-size:12px;border-radius:0 4px 4px 0">
+                        <strong style="color:#1d4ed8">💬 Message de l'éducatrice :</strong><br><span style="color:#374151">{msg}</span>
+                    </div>"#
+                    ));
+                }
+            }
+
+            if let Some(obs) = &entry.observations {
+                if !obs.trim().is_empty() {
+                    html.push_str(&format!(
+                        r#"<div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:8px 12px;margin-top:8px;font-size:12px;border-radius:0 4px 4px 0">
+                        <strong style="color:#15803d">📝 Observations :</strong><br><span style="color:#374151">{obs}</span>
+                    </div>"#
+                    ));
+                }
+            }
+
+            html.push_str("</div>");
+        }
+    }
+
+    html.push_str(&format!(
+        r#"<div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280">
+        <p style="margin:0">Cordialement,<br><strong>{}</strong></p>
+    </div>
+    </div></body></html>"#,
+        garderie_name
+    ));
 
     html
 }

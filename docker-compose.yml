@@ -4,6 +4,7 @@ services:
     container_name: minispace_db
     restart: unless-stopped
     environment:
+      TZ: ${TZ:-UTC}
       POSTGRES_USER: ${POSTGRES_USER:-garderie}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       POSTGRES_DB: ${POSTGRES_DB:-garderieconnect}
@@ -21,6 +22,8 @@ services:
     image: redis:7-alpine
     container_name: minispace_redis
     restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data
@@ -39,6 +42,7 @@ services:
     container_name: minispace_api
     restart: unless-stopped
     environment:
+      - TZ=${TZ:-UTC}
       - DATABASE_URL=postgres://${POSTGRES_USER:-garderie}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-garderieconnect}
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=${JWT_SECRET:-change_this_secret_in_production}
@@ -58,6 +62,7 @@ services:
       - SMTP_USERNAME=${SMTP_USERNAME:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - SMTP_FROM=${SMTP_FROM:-}
+      - ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
       - RUST_LOG=${RUST_LOG:-info}
       - HOST=0.0.0.0
       - PORT=8080
@@ -84,6 +89,7 @@ services:
     container_name: minispace_web
     restart: unless-stopped
     environment:
+      - TZ=${TZ:-UTC}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost/api}
       - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-ws://localhost/ws}
     depends_on:
@@ -97,6 +103,8 @@ services:
     image: nginx:alpine
     container_name: minispace_nginx
     restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
     ports:
       - "${NGINX_HTTP_PORT:-8762}:80"
       - "${NGINX_HTTPS_PORT:-9506}:443"
@@ -106,6 +114,114 @@ services:
     depends_on:
       - api
       - web
+    networks:
+      - internal
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: minispace_prometheus
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    networks:
+      - internal
+    depends_on:
+      - api
+
+  loki:
+    image: grafana/loki:latest
+    container_name: minispace_loki
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yml
+    networks:
+      - internal
+    expose:
+      - "3100"
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: minispace_promtail
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - internal
+    depends_on:
+      - loki
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: minispace_grafana
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_AUTH_PROXY_ENABLED=true
+      - GF_AUTH_PROXY_HEADER_NAME=X-WEBAUTH-USER
+      - GF_AUTH_PROXY_AUTO_SIGN_UP=true
+      - GF_AUTH_PROXY_WHITELIST=
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_USERS_AUTO_ASSIGN_ORG=true
+      - GF_USERS_AUTO_ASSIGN_ORG_ROLE=Admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - internal
+    depends_on:
+      - prometheus
+      - loki
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: minispace_postgres_exporter
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-UTC}
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER:-garderie}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-garderieconnect}?sslmode=disable
+    networks:
+      - internal
+    depends_on:
+      db:
+        condition: service_healthy
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: minispace_node_exporter
+    restart: unless-stopped
+    pid: host
+    environment:
+      - TZ=${TZ:-UTC}
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
     networks:
       - internal
 
@@ -122,6 +238,7 @@ services:
       - ./scripts:/scripts
       - ./backups:/backup/host
     environment:
+      - TZ=${TZ:-UTC}
       - BACKUP_CRON_TIME=0 2 * * *
       - BACKUP_RETENTION_DAYS=30
       - POSTGRES_USER=${POSTGRES_USER:-garderie}
@@ -129,12 +246,15 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-garderieconnect}
       - MANUAL_BACKUP=false
       - ENCRYPTION_PASSWORD=${BACKUP_ENCRYPT_PASSWORD:-}
-    command: "sh -c 'apk add --no-cache postgresql-client && cp /scripts/backup-entrypoint.sh /entrypoint.sh && chmod 755 /entrypoint.sh && /entrypoint.sh'"
+    command: "sh -c 'apk add --no-cache postgresql-client tzdata && cp /scripts/backup-entrypoint.sh /entrypoint.sh && chmod 755 /entrypoint.sh && /entrypoint.sh'"
 
 volumes:
   postgres_data:
   redis_data:
   media_files:
+  prometheus_data:
+  grafana_data:
+  loki_data:
 
 networks:
   internal:
