@@ -8,7 +8,10 @@ interface Garderie {
   id: string;
   slug: string;
   name: string;
-  address: string | null;
+  address_line1: string | null;
+  city: string | null;
+  province: string | null;
+  postal_code: string | null;
   phone: string | null;
   email: string | null;
   plan: string;
@@ -71,7 +74,7 @@ export default function SuperAdminPage() {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [editGarderie, setEditGarderie] = useState<Garderie | null>(null);
 
-  const [garderieForm, setGarderieForm] = useState({ slug: "", name: "", address: "", phone: "", email: "", plan: "free", trial_expires_at: "", remove_trial_expires: false });
+  const [garderieForm, setGarderieForm] = useState({ slug: "", name: "", address_line1: "", city: "", province: "", postal_code: "", phone: "", email: "", plan: "free", trial_expires_at: "", remove_trial_expires: false });
   const [userForm, setUserForm] = useState({ email: "", first_name: "", last_name: "", password: "", role: "admin_garderie", preferred_locale: "fr" });
    const [saving, setSaving] = useState(false);
    const [formError, setFormError] = useState("");
@@ -221,13 +224,16 @@ export default function SuperAdminPage() {
       await superAdminApi.createGarderie({
         slug: garderieForm.slug,
         name: garderieForm.name,
-        address: garderieForm.address || undefined,
+        address_line1: garderieForm.address_line1 || undefined,
+        city: garderieForm.city || undefined,
+        province: garderieForm.province || undefined,
+        postal_code: garderieForm.postal_code || undefined,
         phone: garderieForm.phone || undefined,
         email: garderieForm.email || undefined,
         plan: garderieForm.plan,
       });
       setShowCreateGarderie(false);
-      setGarderieForm({ slug: "", name: "", address: "", phone: "", email: "", plan: "free", trial_expires_at: "", remove_trial_expires: false });
+      setGarderieForm({ slug: "", name: "", address_line1: "", city: "", province: "", postal_code: "", phone: "", email: "", plan: "free", trial_expires_at: "", remove_trial_expires: false });
       loadGarderies();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -245,14 +251,17 @@ export default function SuperAdminPage() {
     try {
       await superAdminApi.updateGarderie(editGarderie.slug, {
         name: garderieForm.name || undefined,
-        address: garderieForm.address || undefined,
+        address_line1: garderieForm.address_line1 || undefined,
+        city: garderieForm.city || undefined,
+        province: garderieForm.province || undefined,
+        postal_code: garderieForm.postal_code || undefined,
         phone: garderieForm.phone || undefined,
         email: garderieForm.email || undefined,
         trial_expires_at: garderieForm.trial_expires_at ? new Date(garderieForm.trial_expires_at).toISOString() : undefined,
         remove_trial_expires: garderieForm.remove_trial_expires || undefined,
       });
       setEditGarderie(null);
-      setGarderieForm({ slug: "", name: "", address: "", phone: "", email: "", plan: "free", trial_expires_at: "", remove_trial_expires: false });
+      setGarderieForm({ slug: "", name: "", address_line1: "", city: "", province: "", postal_code: "", phone: "", email: "", plan: "free", trial_expires_at: "", remove_trial_expires: false });
       loadGarderies();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -624,7 +633,26 @@ export default function SuperAdminPage() {
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-slate-600">Adresse</label>
-                  <input value={garderieForm.address} onChange={e => setGarderieForm(f => ({...f, address: e.target.value}))}
+                  <input value={garderieForm.address_line1} onChange={e => setGarderieForm(f => ({...f, address_line1: e.target.value}))}
+                    placeholder="123 rue des Érables"
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600">Ville</label>
+                  <input value={garderieForm.city} onChange={e => setGarderieForm(f => ({...f, city: e.target.value}))}
+                    placeholder="Montréal"
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600">Province</label>
+                  <input value={garderieForm.province} onChange={e => setGarderieForm(f => ({...f, province: e.target.value}))}
+                    placeholder="QC"
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600">Code postal</label>
+                  <input value={garderieForm.postal_code} onChange={e => setGarderieForm(f => ({...f, postal_code: e.target.value}))}
+                    placeholder="H1A 1A1"
                     className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
                 </div>
                 <div>
@@ -670,9 +698,28 @@ export default function SuperAdminPage() {
                   <input value={garderieForm.phone} onChange={e => setGarderieForm(f => ({...f, phone: e.target.value}))}
                     className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
                 </div>
-                <div>
+                <div className="col-span-2">
                   <label className="text-xs font-medium text-slate-600">Adresse</label>
-                  <input value={garderieForm.address} onChange={e => setGarderieForm(f => ({...f, address: e.target.value}))}
+                  <input value={garderieForm.address_line1} onChange={e => setGarderieForm(f => ({...f, address_line1: e.target.value}))}
+                    placeholder="123 rue des Érables"
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600">Ville</label>
+                  <input value={garderieForm.city} onChange={e => setGarderieForm(f => ({...f, city: e.target.value}))}
+                    placeholder="Montréal"
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600">Province</label>
+                  <input value={garderieForm.province} onChange={e => setGarderieForm(f => ({...f, province: e.target.value}))}
+                    placeholder="QC"
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-600">Code postal</label>
+                  <input value={garderieForm.postal_code} onChange={e => setGarderieForm(f => ({...f, postal_code: e.target.value}))}
+                    placeholder="H1A 1A1"
                     className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
                 </div>
                 <div>
@@ -762,7 +809,7 @@ export default function SuperAdminPage() {
                             const trialDate = g.trial_expires_at
                               ? new Date(g.trial_expires_at).toISOString().slice(0, 16)
                               : "";
-                            setGarderieForm({ slug: g.slug, name: g.name, address: g.address || "", phone: g.phone || "", email: g.email || "", plan: g.plan, trial_expires_at: trialDate, remove_trial_expires: false });
+                            setGarderieForm({ slug: g.slug, name: g.name, address_line1: g.address_line1 || "", city: g.city || "", province: g.province || "", postal_code: g.postal_code || "", phone: g.phone || "", email: g.email || "", plan: g.plan, trial_expires_at: trialDate, remove_trial_expires: false });
                             setShowCreateGarderie(false);
                             setFormError("");
                           }}

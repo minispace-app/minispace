@@ -130,6 +130,10 @@ export const authApi = {
     apiClient.put("/auth/consent", { photos_accepted }),
   requestAccountDeletion: () =>
     apiClient.post("/auth/account/deletion-request"),
+  validateToken: (token: string) =>
+    apiClient.get(`/auth/validate-token/${token}`, {
+      headers: { "X-Tenant": getTenantSlug() },
+    }),
 };
 
 // Messages
@@ -307,7 +311,7 @@ export const activitiesApi = {
 export const menusApi = {
   getWeek: (weekStart: string) =>
     apiClient.get("/menus", { params: { week_start: weekStart } }),
-  upsert: (data: { date: string; menu: string }) =>
+  upsert: (data: { date: string; menu?: string; collation_matin?: string; diner?: string; collation_apres_midi?: string }) =>
     apiClient.put("/menus", data),
 };
 
@@ -320,9 +324,9 @@ export const emailApi = {
 // Super-admin management
 export const superAdminApi = {
   listGarderies: () => superAdminClient.get("/super-admin/garderies"),
-  createGarderie: (data: { slug: string; name: string; address?: string; phone?: string; email?: string; plan?: string }) =>
+  createGarderie: (data: { slug: string; name: string; address_line1?: string; city?: string; province?: string; postal_code?: string; phone?: string; email?: string; plan?: string }) =>
     superAdminClient.post("/super-admin/garderies", data),
-  updateGarderie: (slug: string, data: { name?: string; address?: string; phone?: string; email?: string; is_active?: boolean; trial_expires_at?: string | null; remove_trial_expires?: boolean }) =>
+  updateGarderie: (slug: string, data: { name?: string; address_line1?: string; city?: string; province?: string; postal_code?: string; phone?: string; email?: string; is_active?: boolean; trial_expires_at?: string | null; remove_trial_expires?: boolean }) =>
     superAdminClient.put(`/super-admin/garderies/${slug}`, data),
   listGarderieUsers: (slug: string) =>
     superAdminClient.get(`/super-admin/garderies/${slug}/users`),
