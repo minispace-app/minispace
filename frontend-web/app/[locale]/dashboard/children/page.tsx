@@ -1147,10 +1147,8 @@ export default function ChildrenPage() {
         : [...p.schedule_days, day].sort(),
     }));
 
-  // Reset to calendar tab when child changes
+  // Reset journal state when child changes (but keep activeTab)
   useEffect(() => {
-    setActiveTab("calendar");
-    // Also reset journal state
     setJournalWeekStart(getMonday(new Date()));
     setJournalLocalData({});
     setJournalActiveDayIndex(getDefaultActiveDayIndex(getMonday(new Date())));
@@ -1159,6 +1157,14 @@ export default function ChildrenPage() {
   }, [selectedChildId]);
 
   const { data, mutate } = useSWR("children-list", () => childrenApi.list());
+
+  // Auto-select first child when list loads
+  useEffect(() => {
+    const childrenList: Child[] = (data as { data: Child[] } | undefined)?.data ?? [];
+    if (childrenList.length > 0 && !selectedChildId) {
+      setSelectedChildId(childrenList[0].id);
+    }
+  }, [data, selectedChildId]);
   const { data: groupsData } = useSWR("groups-list-ch", () => groupsApi.list());
 
   const children: Child[] = (data as { data: Child[] } | undefined)?.data ?? [];
