@@ -136,6 +136,7 @@ export default function DashboardPage() {
               </thead>
               <tbody>
                 <tr className="border-t border-slate-200 hover:bg-slate-50">
+                  <td className="py-4 px-4 text-left font-medium text-slate-700 w-32">Absences</td>
                   {weekDays.map((day, idx) => {
                     const dateStr = format(day, "yyyy-MM-dd");
                     const totals = totalByDay[dateStr];
@@ -146,41 +147,37 @@ export default function DashboardPage() {
                     return (
                       <td
                         key={dateStr}
-                        className={`py-4 px-4 align-top ${idx === 0 ? 'text-left font-medium text-slate-700' : ''}`}
+                        className="py-4 px-4 align-top"
                       >
-                        {idx === 0 ? (
-                          <span>Absences</span>
-                        ) : (
-                          <div className="space-y-2">
-                            {absentThisDay.length > 0 ? (
-                              <>
-                                {absentThisDay.map((child) => (
-                                  <div
-                                    key={child.id}
-                                    className="flex items-center gap-2 p-2 bg-red-50 rounded-lg border border-red-100"
-                                  >
-                                    <ChildAvatar
-                                      id={child.id}
-                                      firstName={child.first_name}
-                                      lastName={child.last_name}
-                                      size="sm"
-                                    />
-                                    <span className="text-xs font-medium text-red-700 truncate">
-                                      {child.first_name}
-                                    </span>
-                                  </div>
-                                ))}
-                                <div className="text-xs font-semibold text-slate-500 pt-2 border-t border-red-100">
-                                  {presentCount}/{totalCount}
+                        <div className="space-y-2">
+                          {absentThisDay.length > 0 ? (
+                            <>
+                              {absentThisDay.map((child) => (
+                                <div
+                                  key={child.id}
+                                  className="flex items-center gap-2 p-2 bg-red-50 rounded-lg border border-red-100"
+                                >
+                                  <ChildAvatar
+                                    id={child.id}
+                                    firstName={child.first_name}
+                                    lastName={child.last_name}
+                                    size="sm"
+                                  />
+                                  <span className="text-xs font-medium text-red-700 truncate">
+                                    {child.first_name}
+                                  </span>
                                 </div>
-                              </>
-                            ) : (
-                              <div className="text-xs font-semibold text-green-600 p-2 bg-green-50 rounded-lg border border-green-100 text-center">
-                                ✓ {totalCount}/{totalCount}
+                              ))}
+                              <div className="text-xs font-semibold text-slate-500 pt-2 border-t border-red-100">
+                                {presentCount}/{totalCount}
                               </div>
-                            )}
-                          </div>
-                        )}
+                            </>
+                          ) : (
+                            <div className="text-xs font-semibold text-green-600 p-2 bg-green-50 rounded-lg border border-green-100 text-center">
+                              ✓ {totalCount}/{totalCount}
+                            </div>
+                          )}
+                        </div>
                       </td>
                     );
                   })}
