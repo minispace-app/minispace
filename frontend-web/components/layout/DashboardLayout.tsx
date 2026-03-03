@@ -39,7 +39,6 @@ const navItems = [
   { key: "groups", icon: FolderOpen, href: "/dashboard/groups", roles: null },
   { key: "menus", icon: UtensilsCrossed, href: "/dashboard/menus", roles: null },
   { key: "activities", icon: PartyPopper, href: "/dashboard/activities", roles: ["admin_garderie"] },
-  { key: "journal", icon: BookOpen, href: "/dashboard/journal", roles: null },
   { key: "users",     icon: Settings, href: "/dashboard/users",   roles: ["admin_garderie", "super_admin"] },
   { key: "myProfile", icon: User,    href: "/dashboard/profile", roles: null },
 ];
