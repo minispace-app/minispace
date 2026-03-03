@@ -1,6 +1,8 @@
 use chrono::{Datelike, Local, Timelike};
 use sqlx::PgPool;
 use std::sync::Arc;
+use std::collections::HashMap;
+use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 use crate::services::email::EmailService;
@@ -9,8 +11,12 @@ use crate::services::journal::JournalService;
 /// Spawn a background task that wakes up every minute and sends journals
 /// for any tenant whose `journal_auto_send_time` matches the current local time.
 /// Weekends are skipped automatically.
+/// Uses a HashMap to track the last execution minute per tenant to prevent duplicate sends.
 pub fn start(pool: PgPool, email: Option<Arc<EmailService>>) {
     tokio::spawn(async move {
+        // Track the last minute we executed for each tenant (tenant_slug -> "HH:MM")
+        let last_executed = Arc::new(Mutex::new(HashMap::new()));
+
         loop {
             // Sleep until the next minute boundary
             let secs_past = Local::now().second() as u64;
@@ -42,8 +48,17 @@ pub fn start(pool: PgPool, email: Option<Arc<EmailService>>) {
                 }
             };
 
+            let mut last_exec = last_executed.lock().await;
+
             for (slug, send_time) in tenants {
                 if send_time == current_time {
+                    // Check if we've already executed for this tenant at this minute
+                    let last = last_exec.get(&slug);
+                    if last == Some(&current_time) {
+                        // Already executed for this tenant at this minute, skip
+                        continue;
+                    }
+
                     info!("Journal auto-send: firing for tenant '{}'", slug);
                     match JournalService::auto_send_today(
                         &pool,
@@ -53,7 +68,11 @@ pub fn start(pool: PgPool, email: Option<Arc<EmailService>>) {
                     )
                     .await
                     {
-                        Ok(n) => info!("Journal auto-send: {} email(s) sent for '{}'", n, slug),
+                        Ok(n) => {
+                            info!("Journal auto-send: {} email(s) sent for '{}'", n, slug);
+                            // Mark this tenant as executed at this minute
+                            last_exec.insert(slug.clone(), current_time.clone());
+                        }
                         Err(e) => warn!("Journal auto-send error for '{}': {}", slug, e),
                     }
                 }

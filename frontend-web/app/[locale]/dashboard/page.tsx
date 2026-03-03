@@ -47,8 +47,10 @@ export default function DashboardPage() {
     (d) => getISODay(d) <= 5
   );
 
-  // Group absent children by day
+  // Group absent children by day + calculate totals
   const absentByDay: Record<string, Child[]> = {};
+  const totalByDay: Record<string, { absent: number; present: number; total: number }> = {};
+
   weekDays.forEach((day) => {
     const dateStr = format(day, "yyyy-MM-dd");
     const absentIds = new Set(
@@ -56,10 +58,23 @@ export default function DashboardPage() {
         .filter(([_, date, status]) => date === dateStr && status === "absent")
         .map(([childId]) => childId)
     );
+    const presentIds = new Set(
+      attendanceRecords
+        .filter(([_, date, status]) => date === dateStr && status === "present")
+        .map(([childId]) => childId)
+    );
     const absentThisDay = childrenList?.filter((child) => absentIds.has(child.id)) ?? [];
+    const total = childrenList?.length ?? 0;
+
     if (absentThisDay.length > 0) {
       absentByDay[dateStr] = absentThisDay;
     }
+
+    totalByDay[dateStr] = {
+      absent: absentThisDay.length,
+      present: presentIds.size,
+      total: total,
+    };
   });
 
   const hasAbsentThisWeek = Object.keys(absentByDay).length > 0;
@@ -88,43 +103,89 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Absent children section - Week view */}
-      {(user?.role === "educateur" || user?.role === "admin_garderie") && hasAbsentThisWeek && (
+      {/* Absent children section - Week view with summary table */}
+      {(user?.role === "educateur" || user?.role === "admin_garderie") && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-8">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-6">
             <AlertCircle className="w-5 h-5 text-red-600" />
             <h2 className="font-semibold text-red-900">
-              Absences de la semaine ({format(weekStart, "d MMM", { locale: dateLocale })} - {format(weekEnd, "d MMM", { locale: dateLocale })})
+              Récapitulatif de la semaine ({format(weekStart, "d MMM", { locale: dateLocale })} - {format(weekEnd, "d MMM", { locale: dateLocale })})
             </h2>
           </div>
-          <div className="space-y-4">
-            {weekDays.map((day) => {
-              const dateStr = format(day, "yyyy-MM-dd");
-              const absentThisDay = absentByDay[dateStr];
-              if (!absentThisDay) return null;
 
-              return (
-                <div key={dateStr} className="bg-white rounded-lg p-4">
-                  <h3 className="font-semibold text-slate-700 mb-3">
-                    {format(day, "EEEE d MMMM", { locale: dateLocale })}
-                  </h3>
-                  <div className="space-y-2">
-                    {absentThisDay.map((child) => (
-                      <div key={child.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition">
-                        <ChildAvatar
-                          id={child.id}
-                          firstName={child.first_name}
-                          lastName={child.last_name}
-                          size="sm"
-                        />
-                        <p className="text-sm font-medium text-slate-800">{child.first_name} {child.last_name}</p>
+          {/* Summary table with children */}
+          <div className="bg-white rounded-lg p-4 mb-6 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left py-3 px-4 font-semibold text-slate-700 w-32">Jour</th>
+                  {weekDays.map((day) => (
+                    <th key={format(day, "yyyy-MM-dd")} className="py-3 px-4 font-semibold text-slate-700 min-w-max">
+                      <div className="text-center">
+                        {format(day, "EEE", { locale: dateLocale })}
+                        <div className="text-xs font-normal text-slate-500">
+                          {format(day, "d MMM", { locale: dateLocale })}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-slate-200 hover:bg-slate-50">
+                  {weekDays.map((day, idx) => {
+                    const dateStr = format(day, "yyyy-MM-dd");
+                    const totals = totalByDay[dateStr];
+                    const presentCount = (childrenList?.length ?? 0) - totals.absent;
+                    const totalCount = childrenList?.length ?? 0;
+                    const absentThisDay = absentByDay[dateStr] || [];
+
+                    return (
+                      <td
+                        key={dateStr}
+                        className={`py-4 px-4 align-top ${idx === 0 ? 'text-left font-medium text-slate-700' : ''}`}
+                      >
+                        {idx === 0 ? (
+                          <span>Absences</span>
+                        ) : (
+                          <div className="space-y-2">
+                            {absentThisDay.length > 0 ? (
+                              <>
+                                {absentThisDay.map((child) => (
+                                  <div
+                                    key={child.id}
+                                    className="flex items-center gap-2 p-2 bg-red-50 rounded-lg border border-red-100"
+                                  >
+                                    <ChildAvatar
+                                      id={child.id}
+                                      firstName={child.first_name}
+                                      lastName={child.last_name}
+                                      size="sm"
+                                    />
+                                    <span className="text-xs font-medium text-red-700 truncate">
+                                      {child.first_name}
+                                    </span>
+                                  </div>
+                                ))}
+                                <div className="text-xs font-semibold text-slate-500 pt-2 border-t border-red-100">
+                                  {presentCount}/{totalCount}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="text-xs font-semibold text-green-600 p-2 bg-green-50 rounded-lg border border-green-100 text-center">
+                                ✓ {totalCount}/{totalCount}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
           </div>
+
         </div>
       )}
 
