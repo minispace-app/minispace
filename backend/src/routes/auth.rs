@@ -253,6 +253,46 @@ pub async fn invite_user(
     })
 }
 
+pub async fn validate_invitation_token(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    Path(token): Path<String>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    use crate::db::tenant::schema_name;
+    use crate::models::user::InvitationToken;
+
+    let schema = schema_name(&tenant);
+    match sqlx::query_as::<_, InvitationToken>(&format!(
+        "SELECT id, email, token, role::TEXT as role, invited_by, used, expires_at, created_at
+         FROM {schema}.invitation_tokens WHERE token = $1 AND used = FALSE"
+    ))
+    .bind(&token)
+    .fetch_optional(&state.db)
+    .await
+    {
+        Ok(Some(invite)) => {
+            if invite.expires_at < chrono::Utc::now() {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": "Invitation token expired" })),
+                ));
+            }
+            Ok(Json(json!({
+                "email": invite.email,
+                "role": invite.role,
+            })))
+        }
+        Ok(None) => Err((
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Invalid or already-used invitation token" })),
+        )),
+        Err(_) => Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": "Failed to validate token" })),
+        )),
+    }
+}
+
 pub async fn register_from_invite(
     State(state): State<AppState>,
     TenantSlug(tenant): TenantSlug,

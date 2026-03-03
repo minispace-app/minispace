@@ -476,6 +476,22 @@
     "journalModal": {
       "title": "Journal de bord",
       "noData": "Aucune donnée pour ce jour"
+    },
+    "dayDetail": {
+      "attendance": "Présence",
+      "journal": "Journal de bord",
+      "activities": "Activités",
+      "noJournal": "Aucun journal pour ce jour",
+      "noActivities": "Aucune activité ce jour",
+      "theme": "Thème",
+      "sortie": "Sortie",
+      "register": "Inscrire mon enfant",
+      "registered": "Inscrit(e)",
+      "tapToUnregister": "Appuyer pour désinscrire",
+      "full": "Complet",
+      "vacances": "Vacances",
+      "present": "Présent",
+      "absent": "Absent"
     }
   },
   "activities": {
@@ -483,6 +499,9 @@
     "create": "Nouvelle activité",
     "empty": "Aucune activité pour ce mois",
     "registered": "inscrits",
+    "registrations": "Inscrits",
+    "noRegistrations": "Aucun enfant inscrit pour l'instant",
+    "inscribed": "inscrit(s)",
     "error": {
       "unauthorized": "Seul l'administrateur peut accéder à cette page"
     },
@@ -495,10 +514,29 @@
       "title": "Titre",
       "description": "Description",
       "date": "Date",
+      "endDate": "Date de fin (optionnel)",
       "capacity": "Capacité (nombre de places)",
       "capacityPlaceholder": "Illimité",
+      "group": "Groupe (laisser vide = tous les groupes)",
+      "noGroup": "Tous les groupes",
       "save": "Enregistrer",
-      "saving": "Enregistrement..."
+      "saving": "Enregistrement...",
+      "type": "Type d'activité",
+      "typeTheme": "Thème de la semaine",
+      "typeSortie": "Sortie / Excursion"
+    }
+  },
+  "parent": {
+    "activities": {
+      "title": "Activités",
+      "subtitle": "Inscrivez vos enfants aux activités du mois",
+      "noActivities": "Aucune activité ce mois-ci",
+      "noChildren": "Vous n'avez pas d'enfants associés",
+      "register": "Inscrire",
+      "unregister": "Désinscrire",
+      "registered": "Inscrit(e)",
+      "full": "Complet",
+      "notEligible": "Non éligible (groupe différent)"
     }
   }
 }

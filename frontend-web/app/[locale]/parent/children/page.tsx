@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
-import useSWR from "swr";
+import useSWR, { mutate as globalMutate } from "swr";
 import { childrenApi, groupsApi, attendanceApi, journalApi, activitiesApi } from "../../../../lib/api";
 import { ChildAvatar, childAvatarColor } from "../../../../components/ChildAvatar";
-import { Users, Pencil, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Users, Pencil, Check, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, parseISO, getISODay, startOfWeek } from "date-fns";
 import { fr, enUS } from "date-fns/locale";
 
@@ -35,6 +35,8 @@ interface Activity {
   title: string;
   description?: string;
   date: string;
+  end_date?: string;
+  type?: "theme" | "sortie";
   capacity?: number;
   registration_count?: number;
   is_registered?: boolean;
@@ -47,7 +49,7 @@ const ATTENDANCE_COLORS: Record<AttendanceStatus, { bg: string; text: string; ic
   present: { bg: "bg-green-100", text: "text-green-600", icon: "✓", label: "Présent" },
   absent: { bg: "bg-red-100", text: "text-red-600", icon: "✗", label: "Absent" },
   malade: { bg: "bg-orange-100", text: "text-orange-600", icon: "🤒", label: "Malade" },
-  vacances: { bg: "bg-blue-100", text: "text-blue-600", icon: "🏖", label: "Vacances" },
+  vacances: { bg: "bg-blue-100", text: "text-blue-600", icon: "🏖", label: "Vacances" }, // legacy display only
   present_hors_contrat: { bg: "bg-purple-100", text: "text-purple-600", icon: "✓", label: "Hors contrat" },
 };
 
@@ -231,26 +233,340 @@ function ChildBirthDateEdit({ child, onUpdated }: { child: Child; onUpdated: () 
   );
 }
 
-function ParentCalendarSection({
+// ── DayDetailModal ──
+// Bottom-sheet on mobile, centered modal on desktop.
+// Shows: attendance, journal, activities (theme + sortie) for one day.
+function DayDetailModal({
+  date,
   child,
-  currentMonth,
-  setCurrentMonth,
-  statusModalDate,
-  setStatusModalDate,
-  journalModalDate,
-  setJournalModalDate,
+  onClose,
+  monthStr,
 }: {
+  date: string;
   child: Child;
-  currentMonth: Date;
-  setCurrentMonth: (date: Date) => void;
-  statusModalDate: string | null;
-  setStatusModalDate: (date: string | null) => void;
-  journalModalDate: string | null;
-  setJournalModalDate: (date: string | null) => void;
+  onClose: () => void;
+  monthStr: string;
 }) {
   const t = useTranslations("calendar");
   const params = useParams();
   const locale = params.locale as string;
+  const dateLocale = locale === "en" ? enUS : fr;
+
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [registerLoading, setRegisterLoading] = useState<string | null>(null);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dateObj = parseISO(date);
+  const isFuture = dateObj >= today;
+
+  // SWR keys matching the calendar's keys → shared cache
+  const attendanceKey = `attendance-${child.id}-${monthStr}`;
+  const activitiesKey = `activities-${child.id}-${monthStr}`;
+  const weekStart = format(startOfWeek(dateObj, { weekStartsOn: 1 }), "yyyy-MM-dd");
+  const journalKey = `journal-${child.id}-${weekStart}`;
+
+  const { data: attendance = {}, mutate: mutateAttendance } = useSWR(
+    attendanceKey,
+    () => attendanceApi.getMonth(child.id, monthStr).then((r) => r.data.attendance || {})
+  );
+
+  const { data: weekData } = useSWR(journalKey, () =>
+    journalApi.getWeek(child.id, weekStart).then((r) => r.data)
+  );
+  const journal = weekData?.find((j: any) => j.date === date);
+
+  const { data: activities = [], mutate: mutateActivities } = useSWR(
+    activitiesKey,
+    () => activitiesApi.list(monthStr, child.id).then((r) => r.data.activities || [])
+  );
+
+  // Activities for this specific day (including multi-day)
+  const dayActivities: Activity[] = activities.filter((a: Activity) => {
+    const end = a.end_date || a.date;
+    return date >= a.date && date <= end;
+  });
+
+  const currentStatus = (attendance[date] || "present") as AttendanceStatus;
+
+  const handleSetStatus = async (status: string) => {
+    setStatusLoading(true);
+    try {
+      await attendanceApi.setStatus(child.id, date, status);
+      mutateAttendance();
+      // Also mutate the calendar's attendance key
+      globalMutate(attendanceKey);
+    } catch (error) {
+      console.error("Error setting status:", error);
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
+  const handleRegister = async (activityId: string) => {
+    setRegisterLoading(activityId);
+    try {
+      await activitiesApi.register(activityId, child.id);
+      mutateActivities();
+      globalMutate(activitiesKey);
+    } catch (error) {
+      console.error("Error registering:", error);
+    } finally {
+      setRegisterLoading(null);
+    }
+  };
+
+  const handleUnregister = async (activityId: string) => {
+    setRegisterLoading(activityId);
+    try {
+      await activitiesApi.unregister(activityId, child.id);
+      mutateActivities();
+      globalMutate(activitiesKey);
+    } catch (error) {
+      console.error("Error unregistering:", error);
+    } finally {
+      setRegisterLoading(null);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-t-2xl md:rounded-xl w-full md:max-w-lg max-h-[85vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0">
+          <h3 className="text-lg font-bold text-slate-800 capitalize">
+            {format(dateObj, "EEEE d MMMM", { locale: dateLocale })}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 text-slate-400 hover:text-slate-600 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {/* ── ATTENDANCE ── */}
+          <section>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+              {t("dayDetail.attendance")}
+            </h4>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-sm">{ATTENDANCE_COLORS[currentStatus]?.icon}</span>
+              <span className="text-sm font-medium text-slate-700">
+                {ATTENDANCE_COLORS[currentStatus]?.label}
+              </span>
+            </div>
+            {isFuture && (
+              <div className="flex gap-2">
+                {(["present", "absent"] as const).map((status) => {
+                  const isActive = currentStatus === status;
+                  const labels: Record<string, string> = {
+                    present: t("dayDetail.present"),
+                    absent: t("dayDetail.absent"),
+                  };
+                  return (
+                    <button
+                      key={status}
+                      onClick={() => handleSetStatus(status)}
+                      disabled={statusLoading}
+                      className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium transition border ${
+                        isActive
+                          ? `${ATTENDANCE_COLORS[status].bg} ${ATTENDANCE_COLORS[status].text} border-current`
+                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                      } disabled:opacity-50`}
+                    >
+                      {statusLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                      ) : (
+                        labels[status]
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {/* ── JOURNAL ── */}
+          <section>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+              {t("dayDetail.journal")}
+            </h4>
+            {journal ? (
+              <div className="bg-slate-50 rounded-lg p-4 space-y-2 text-sm">
+                {journal.humeur && (
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-700">Humeur:</span>
+                    <span className="text-slate-600">{journal.humeur}</span>
+                  </div>
+                )}
+                {journal.appetit && (
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-700">Appétit:</span>
+                    <span className="text-slate-600">{journal.appetit}</span>
+                  </div>
+                )}
+                {journal.sommeil_minutes && (
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-700">Sommeil:</span>
+                    <span className="text-slate-600">{journal.sommeil_minutes} min</span>
+                  </div>
+                )}
+                {journal.message_educatrice && (
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-700">Message:</span>
+                    <span className="text-slate-600">{journal.message_educatrice}</span>
+                  </div>
+                )}
+                {journal.observations && (
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-700">Observations:</span>
+                    <span className="text-slate-600">{journal.observations}</span>
+                  </div>
+                )}
+                {journal.sante && (
+                  <div className="flex gap-2">
+                    <span className="font-semibold text-slate-700">Santé:</span>
+                    <span className="text-slate-600">{journal.sante}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-slate-400 italic">{t("dayDetail.noJournal")}</p>
+            )}
+          </section>
+
+          {/* ── ACTIVITIES ── */}
+          <section>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+              {t("dayDetail.activities")}
+            </h4>
+            {dayActivities.length === 0 ? (
+              <p className="text-sm text-slate-400 italic">{t("dayDetail.noActivities")}</p>
+            ) : (
+              <div className="space-y-3">
+                {dayActivities.map((activity) => {
+                  const isTheme = activity.type === "theme";
+                  const isRegistered = activity.is_registered;
+                  const isFull = activity.capacity != null && (activity.registration_count || 0) >= activity.capacity;
+                  const loading = registerLoading === activity.id;
+
+                  return (
+                    <div
+                      key={activity.id}
+                      className={`rounded-xl border-2 p-4 ${
+                        isTheme
+                          ? "border-violet-200 bg-violet-50/50"
+                          : "border-orange-200 bg-orange-50/50"
+                      }`}
+                    >
+                      {/* Type badge */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-xs font-bold uppercase tracking-wide ${
+                          isTheme ? "text-violet-600" : "text-orange-600"
+                        }`}>
+                          {isTheme ? `📚 ${t("dayDetail.theme")}` : `🚌 ${t("dayDetail.sortie")}`}
+                        </span>
+                        {!isTheme && activity.capacity != null && (
+                          <span className="text-xs text-slate-500 ml-auto">
+                            {activity.registration_count || 0}/{activity.capacity}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Title */}
+                      <p className="font-semibold text-slate-800">{activity.title}</p>
+
+                      {/* Date range if multi-day */}
+                      {activity.end_date && activity.end_date !== activity.date && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          {format(parseISO(activity.date), "d MMM", { locale: dateLocale })} – {format(parseISO(activity.end_date), "d MMM", { locale: dateLocale })}
+                        </p>
+                      )}
+
+                      {/* Description */}
+                      {activity.description && (
+                        <p className="text-sm text-slate-600 mt-1">{activity.description}</p>
+                      )}
+
+                      {/* Registration button for sortie only */}
+                      {!isTheme && isFuture && (
+                        <div className="mt-3">
+                          {isRegistered ? (
+                            <button
+                              onClick={() => handleUnregister(activity.id)}
+                              disabled={loading}
+                              className="w-full px-4 py-2.5 bg-green-100 text-green-700 border border-green-300 rounded-lg font-medium text-sm hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition disabled:opacity-50"
+                            >
+                              {loading ? (
+                                <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                              ) : (
+                                <>✓ {t("dayDetail.registered")} — {t("dayDetail.tapToUnregister")}</>
+                              )}
+                            </button>
+                          ) : isFull ? (
+                            <button
+                              disabled
+                              className="w-full px-4 py-2.5 bg-slate-100 text-slate-400 border border-slate-200 rounded-lg font-medium text-sm cursor-not-allowed"
+                            >
+                              {t("dayDetail.full")}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleRegister(activity.id)}
+                              disabled={loading}
+                              className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition disabled:opacity-50"
+                            >
+                              {loading ? (
+                                <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                              ) : (
+                                t("dayDetail.register")
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ParentCalendarSection ──
+function ParentCalendarSection({
+  child,
+  currentMonth,
+  setCurrentMonth,
+  dayDetailDate,
+  setDayDetailDate,
+}: {
+  child: Child;
+  currentMonth: Date;
+  setCurrentMonth: (date: Date) => void;
+  dayDetailDate: string | null;
+  setDayDetailDate: (date: string | null) => void;
+}) {
+  const t = useTranslations("calendar");
+  const params = useParams();
+  const locale = params.locale as string;
+
+  const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const monthStr = format(currentMonth, "yyyy-MM");
 
@@ -265,9 +581,36 @@ function ParentCalendarSection({
   );
 
   const { data: activities = [] } = useSWR(
-    `activities-${monthStr}`,
+    `activities-${child.id}-${monthStr}`,
     () => activitiesApi.list(monthStr, child.id).then((r) => r.data.activities || [])
   );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const toggleDate = (dateStr: string) => {
+    // Parents can only select future dates
+    if (new Date(dateStr) < today) return;
+    setSelectedDates((prev) => {
+      const next = new Set(prev);
+      if (next.has(dateStr)) next.delete(dateStr); else next.add(dateStr);
+      return next;
+    });
+  };
+
+  const clearSelection = () => { setSelectedDates(new Set()); setSelectMode(false); };
+
+  const handleBulkStatus = async (status: string) => {
+    if (selectedDates.size === 0) return;
+    setBulkLoading(true);
+    try {
+      await attendanceApi.setBulkStatus(child.id, Array.from(selectedDates), status);
+      mutateAttendance();
+      clearSelection();
+    } finally {
+      setBulkLoading(false);
+    }
+  };
 
   const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
@@ -290,16 +633,19 @@ function ParentCalendarSection({
     return false;
   };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
   const journalMap = journals.reduce((acc: Record<string, JournalDay>, j: JournalDay) => {
     acc[j.date] = j;
     return acc;
   }, {});
 
-  const activitiesForDay = (date: Date) =>
-    activities.filter((a: any) => a.date === format(date, "yyyy-MM-dd"));
+  // Multi-day aware: an activity covers a day if dateStr is between a.date and a.end_date
+  const activitiesForDay = (date: Date) => {
+    const dateStr = format(date, "yyyy-MM-dd");
+    return activities.filter((a: Activity) => {
+      const end = a.end_date || a.date;
+      return dateStr >= a.date && dateStr <= end;
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -311,15 +657,17 @@ function ParentCalendarSection({
           </h2>
           <div className="flex gap-2">
             <button
-              onClick={handlePrevMonth}
-              className="p-2 hover:bg-slate-100 rounded-lg transition"
+              onClick={() => { setSelectMode(!selectMode); setSelectedDates(new Set()); }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+                selectMode ? "bg-blue-600 text-white border-blue-600" : "text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
             >
+              {selectMode ? `✓ ${selectedDates.size} sélectionné(s)` : "Sélection multiple"}
+            </button>
+            <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 rounded-lg transition">
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <button
-              onClick={handleNextMonth}
-              className="p-2 hover:bg-slate-100 rounded-lg transition"
-            >
+            <button onClick={handleNextMonth} className="p-2 hover:bg-slate-100 rounded-lg transition">
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
@@ -340,51 +688,55 @@ function ParentCalendarSection({
           {days.map((day) => {
             const dateStr = format(day, "yyyy-MM-dd");
             const disabled = isDayDisabled(day);
+            const isFutureDay = day >= today;
             const dayAttendance = disabled ? "present" : (attendance[dateStr] || "present") as AttendanceStatus;
             const dayJournal = !disabled && journalMap[dateStr];
             const dayActivities = disabled ? [] : activitiesForDay(day);
             const colors = disabled ? { bg: "bg-slate-50", text: "text-slate-300", icon: null } : ATTENDANCE_COLORS[dayAttendance];
             const isToday = isSameDay(day, today);
-            const isFuture = day > today;
+            const isSelected = selectedDates.has(dateStr);
+            const canSelect = !disabled && isFutureDay;
+
+            const hasTheme = dayActivities.some((a: Activity) => a.type === "theme");
+            const hasSortie = dayActivities.some((a: Activity) => a.type !== "theme");
 
             return (
               <div
                 key={dateStr}
-                onClick={() => !disabled && isFuture && setStatusModalDate(dateStr)}
+                onClick={() => {
+                  if (disabled) return;
+                  if (selectMode && canSelect) toggleDate(dateStr);
+                  else if (!selectMode) setDayDetailDate(dateStr);
+                }}
                 className={`h-24 rounded-lg border-2 p-2 transition overflow-hidden flex flex-col ${
-                  disabled
-                    ? "bg-slate-50 border-slate-100 cursor-not-allowed opacity-40"
-                    : !isFuture
-                    ? "bg-slate-50 border-slate-100 cursor-not-allowed"
-                    : isToday
-                    ? `${colors.bg} border-slate-900 cursor-pointer hover:shadow-md ring-2 ring-slate-900/20`
-                    : `${colors.bg} border-slate-200 cursor-pointer hover:shadow-md`
+                  disabled ? "bg-slate-50 border-slate-100 cursor-not-allowed opacity-40"
+                  : isSelected ? "bg-blue-100 border-blue-500 cursor-pointer ring-2 ring-blue-400/40"
+                  : isToday ? `${colors.bg} border-slate-900 cursor-pointer hover:shadow-md ring-2 ring-slate-900/20`
+                  : `${colors.bg} border-slate-200 cursor-pointer hover:shadow-md`
                 }`}
               >
                 <div className={`text-sm font-semibold ${disabled ? "text-slate-300" : "text-slate-800"} flex items-center justify-between`}>
                   {format(day, "d")}
+                  <div className="flex gap-0.5 items-center">
+                    {isSelected && <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">✓</span>}
+                    {!isSelected && !disabled && (hasTheme || hasSortie) && (
+                      <>
+                        {hasTheme && <span className="w-2 h-2 rounded-full bg-violet-500" />}
+                        {hasSortie && <span className="w-2 h-2 rounded-full bg-orange-500" />}
+                      </>
+                    )}
+                  </div>
                 </div>
                 {!disabled && (
                   <>
                     <div className="flex items-center justify-between gap-1 mt-1">
                       <span className="text-sm">{colors.icon}</span>
-                      {dayJournal && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setJournalModalDate(dateStr); }}
-                          className="text-xs text-blue-600 hover:text-blue-800"
-                        >📋</button>
-                      )}
+                      {dayJournal && <span className="text-xs">📋</span>}
                     </div>
-                    {dayActivities.length > 0 && (
-                      <div className="text-xs mt-1 space-y-0.5 flex-1 overflow-y-auto">
-                        {dayActivities.slice(0, 1).map((a: any) => (
-                          <div key={a.id} className="bg-white/60 px-1 py-0.5 rounded text-slate-700 truncate">
-                            {a.title}
-                          </div>
-                        ))}
-                        {dayActivities.length > 1 && (
-                          <div className="text-slate-500">+{dayActivities.length - 1}</div>
-                        )}
+                    {dayActivities.length > 0 && !isSelected && (
+                      <div className="text-xs mt-1 space-y-0.5 flex-1 overflow-hidden">
+                        <div className="truncate text-slate-600">{dayActivities[0].title}</div>
+                        {dayActivities.length > 1 && <div className="text-slate-400">+{dayActivities.length - 1}</div>}
                       </div>
                     )}
                   </>
@@ -397,7 +749,7 @@ function ParentCalendarSection({
         {/* Legend */}
         <div className="text-xs text-slate-600 space-y-1">
           <div className="font-semibold mb-2">{t("legend")}</div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             {["present", "absent"].map((status) => {
               const { icon, label } = ATTENDANCE_COLORS[status as AttendanceStatus];
               return (
@@ -408,8 +760,12 @@ function ParentCalendarSection({
               );
             })}
             <div className="flex items-center gap-2">
-              <span>📋</span>
-              <span>{t("hasJournal")}</span>
+              <span className="w-2 h-2 rounded-full bg-violet-500" />
+              <span>{t("dayDetail.theme")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-orange-500" />
+              <span>{t("dayDetail.sortie")}</span>
             </div>
           </div>
         </div>
@@ -417,77 +773,75 @@ function ParentCalendarSection({
 
       {/* Mobile: Small calendar grid */}
       <div className="md:hidden bg-white rounded-lg shadow p-4 flex flex-col h-full overflow-hidden">
-        {/* Month navigation */}
         <div className="flex items-center justify-between mb-3 flex-shrink-0">
-          <button
-            onClick={handlePrevMonth}
-            className="p-2 hover:bg-slate-100 rounded-lg transition"
-          >
+          <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 rounded-lg transition">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <h2 className="text-sm font-semibold text-slate-800">
-            {format(currentMonth, "MMM yyyy", { locale: dateLocale })}
-          </h2>
-          <button
-            onClick={handleNextMonth}
-            className="p-2 hover:bg-slate-100 rounded-lg transition"
-          >
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-slate-800">
+              {format(currentMonth, "MMM yyyy", { locale: dateLocale })}
+            </h2>
+            <button
+              onClick={() => { setSelectMode(!selectMode); setSelectedDates(new Set()); }}
+              className={`px-2 py-1 rounded text-xs font-medium border transition ${
+                selectMode ? "bg-blue-600 text-white border-blue-600" : "text-slate-600 border-slate-200"
+              }`}
+            >
+              {selectMode ? `✓ ${selectedDates.size}` : "Multi"}
+            </button>
+          </div>
+          <button onClick={handleNextMonth} className="p-2 hover:bg-slate-100 rounded-lg transition">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Small calendar grid */}
         <div className="flex-1 overflow-y-auto">
           <div className="grid grid-cols-5 gap-1">
-            {/* Day headers */}
             {["Lun", "Mar", "Mer", "Jeu", "Ven"].map((day) => (
-              <div key={day} className="text-center font-semibold text-slate-500 py-1 text-xs">
-                {day}
-              </div>
+              <div key={day} className="text-center font-semibold text-slate-500 py-1 text-xs">{day}</div>
             ))}
-
-            {/* Empty cells */}
             {Array.from({ length: firstDayOffset }).map((_, i) => (
               <div key={`empty-${i}`} />
             ))}
-
-            {/* Days */}
             {days.map((day) => {
               const dateStr = format(day, "yyyy-MM-dd");
               const disabled = isDayDisabled(day);
+              const isFutureDay = day >= today;
               const dayAttendance = disabled ? "present" : (attendance[dateStr] || "present") as AttendanceStatus;
-              const dayJournal = !disabled && journalMap[dateStr];
+              const dayActivities = disabled ? [] : activitiesForDay(day);
               const colors = disabled ? { bg: "bg-slate-50", text: "text-slate-300", icon: null } : ATTENDANCE_COLORS[dayAttendance];
               const isToday = isSameDay(day, today);
-              const isFuture = day > today;
-
-              const handleClick = () => {
-                if (disabled || !isFuture) return;
-                setStatusModalDate(dateStr);
-              };
+              const isSelected = selectedDates.has(dateStr);
+              const canSelect = !disabled && isFutureDay;
+              const hasTheme = dayActivities.some((a: Activity) => a.type === "theme");
+              const hasSortie = dayActivities.some((a: Activity) => a.type !== "theme");
 
               return (
                 <button
                   key={dateStr}
-                  onClick={handleClick}
-                  disabled={disabled || !isFuture}
+                  onClick={() => {
+                    if (disabled) return;
+                    if (selectMode && canSelect) toggleDate(dateStr);
+                    else if (!selectMode) setDayDetailDate(dateStr);
+                  }}
+                  disabled={disabled}
                   className={`aspect-square rounded p-1 transition flex flex-col items-center justify-center text-xs ${
-                    disabled || !isFuture
-                      ? "bg-slate-50 opacity-40 cursor-not-allowed"
-                      : isToday
-                      ? `${colors.bg} border border-slate-900 cursor-pointer ring-1 ring-slate-900/20`
-                      : `${colors.bg} cursor-pointer hover:shadow-sm`
+                    disabled ? "bg-slate-50 opacity-40 cursor-not-allowed"
+                    : isSelected ? "bg-blue-100 border-2 border-blue-500"
+                    : isToday ? `${colors.bg} border border-slate-900 ring-1 ring-slate-900/20`
+                    : `${colors.bg} hover:shadow-sm`
                   }`}
                 >
                   <div className="font-semibold text-slate-800">{format(day, "d")}</div>
-                  <div className="text-xs">{colors.icon}</div>
-                  {dayJournal && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setJournalModalDate(dateStr); }}
-                      className="text-xs hover:scale-110 transition"
-                    >
-                      📋
-                    </button>
+                  {isSelected
+                    ? <span className="text-blue-600 text-[10px] font-bold">✓</span>
+                    : <div className="text-xs">{colors.icon}</div>
+                  }
+                  {!isSelected && (hasTheme || hasSortie) && (
+                    <div className="flex gap-0.5 mt-0.5">
+                      {hasTheme && <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />}
+                      {hasSortie && <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />}
+                    </div>
                   )}
                 </button>
               );
@@ -496,162 +850,46 @@ function ParentCalendarSection({
         </div>
       </div>
 
-      {/* Status modal */}
-      {statusModalDate && (
-        <ParentStatusModal
-          date={statusModalDate}
-          childId={child.id}
-          onClose={() => setStatusModalDate(null)}
-          onStatusChange={() => {
-            setStatusModalDate(null);
-            mutateAttendance();
-          }}
-        />
-      )}
-
-      {/* Journal modal */}
-      {journalModalDate && (
-        <JournalModal
-          date={journalModalDate}
-          childId={child.id}
-          onClose={() => setJournalModalDate(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-function ParentStatusModal({
-  date,
-  childId,
-  onClose,
-  onStatusChange,
-}: {
-  date: string;
-  childId: string;
-  onClose: () => void;
-  onStatusChange: () => void;
-}) {
-  const t = useTranslations("calendar");
-  const [loading, setLoading] = useState(false);
-
-  const handleSetStatus = async (status: "present" | "absent") => {
-    setLoading(true);
-    try {
-      await attendanceApi.setStatus(childId, date, status);
-      onStatusChange();
-      onClose();
-    } catch (error) {
-      console.error("Error setting status:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg max-w-sm w-full p-6">
-        <h3 className="text-lg font-bold text-slate-800 mb-4">{t("statusModal.title")}</h3>
-        <div className="space-y-3">
-          <button
-            onClick={() => handleSetStatus("present")}
-            disabled={loading}
-            className="w-full px-4 py-2 bg-green-100 text-green-700 border border-green-300 rounded-lg hover:bg-green-200 transition font-medium disabled:opacity-50"
-          >
-            ✓ {t("statusModal.present")}
-          </button>
-          <button
-            onClick={() => handleSetStatus("absent")}
-            disabled={loading}
-            className="w-full px-4 py-2 bg-red-100 text-red-700 border border-red-300 rounded-lg hover:bg-red-200 transition font-medium disabled:opacity-50"
-          >
-            ✗ Absent
-          </button>
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="w-full px-4 py-2 bg-slate-100 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-200 transition font-medium disabled:opacity-50"
-          >
-            Annuler
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function JournalModal({
-  date,
-  childId,
-  onClose,
-}: {
-  date: string;
-  childId: string;
-  onClose: () => void;
-}) {
-  const t = useTranslations("calendar");
-  const weekStart = format(startOfWeek(parseISO(date), { weekStartsOn: 1 }), "yyyy-MM-dd");
-
-  const { data: weekData } = useSWR(`journal-${childId}-${weekStart}`, () =>
-    journalApi.getWeek(childId, weekStart).then((r) => r.data)
-  );
-
-  const journal = weekData?.find((j: any) => j.date === date);
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-slate-800">{t("journalModal.title")}</h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-700">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {journal ? (
-          <div className="space-y-4">
-            {journal.humeur && (
-              <div>
-                <span className="font-semibold text-slate-700">Humeur:</span> {journal.humeur}
-              </div>
-            )}
-            {journal.appetit && (
-              <div>
-                <span className="font-semibold text-slate-700">Appétit:</span> {journal.appetit}
-              </div>
-            )}
-            {journal.sommeil_minutes && (
-              <div>
-                <span className="font-semibold text-slate-700">Sommeil:</span> {journal.sommeil_minutes} min
-              </div>
-            )}
-            {journal.message_educatrice && (
-              <div>
-                <span className="font-semibold text-slate-700">Message:</span> {journal.message_educatrice}
-              </div>
-            )}
-            {journal.observations && (
-              <div>
-                <span className="font-semibold text-slate-700">Observations:</span> {journal.observations}
-              </div>
-            )}
-            {journal.sante && (
-              <div>
-                <span className="font-semibold text-slate-700">Santé:</span> {journal.sante}
-              </div>
-            )}
+      {/* Bulk action bar */}
+      {selectMode && selectedDates.size > 0 && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white rounded-xl shadow-2xl border border-slate-200 px-4 py-3 flex items-center gap-3 max-w-sm w-full mx-4">
+          <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
+            {selectedDates.size} jour{selectedDates.size > 1 ? "s" : ""}
+          </span>
+          <div className="flex gap-2 flex-1">
+            {(["present", "absent"] as const).map((status) => (
+              <button
+                key={status}
+                onClick={() => handleBulkStatus(status)}
+                disabled={bulkLoading}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold border transition ${
+                  status === "present"
+                    ? "bg-green-100 text-green-700 hover:bg-green-200 border-green-300"
+                    : "bg-red-100 text-red-700 hover:bg-red-200 border-red-300"
+                } disabled:opacity-50`}
+              >
+                {bulkLoading
+                  ? <Loader2 className="w-3 h-3 animate-spin inline" />
+                  : status === "present" ? "✓ Présent" : "✗ Absent"
+                }
+              </button>
+            ))}
           </div>
-        ) : (
-          <p className="text-slate-600">{t("journalModal.noData")}</p>
-        )}
+          <button onClick={clearSelection} className="p-1 text-slate-400 hover:text-slate-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
-        <button
-          onClick={onClose}
-          className="mt-6 w-full px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition font-medium"
-        >
-          Fermer
-        </button>
-      </div>
+      {/* Day detail modal */}
+      {dayDetailDate && (
+        <DayDetailModal
+          date={dayDetailDate}
+          child={child}
+          monthStr={monthStr}
+          onClose={() => setDayDetailDate(null)}
+        />
+      )}
     </div>
   );
 }
@@ -659,10 +897,9 @@ function JournalModal({
 export default function ParentChildrenPage() {
   const t = useTranslations("children");
   const [selectedChildId, setSelectedChildId] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"calendar" | "journals" | "profile">("calendar");
+  const [activeTab, setActiveTab] = useState<"calendar" | "profile">("calendar");
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [statusModalDate, setStatusModalDate] = useState<string | null>(null);
-  const [journalModalDate, setJournalModalDate] = useState<string | null>(null);
+  const [dayDetailDate, setDayDetailDate] = useState<string | null>(null);
 
   // Reset to calendar tab when child changes
   useEffect(() => {
@@ -733,12 +970,6 @@ export default function ParentChildrenPage() {
                 📅 Calendrier
               </TabButton>
               <TabButton
-                active={activeTab === "journals"}
-                onClick={() => setActiveTab("journals")}
-              >
-                📖 Journaux
-              </TabButton>
-              <TabButton
                 active={activeTab === "profile"}
                 onClick={() => setActiveTab("profile")}
               >
@@ -753,14 +984,9 @@ export default function ParentChildrenPage() {
                   child={selectedChild}
                   currentMonth={currentMonth}
                   setCurrentMonth={setCurrentMonth}
-                  statusModalDate={statusModalDate}
-                  setStatusModalDate={setStatusModalDate}
-                  journalModalDate={journalModalDate}
-                  setJournalModalDate={setJournalModalDate}
+                  dayDetailDate={dayDetailDate}
+                  setDayDetailDate={setDayDetailDate}
                 />
-              )}
-              {activeTab === "journals" && selectedChild && (
-                <ParentJournalsSection child={selectedChild} />
               )}
               {activeTab === "profile" && (
                 <div className="space-y-4">
@@ -820,12 +1046,6 @@ export default function ParentChildrenPage() {
                 📅 Cal
               </TabButton>
               <TabButton
-                active={activeTab === "journals"}
-                onClick={() => setActiveTab("journals")}
-              >
-                📖 Journaux
-              </TabButton>
-              <TabButton
                 active={activeTab === "profile"}
                 onClick={() => setActiveTab("profile")}
               >
@@ -841,14 +1061,9 @@ export default function ParentChildrenPage() {
                     child={selectedChild}
                     currentMonth={currentMonth}
                     setCurrentMonth={setCurrentMonth}
-                    statusModalDate={statusModalDate}
-                    setStatusModalDate={setStatusModalDate}
-                    journalModalDate={journalModalDate}
-                    setJournalModalDate={setJournalModalDate}
+                    dayDetailDate={dayDetailDate}
+                    setDayDetailDate={setDayDetailDate}
                   />
-                )}
-                {activeTab === "journals" && selectedChild && (
-                  <ParentJournalsSection child={selectedChild} />
                 )}
                 {activeTab === "profile" && (
                   <>

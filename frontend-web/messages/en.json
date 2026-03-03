@@ -476,6 +476,22 @@
     "journalModal": {
       "title": "Journal Entry",
       "noData": "No data for this day"
+    },
+    "dayDetail": {
+      "attendance": "Attendance",
+      "journal": "Daily Journal",
+      "activities": "Activities",
+      "noJournal": "No journal for this day",
+      "noActivities": "No activities this day",
+      "theme": "Theme",
+      "sortie": "Outing",
+      "register": "Register my child",
+      "registered": "Registered",
+      "tapToUnregister": "Tap to unregister",
+      "full": "Full",
+      "vacances": "Vacation",
+      "present": "Present",
+      "absent": "Absent"
     }
   },
   "activities": {
@@ -483,6 +499,9 @@
     "create": "New Activity",
     "empty": "No activities this month",
     "registered": "registered",
+    "registrations": "Registrations",
+    "noRegistrations": "No children registered yet",
+    "inscribed": "registered",
     "error": {
       "unauthorized": "Only administrators can access this page"
     },
@@ -495,10 +514,29 @@
       "title": "Title",
       "description": "Description",
       "date": "Date",
+      "endDate": "End Date (optional)",
       "capacity": "Capacity (number of spots)",
       "capacityPlaceholder": "Unlimited",
+      "group": "Group (leave empty = all groups)",
+      "noGroup": "All groups",
       "save": "Save",
-      "saving": "Saving..."
+      "saving": "Saving...",
+      "type": "Activity Type",
+      "typeTheme": "Weekly Theme",
+      "typeSortie": "Outing / Excursion"
+    }
+  },
+  "parent": {
+    "activities": {
+      "title": "Activities",
+      "subtitle": "Register your children for this month's activities",
+      "noActivities": "No activities this month",
+      "noChildren": "You have no children associated",
+      "register": "Register",
+      "unregister": "Unregister",
+      "registered": "Registered",
+      "full": "Full",
+      "notEligible": "Not eligible (different group)"
     }
   }
 }

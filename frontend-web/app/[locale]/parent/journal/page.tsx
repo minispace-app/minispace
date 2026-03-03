@@ -81,11 +81,24 @@ export default function ParentJournalPage() {
   const { data: menusData } = useSWR(["menus-week-parent", weekStartStr], () =>
     menusApi.getWeek(weekStartStr)
   );
-  interface MenuEntry { date: string; menu: string; }
+  interface MenuEntry {
+    date: string;
+    menu?: string;
+    collation_matin?: string;
+    diner?: string;
+    collation_apres_midi?: string;
+  }
   const serverMenus: MenuEntry[] =
     (menusData as { data: MenuEntry[] } | undefined)?.data ?? [];
-  const getMenuForDate = (dateStr: string): string | null =>
-    serverMenus.find((m) => m.date === dateStr)?.menu ?? null;
+  const getMenuForDate = (dateStr: string) => {
+    const menuEntry = serverMenus.find((m) => m.date === dateStr);
+    if (!menuEntry) return null;
+    return {
+      collation_matin: menuEntry.collation_matin,
+      diner: menuEntry.diner,
+      collation_apres_midi: menuEntry.collation_apres_midi,
+    };
+  };
 
   const getDayData = (dateStr: string): DailyJournal =>
     serverEntries.find((e) => e.date === dateStr) ?? emptyEntry(dateStr);
@@ -167,12 +180,31 @@ export default function ParentJournalPage() {
                   ) : isToday ? (
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mx-auto mt-1" />
                   ) : null}
-                  {menuDuJour && (
-                    <div className="mt-1.5 flex items-center gap-1 text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 max-w-full overflow-hidden" title={menuDuJour}>
-                      <span className="flex-shrink-0">🍽</span>
-                      <span className="truncate">{menuDuJour}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const menuData = getMenuForDate(dateStr);
+                    if (!menuData) return null;
+                    const hasMenu = menuData.collation_matin || menuData.diner || menuData.collation_apres_midi;
+                    if (!hasMenu) return null;
+                    return (
+                      <div className="mt-1.5 space-y-0.5">
+                        {menuData.collation_matin && (
+                          <div className="text-xs text-blue-700 bg-blue-50 rounded px-1 py-0.5 truncate" title={menuData.collation_matin}>
+                            🌅 {menuData.collation_matin}
+                          </div>
+                        )}
+                        {menuData.diner && (
+                          <div className="text-xs text-amber-700 bg-amber-50 rounded px-1 py-0.5 truncate" title={menuData.diner}>
+                            🍽️ {menuData.diner}
+                          </div>
+                        )}
+                        {menuData.collation_apres_midi && (
+                          <div className="text-xs text-purple-700 bg-purple-50 rounded px-1 py-0.5 truncate" title={menuData.collation_apres_midi}>
+                            🌙 {menuData.collation_apres_midi}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}

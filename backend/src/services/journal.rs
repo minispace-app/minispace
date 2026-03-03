@@ -9,6 +9,58 @@ use crate::{
     },
 };
 
+#[derive(Clone, Debug, sqlx::FromRow)]
+struct MenuDuJour {
+    collation_matin: Option<String>,
+    diner: Option<String>,
+    collation_apres_midi: Option<String>,
+}
+
+#[derive(Clone, Debug, sqlx::FromRow)]
+struct ThemeActivity {
+    title: String,
+    date: NaiveDate,
+    end_date: Option<NaiveDate>,
+}
+
+/// Fetch menu du jour (garderie-level menu) for a given date.
+async fn fetch_menu_du_jour(
+    pool: &PgPool,
+    tenant: &str,
+    date: NaiveDate,
+) -> anyhow::Result<Option<MenuDuJour>> {
+    let schema = schema_name(tenant);
+    let menu: Option<MenuDuJour> = sqlx::query_as(&format!(
+        r#"SELECT collation_matin, diner, collation_apres_midi
+           FROM "{schema}".daily_menus
+           WHERE date = $1"#
+    ))
+    .bind(date)
+    .fetch_optional(pool)
+    .await?;
+    Ok(menu)
+}
+
+/// Fetch all theme activities that cover a given date.
+async fn fetch_themes_for_date(
+    pool: &PgPool,
+    tenant: &str,
+    date: NaiveDate,
+) -> anyhow::Result<Vec<ThemeActivity>> {
+    let schema = schema_name(tenant);
+    let themes: Vec<ThemeActivity> = sqlx::query_as(&format!(
+        r#"SELECT title, date, end_date
+           FROM "{schema}".activities
+           WHERE type = 'theme'
+             AND date <= $1
+             AND (end_date IS NULL OR end_date >= $1)"#
+    ))
+    .bind(date)
+    .fetch_all(pool)
+    .await?;
+    Ok(themes)
+}
+
 pub struct JournalService;
 
 impl JournalService {
@@ -263,8 +315,12 @@ impl JournalService {
                     )
                 };
 
+                // Fetch theme activities and menu for today
+                let themes = fetch_themes_for_date(pool, tenant, today).await.unwrap_or_default();
+                let menu = fetch_menu_du_jour(pool, tenant, today).await.unwrap_or(None);
+
                 // Build HTML with all children's journals
-                let html = build_journal_email_html_multi(&children_entries, today, &garderie_name);
+                let html = build_journal_email_html_multi(&children_entries, today, &garderie_name, &themes, menu.as_ref());
 
                 let _ = svc
                     .send_journal(&parent_email, &parent_name, &html, &subject, &garderie_name)
@@ -366,8 +422,23 @@ impl JournalService {
             }
 
             if let Some(svc) = email_svc {
+                // Fetch theme activities and menus for the week
+                let mut themes_for_week = Vec::new();
+                let mut menus_for_week = std::collections::HashMap::new();
+                for i in 0..5 {
+                    let day = week_start + chrono::Duration::days(i);
+                    if let Ok(day_themes) = fetch_themes_for_date(pool, tenant, day).await {
+                        themes_for_week.extend(day_themes);
+                    }
+                    if let Ok(menu) = fetch_menu_du_jour(pool, tenant, day).await {
+                        if let Some(m) = menu {
+                            menus_for_week.insert(day, m);
+                        }
+                    }
+                }
+
                 let html = build_journal_email_html(
-                    child_first, child_last, week_start, week_end, &entries, &garderie_name,
+                    child_first, child_last, week_start, week_end, &entries, &garderie_name, &themes_for_week, &menus_for_week,
                 );
                 let subject = format!(
                     "Journal de bord de {} {} - Semaine du {}",
@@ -441,8 +512,23 @@ impl JournalService {
 
         let week_end = week_start + chrono::Duration::days(4);
 
+        // Fetch theme activities and menus for the week
+        let mut themes_for_week = Vec::new();
+        let mut menus_for_week = std::collections::HashMap::new();
+        for i in 0..5 {
+            let day = week_start + chrono::Duration::days(i);
+            if let Ok(day_themes) = fetch_themes_for_date(pool, tenant, day).await {
+                themes_for_week.extend(day_themes);
+            }
+            if let Ok(menu) = fetch_menu_du_jour(pool, tenant, day).await {
+                if let Some(m) = menu {
+                    menus_for_week.insert(day, m);
+                }
+            }
+        }
+
         // Build HTML email
-        let html = build_journal_email_html(&child_first_name, &child_last_name, week_start, week_end, &entries, &garderie_name);
+        let html = build_journal_email_html(&child_first_name, &child_last_name, week_start, week_end, &entries, &garderie_name, &themes_for_week, &menus_for_week);
 
         // Send to all parents
         if let Some(svc) = email_svc {
@@ -513,6 +599,17 @@ fn opt_str(v: Option<&str>) -> &str {
     }
 }
 
+fn get_theme_for_date(date: NaiveDate, themes: &[ThemeActivity]) -> Option<String> {
+    themes.iter().find_map(|theme| {
+        let end = theme.end_date.unwrap_or(theme.date);
+        if date >= theme.date && date <= end {
+            Some(theme.title.clone())
+        } else {
+            None
+        }
+    })
+}
+
 fn build_journal_email_html(
     child_first: &str,
     child_last: &str,
@@ -520,6 +617,8 @@ fn build_journal_email_html(
     week_end: NaiveDate,
     entries: &[crate::models::journal::DailyJournal],
     garderie_name: &str,
+    themes: &[ThemeActivity],
+    menus: &std::collections::HashMap<NaiveDate, MenuDuJour>,
 ) -> String {
     let period = if week_start == week_end {
         format!("Journal du {} — {}", fmt_date_fr(week_start), garderie_name)
@@ -563,8 +662,65 @@ fn build_journal_email_html(
 
         html.push_str(&format!(
             r#"<div style="border:1px solid #e5e7eb;border-radius:6px;padding:16px;margin-bottom:12px">
-            <h3 style="color:#2563eb;margin:0 0 12px 0;font-size:16px">{date}</h3>
-            <table style="width:100%;font-size:14px;color:#374151;border-collapse:collapse">
+            <h3 style="color:#2563eb;margin:0 0 12px 0;font-size:16px">{date}</h3>"#,
+            date = date_fr,
+        ));
+
+        // Add menu du jour if present
+        if let Some(menu) = menus.get(&entry.date) {
+            let has_menu = menu.collation_matin.is_some() || menu.diner.is_some() || menu.collation_apres_midi.is_some();
+            if has_menu {
+                html.push_str(r#"<div style="margin-bottom:12px;font-size:13px">"#);
+
+                if let Some(ref m) = menu.collation_matin {
+                    if !m.trim().is_empty() {
+                        html.push_str(&format!(
+                            r#"<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:10px;margin-bottom:8px">
+                            <span style="color:#d97706;font-weight:600">🌅 Collation matin :</span> <span style="color:#92400e">{}</span>
+                            </div>"#,
+                            m
+                        ));
+                    }
+                }
+
+                if let Some(ref m) = menu.diner {
+                    if !m.trim().is_empty() {
+                        html.push_str(&format!(
+                            r#"<div style="background:#fed7aa;border:1px solid #fdba74;border-radius:6px;padding:10px;margin-bottom:8px">
+                            <span style="color:#c2410c;font-weight:600">🍽️ Dîner :</span> <span style="color:#7c2d12">{}</span>
+                            </div>"#,
+                            m
+                        ));
+                    }
+                }
+
+                if let Some(ref m) = menu.collation_apres_midi {
+                    if !m.trim().is_empty() {
+                        html.push_str(&format!(
+                            r#"<div style="background:#e9d5ff;border:1px solid #d8b4fe;border-radius:6px;padding:10px;margin-bottom:8px">
+                            <span style="color:#9333ea;font-weight:600">🌙 Collation après-midi :</span> <span style="color:#5b21b6">{}</span>
+                            </div>"#,
+                            m
+                        ));
+                    }
+                }
+
+                html.push_str("</div>");
+            }
+        }
+
+        // Add theme if present for this day
+        if let Some(theme) = get_theme_for_date(entry.date, themes) {
+            html.push_str(&format!(
+                r#"<div style="background:#f3e8ff;border:1px solid #e9d5ff;border-radius:6px;padding:12px;margin-bottom:12px;font-size:14px">
+                <span style="color:#7c3aed;font-weight:600">📚 Thème :</span> <span style="color:#6d28d9">{}</span>
+                </div>"#,
+                theme
+            ));
+        }
+
+        html.push_str(&format!(
+            r#"<table style="width:100%;font-size:14px;color:#374151;border-collapse:collapse">
                 <tr><td style="padding:5px 8px 5px 0;width:140px;color:#6b7280"><strong>Température</strong></td><td style="padding:5px 0">{temp}</td></tr>
                 <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Menu</strong></td><td style="padding:5px 0">{menu}</td></tr>
                 <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Appétit</strong></td><td style="padding:5px 0">{appetit}</td></tr>
@@ -573,7 +729,6 @@ fn build_journal_email_html(
                 <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Santé</strong></td><td style="padding:5px 0">{sante}</td></tr>
                 <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Médicaments</strong></td><td style="padding:5px 0">{med}</td></tr>
             </table>"#,
-            date    = date_fr,
             temp    = entry.temperature.as_deref().map(fmt_temperature).unwrap_or("—"),
             menu    = opt_str(entry.menu.as_deref()),
             appetit = entry.appetit.as_deref().map(fmt_appetit).unwrap_or("—"),
@@ -623,6 +778,8 @@ fn build_journal_email_html_multi(
     children_entries: &[(String, String, crate::models::journal::DailyJournal)],
     today: NaiveDate,
     garderie_name: &str,
+    themes: &[ThemeActivity],
+    menu: Option<&MenuDuJour>,
 ) -> String {
     let period = format!("Journal du {} — {}", fmt_date_fr(today), garderie_name);
 
@@ -660,8 +817,65 @@ fn build_journal_email_html_multi(
 
             html.push_str(&format!(
                 r#"<div style="border:1px solid #e5e7eb;border-radius:6px;padding:16px;margin-bottom:12px">
-                <h4 style="color:#2563eb;margin:0 0 12px 0;font-size:14px">{date}</h4>
-                <table style="width:100%;font-size:13px;color:#374151;border-collapse:collapse">
+                <h4 style="color:#2563eb;margin:0 0 12px 0;font-size:14px">{date}</h4>"#,
+                date = date_fr,
+            ));
+
+            // Add menu du jour if present
+            if let Some(menu) = menu {
+                let has_menu = menu.collation_matin.is_some() || menu.diner.is_some() || menu.collation_apres_midi.is_some();
+                if has_menu {
+                    html.push_str(r#"<div style="margin-bottom:12px;font-size:12px">"#);
+
+                    if let Some(ref m) = menu.collation_matin {
+                        if !m.trim().is_empty() {
+                            html.push_str(&format!(
+                                r#"<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:8px;margin-bottom:6px">
+                                <span style="color:#d97706;font-weight:600">🌅 Collation matin :</span> <span style="color:#92400e">{}</span>
+                                </div>"#,
+                                m
+                            ));
+                        }
+                    }
+
+                    if let Some(ref m) = menu.diner {
+                        if !m.trim().is_empty() {
+                            html.push_str(&format!(
+                                r#"<div style="background:#fed7aa;border:1px solid #fdba74;border-radius:6px;padding:8px;margin-bottom:6px">
+                                <span style="color:#c2410c;font-weight:600">🍽️ Dîner :</span> <span style="color:#7c2d12">{}</span>
+                                </div>"#,
+                                m
+                            ));
+                        }
+                    }
+
+                    if let Some(ref m) = menu.collation_apres_midi {
+                        if !m.trim().is_empty() {
+                            html.push_str(&format!(
+                                r#"<div style="background:#e9d5ff;border:1px solid #d8b4fe;border-radius:6px;padding:8px;margin-bottom:6px">
+                                <span style="color:#9333ea;font-weight:600">🌙 Collation après-midi :</span> <span style="color:#5b21b6">{}</span>
+                                </div>"#,
+                                m
+                            ));
+                        }
+                    }
+
+                    html.push_str("</div>");
+                }
+            }
+
+            // Add theme if present for this day
+            if let Some(theme) = get_theme_for_date(entry.date, themes) {
+                html.push_str(&format!(
+                    r#"<div style="background:#f3e8ff;border:1px solid #e9d5ff;border-radius:6px;padding:10px;margin-bottom:10px;font-size:13px">
+                    <span style="color:#7c3aed;font-weight:600">📚 Thème :</span> <span style="color:#6d28d9">{}</span>
+                    </div>"#,
+                    theme
+                ));
+            }
+
+            html.push_str(&format!(
+                r#"<table style="width:100%;font-size:13px;color:#374151;border-collapse:collapse">
                     <tr><td style="padding:4px 8px 4px 0;width:120px;color:#6b7280"><strong>Température</strong></td><td style="padding:4px 0">{temp}</td></tr>
                     <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Menu</strong></td><td style="padding:4px 0">{menu}</td></tr>
                     <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Appétit</strong></td><td style="padding:4px 0">{appetit}</td></tr>
@@ -670,7 +884,6 @@ fn build_journal_email_html_multi(
                     <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Santé</strong></td><td style="padding:4px 0">{sante}</td></tr>
                     <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Médicaments</strong></td><td style="padding:4px 0">{med}</td></tr>
                 </table>"#,
-                date    = date_fr,
                 temp    = entry.temperature.as_deref().map(fmt_temperature).unwrap_or("—"),
                 menu    = opt_str(entry.menu.as_deref()),
                 appetit = entry.appetit.as_deref().map(fmt_appetit).unwrap_or("—"),

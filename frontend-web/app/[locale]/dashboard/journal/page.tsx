@@ -71,11 +71,24 @@ export default function JournalDashboardPage() {
   const { data: menusData } = useSWR(["menus-week-journal", weekStartStr], () =>
     menusApi.getWeek(weekStartStr)
   );
-  interface MenuEntry { date: string; menu: string; }
+  interface MenuEntry {
+    date: string;
+    menu?: string;
+    collation_matin?: string;
+    diner?: string;
+    collation_apres_midi?: string;
+  }
   const serverMenus: MenuEntry[] =
     (menusData as { data: MenuEntry[] } | undefined)?.data ?? [];
-  const getMenuForDate = (dateStr: string): string | null =>
-    serverMenus.find((m) => m.date === dateStr)?.menu ?? null;
+  const getMenuForDate = (dateStr: string) => {
+    const menuEntry = serverMenus.find((m) => m.date === dateStr);
+    if (!menuEntry) return null;
+    return {
+      collation_matin: menuEntry.collation_matin,
+      diner: menuEntry.diner,
+      collation_apres_midi: menuEntry.collation_apres_midi,
+    };
+  };
 
   const getDayData = useCallback(
     (dateStr: string): DayData => {
@@ -251,12 +264,29 @@ export default function JournalDashboardPage() {
                   ) : isToday ? (
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mx-auto mt-1" />
                   ) : null}
-                  {menuDuJour && (
-                    <div className="mt-1.5 flex items-center gap-1 text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 max-w-full overflow-hidden" title={menuDuJour}>
-                      <span className="flex-shrink-0">🍽</span>
-                      <span className="truncate">{menuDuJour}</span>
-                    </div>
-                  )}
+                  {menuDuJour && ((() => {
+                    const hasMenu = menuDuJour.collation_matin || menuDuJour.diner || menuDuJour.collation_apres_midi;
+                    if (!hasMenu) return null;
+                    return (
+                      <div className="mt-1.5 space-y-0.5">
+                        {menuDuJour.collation_matin && (
+                          <div className="text-xs text-blue-700 bg-blue-50 rounded px-1 py-0.5 truncate" title={menuDuJour.collation_matin}>
+                            🌅 {menuDuJour.collation_matin}
+                          </div>
+                        )}
+                        {menuDuJour.diner && (
+                          <div className="text-xs text-amber-700 bg-amber-50 rounded px-1 py-0.5 truncate" title={menuDuJour.diner}>
+                            🍽️ {menuDuJour.diner}
+                          </div>
+                        )}
+                        {menuDuJour.collation_apres_midi && (
+                          <div className="text-xs text-purple-700 bg-purple-50 rounded px-1 py-0.5 truncate" title={menuDuJour.collation_apres_midi}>
+                            🌙 {menuDuJour.collation_apres_midi}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })())}
                 </div>
               );
             })}

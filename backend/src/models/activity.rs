@@ -9,7 +9,12 @@ pub struct Activity {
     pub title: String,
     pub description: Option<String>,
     pub date: NaiveDate,
+    pub end_date: Option<NaiveDate>,
     pub capacity: Option<i32>,
+    pub group_id: Option<Uuid>,
+    #[sqlx(rename = "type")]
+    #[serde(rename = "type")]
+    pub activity_type: String,
     pub created_by: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -30,12 +35,26 @@ pub struct ActivityRegistration {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ActivityRegistrationWithChild {
+    pub id: Uuid,
+    pub child_id: Uuid,
+    pub first_name: String,
+    pub last_name: String,
+    pub registered_by: Uuid,
+    pub created_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreateActivityRequest {
     pub title: String,
     pub description: Option<String>,
     pub date: String, // YYYY-MM-DD
+    pub end_date: Option<String>, // YYYY-MM-DD
     pub capacity: Option<i32>,
+    pub group_id: Option<Uuid>,
+    #[serde(rename = "type")]
+    pub activity_type: Option<String>, // "theme" | "sortie", default "sortie"
 }
 
 #[derive(Debug, Deserialize)]
@@ -43,7 +62,11 @@ pub struct UpdateActivityRequest {
     pub title: Option<String>,
     pub description: Option<String>,
     pub date: Option<String>, // YYYY-MM-DD
+    pub end_date: Option<String>, // YYYY-MM-DD
     pub capacity: Option<i32>,
+    pub group_id: Option<Uuid>,
+    #[serde(rename = "type")]
+    pub activity_type: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Shield, Camera, ArrowRight } from "lucide-react";
@@ -31,6 +31,30 @@ export default function RegisterPage() {
   const [consentPhotos, setConsentPhotos] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [validatingToken, setValidatingToken] = useState(true);
+
+  // Validate token and get user role on mount
+  useEffect(() => {
+    if (!token) {
+      setValidatingToken(false);
+      return;
+    }
+
+    const validateToken = async () => {
+      try {
+        const response = await authApi.validateToken(token);
+        setUserRole(response.data.role);
+      } catch (err) {
+        console.error("Token validation failed:", err);
+        setError(tc("error"));
+      } finally {
+        setValidatingToken(false);
+      }
+    };
+
+    validateToken();
+  }, [token, tc]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -45,27 +69,35 @@ export default function RegisterPage() {
       return;
     }
 
-    if (!consentPrivacy) {
+    // Only require privacy consent for parents
+    const isParent = userRole === "parent";
+    if (isParent && !consentPrivacy) {
       setError(t("consentMissing"));
       return;
     }
 
     setLoading(true);
     try {
-      await authApi.register({
+      const payload: any = {
         token,
         first_name: form.first_name,
         last_name: form.last_name,
         password: form.password,
         preferred_locale: locale,
-        consent: {
+      };
+
+      // Only include consent for parents
+      if (isParent) {
+        payload.consent = {
           privacy_accepted: true,
           photos_accepted: consentPhotos,
           accepted_at: new Date().toISOString(),
           policy_version: "2026-02-28",
           language: locale,
-        },
-      });
+        };
+      }
+
+      await authApi.register(payload);
       router.push(`/${locale}/login`);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -89,6 +121,20 @@ export default function RegisterPage() {
           <a href={`/${locale}/login`} className="mt-6 inline-block text-sm text-blue-600 hover:underline">
             {t("backToLogin")}
           </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (validatingToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="absolute top-4 right-4">
+          <LanguageSwitcher />
+        </div>
+        <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-slate-500 text-sm">{tc("loading")}</p>
         </div>
       </div>
     );
@@ -175,7 +221,8 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              {/* Consentements - Deux cartes côte à côte */}
+              {/* Consentements - Deux cartes côte à côte (Parents seulement) */}
+              {userRole === "parent" && (
               <div>
                 <label className="block text-sm font-semibold text-slate-900 mb-4">Protégeons votre enfant</label>
 
@@ -273,6 +320,8 @@ export default function RegisterPage() {
                   </button>
                 </div>
               </div>
+              )}
+
 
               {/* Submit Button */}
               <button

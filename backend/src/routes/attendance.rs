@@ -11,7 +11,7 @@ use crate::{
     db::tenant::schema_name,
     middleware::tenant::TenantSlug,
     models::{
-        attendance::{AttendanceMonthAllQuery, AttendanceMonthQuery, SetAttendanceRequest},
+        attendance::{AttendanceMonthAllQuery, AttendanceMonthQuery, BulkSetAttendanceRequest, SetAttendanceRequest},
         auth::AuthenticatedUser,
         user::UserRole,
     },
@@ -236,6 +236,89 @@ pub async fn set_attendance(
     })?;
 
     Ok(Json(json!({ "success": true })))
+}
+
+/// PUT /attendance/bulk
+/// Set attendance status for multiple dates at once
+/// Access: Parent (present/absent only, future dates only) + Staff (all statuses, all dates)
+pub async fn set_attendance_bulk(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    user: AuthenticatedUser,
+    Json(req): Json<BulkSetAttendanceRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    let schema = schema_name(&tenant);
+
+    // Validate status
+    let valid_statuses = ["attendu", "present", "absent", "malade", "vacances", "present_hors_contrat"];
+    if !valid_statuses.contains(&req.status.as_str()) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": "Invalid status" }))));
+    }
+
+    // Parse and validate all dates first
+    let today = chrono::Local::now().naive_local().date();
+    let mut parsed_dates: Vec<NaiveDate> = Vec::new();
+    for date_str in &req.dates {
+        let date = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
+            .map_err(|_| (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Invalid date: {date_str}") }))))?;
+        parsed_dates.push(date);
+    }
+
+    // Parent restrictions
+    if let UserRole::Parent = user.role {
+        if !["absent", "present"].contains(&req.status.as_str()) {
+            return Err((StatusCode::FORBIDDEN, Json(json!({ "error": "Parents can only set absent or present status" }))));
+        }
+        for date in &parsed_dates {
+            if *date < today {
+                return Err((StatusCode::FORBIDDEN, Json(json!({ "error": "Cannot change attendance for past dates" }))));
+            }
+        }
+        let is_linked = sqlx::query_scalar::<_, bool>(
+            &format!("SELECT EXISTS(SELECT 1 FROM {schema}.child_parents WHERE child_id = $1 AND user_id = $2)"),
+        )
+        .bind(req.child_id)
+        .bind(user.user_id)
+        .fetch_one(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+        if !is_linked {
+            return Err((StatusCode::FORBIDDEN, Json(json!({ "error": "Child not linked to parent" }))));
+        }
+    }
+
+    // Upsert each date
+    let is_absent = req.status == "absent";
+    for date in &parsed_dates {
+        sqlx::query(&format!(
+            "INSERT INTO {schema}.attendance (child_id, date, status, marked_by, created_at, updated_at)
+             VALUES ($1, $2, $3::{schema}.attendance_status, $4, NOW(), NOW())
+             ON CONFLICT (child_id, date) DO UPDATE SET status = $3::{schema}.attendance_status, marked_by = $4, updated_at = NOW()"
+        ))
+        .bind(req.child_id)
+        .bind(date)
+        .bind(&req.status)
+        .bind(user.user_id)
+        .execute(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+        sqlx::query(&format!(
+            "INSERT INTO {schema}.daily_journals (child_id, date, absent, created_by, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, NOW(), NOW())
+             ON CONFLICT (child_id, date) DO UPDATE SET absent = $3, updated_at = NOW()"
+        ))
+        .bind(req.child_id)
+        .bind(date)
+        .bind(is_absent)
+        .bind(user.user_id)
+        .execute(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+    }
+
+    Ok(Json(json!({ "success": true, "updated": parsed_dates.len() })))
 }
 
 /// GET /attendance/month?month=YYYY-MM

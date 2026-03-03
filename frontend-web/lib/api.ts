@@ -288,6 +288,8 @@ export const attendanceApi = {
     apiClient.get("/attendance", { params: { child_id: childId, month } }),
   setStatus: (childId: string, date: string, status: string) =>
     apiClient.put("/attendance", { child_id: childId, date, status }),
+  setBulkStatus: (childId: string, dates: string[], status: string) =>
+    apiClient.put("/attendance/bulk", { child_id: childId, dates, status }),
   getMonthAllChildren: (month: string) =>
     apiClient.get("/attendance/month", { params: { month } }),
 };
@@ -296,15 +298,17 @@ export const attendanceApi = {
 export const activitiesApi = {
   list: (month: string, childId?: string) =>
     apiClient.get("/activities", { params: { month, child_id: childId } }),
-  create: (data: { title: string; description?: string; date: string; capacity?: number }) =>
+  create: (data: { title: string; description?: string; date: string; end_date?: string; capacity?: number; group_id?: string; type?: string }) =>
     apiClient.post("/activities", data),
-  update: (id: string, data: { title?: string; description?: string; date?: string; capacity?: number }) =>
+  update: (id: string, data: { title?: string; description?: string; date?: string; end_date?: string; capacity?: number; group_id?: string; type?: string }) =>
     apiClient.put(`/activities/${id}`, data),
   delete: (id: string) => apiClient.delete(`/activities/${id}`),
   register: (activityId: string, childId: string) =>
     apiClient.post(`/activities/${activityId}/register`, { child_id: childId }),
   unregister: (activityId: string, childId: string) =>
     apiClient.delete(`/activities/${activityId}/register/${childId}`),
+  getRegistrations: (activityId: string) =>
+    apiClient.get(`/activities/${activityId}/registrations`),
 };
 
 // Menus de la garderie (un menu par jour, partagé pour tous les enfants)
