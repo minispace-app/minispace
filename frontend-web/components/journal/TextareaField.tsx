@@ -29,7 +29,7 @@ export function TextareaField({
       onChange={(e) => onChange?.(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+      className="w-full px-3 py-2 md:px-2 md:py-1.5 text-base md:text-sm border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
     />
   );
 }
