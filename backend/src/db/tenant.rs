@@ -107,17 +107,28 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     // --- Children ---
     sqlx::raw_sql(&format!(
         r#"CREATE TABLE IF NOT EXISTS "{schema}".children (
-            id          UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
-            first_name  VARCHAR(128) NOT NULL,
-            last_name   VARCHAR(128) NOT NULL,
-            birth_date  DATE NOT NULL,
-            photo_url   TEXT,
-            group_id    UUID REFERENCES "{schema}".groups(id) ON DELETE SET NULL,
-            notes       TEXT,
-            is_active   BOOLEAN NOT NULL DEFAULT TRUE,
-            created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            id             UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            first_name     VARCHAR(128) NOT NULL,
+            last_name      VARCHAR(128) NOT NULL,
+            birth_date     DATE NOT NULL,
+            photo_url      TEXT,
+            group_id       UUID REFERENCES "{schema}".groups(id) ON DELETE SET NULL,
+            notes          TEXT,
+            is_active      BOOLEAN NOT NULL DEFAULT TRUE,
+            start_date     DATE,
+            schedule_days  INTEGER[],
+            created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // Idempotent: add schedule columns for existing schemas
+    sqlx::raw_sql(&format!(
+        r#"ALTER TABLE "{schema}".children
+           ADD COLUMN IF NOT EXISTS start_date    DATE,
+           ADD COLUMN IF NOT EXISTS schedule_days INTEGER[]"#
     ))
     .execute(pool)
     .await?;
@@ -542,13 +553,27 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     // --- Daily menus (garderie-level, one entry per date) ---
     sqlx::raw_sql(&format!(
         r#"CREATE TABLE IF NOT EXISTS "{schema}".daily_menus (
-            id         UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
-            date       DATE NOT NULL UNIQUE,
-            menu       TEXT NOT NULL,
-            created_by UUID NOT NULL REFERENCES "{schema}".users(id),
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            id                   UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            date                 DATE NOT NULL UNIQUE,
+            menu                 TEXT,
+            collation_matin      TEXT,
+            diner                TEXT,
+            collation_apres_midi TEXT,
+            created_by           UUID NOT NULL REFERENCES "{schema}".users(id),
+            created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // Idempotent: add structured menu columns and make menu nullable for existing schemas
+    sqlx::raw_sql(&format!(
+        r#"ALTER TABLE "{schema}".daily_menus
+           ADD COLUMN IF NOT EXISTS collation_matin TEXT,
+           ADD COLUMN IF NOT EXISTS diner TEXT,
+           ADD COLUMN IF NOT EXISTS collation_apres_midi TEXT;
+           ALTER TABLE "{schema}".daily_menus ALTER COLUMN menu DROP NOT NULL"#
     ))
     .execute(pool)
     .await?;
@@ -639,6 +664,79 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
         .execute(pool)
         .await?;
     }
+
+    // --- Activities ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE TABLE IF NOT EXISTS "{schema}".activities (
+            id           UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            title        VARCHAR(255) NOT NULL,
+            description  TEXT,
+            date         DATE NOT NULL,
+            end_date     DATE,
+            capacity     INT,
+            group_id     UUID REFERENCES "{schema}".groups(id) ON DELETE SET NULL,
+            type         VARCHAR(20) NOT NULL DEFAULT 'sortie',
+            created_by   UUID NOT NULL REFERENCES "{schema}".users(id) ON DELETE CASCADE,
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS "{schema}".activity_registrations (
+            id            UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            activity_id   UUID NOT NULL REFERENCES "{schema}".activities(id) ON DELETE CASCADE,
+            child_id      UUID NOT NULL REFERENCES "{schema}".children(id) ON DELETE CASCADE,
+            registered_by UUID NOT NULL REFERENCES "{schema}".users(id) ON DELETE CASCADE,
+            created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (activity_id, child_id)
+        );
+        CREATE INDEX IF NOT EXISTS act_reg_activity_idx ON "{schema}".activity_registrations(activity_id);
+        CREATE INDEX IF NOT EXISTS idx_activities_end_date ON "{schema}".activities(end_date);
+        CREATE INDEX IF NOT EXISTS idx_activities_group_id ON "{schema}".activities(group_id)"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // Idempotent: add columns for existing schemas
+    sqlx::raw_sql(&format!(
+        r#"ALTER TABLE "{schema}".activities
+           ADD COLUMN IF NOT EXISTS end_date DATE,
+           ADD COLUMN IF NOT EXISTS group_id UUID REFERENCES "{schema}".groups(id) ON DELETE SET NULL,
+           ADD COLUMN IF NOT EXISTS type VARCHAR(20) NOT NULL DEFAULT 'sortie'"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // --- Enum: attendance_status ---
+    sqlx::raw_sql(&format!(
+        "DO $$ BEGIN
+           IF NOT EXISTS (
+             SELECT 1 FROM pg_type t
+             JOIN pg_namespace n ON n.oid = t.typnamespace
+             WHERE t.typname = 'attendance_status' AND n.nspname = '{schema}'
+           ) THEN
+             CREATE TYPE \"{schema}\".attendance_status AS ENUM
+               ('attendu','present','absent','malade','vacances','present_hors_contrat');
+           END IF;
+         END $$"
+    ))
+    .execute(pool)
+    .await?;
+
+    // --- Attendance ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE TABLE IF NOT EXISTS "{schema}".attendance (
+            id         UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            child_id   UUID NOT NULL REFERENCES "{schema}".children(id) ON DELETE CASCADE,
+            date       DATE NOT NULL,
+            status     "{schema}".attendance_status NOT NULL DEFAULT 'attendu',
+            marked_by  UUID REFERENCES "{schema}".users(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (child_id, date)
+        );
+        CREATE INDEX IF NOT EXISTS attendance_child_date_idx ON "{schema}".attendance(child_id, date)"#
+    ))
+    .execute(pool)
+    .await?;
 
     tracing::info!("Provisioned tenant schema: {schema}");
     Ok(())
