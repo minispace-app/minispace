@@ -1479,7 +1479,13 @@ export default function ChildrenPage() {
   const canWrite = user?.role === "admin_garderie" || user?.role === "super_admin";
   const [selectedChildId, setSelectedChildId] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
-  const [activeTab, setActiveTab] = useState<"calendar" | "journals" | "profile">("calendar");
+  const [activeTabByChild, setActiveTabByChild] = useState<Record<string, "calendar" | "journals" | "profile">>({});
+  const activeTab = selectedChildId ? (activeTabByChild[selectedChildId] ?? "calendar") : "calendar";
+  const setActiveTab = (tab: "calendar" | "journals" | "profile") => {
+    if (selectedChildId) {
+      setActiveTabByChild(prev => ({ ...prev, [selectedChildId]: tab }));
+    }
+  };
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statusModalDate, setStatusModalDate] = useState<string | null>(null);
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null);
