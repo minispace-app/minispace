@@ -30,15 +30,21 @@ interface FieldConfig {
   Icon: React.ComponentType<{ className?: string }>;
 }
 
-const FIELD_CONFIGS: FieldConfig[] = [
-  { key: "temperature",        label: "Température",              Icon: Sun },
-  { key: "menu",               label: "Note alimentaire",         Icon: StickyNote },
-  { key: "appetit",            label: "Appétit",                  Icon: Smile },
-  { key: "humeur",             label: "Humeur",                   Icon: Heart },
-  { key: "sommeil_minutes",    label: "Sommeil",                  Icon: Moon },
-  { key: "sante",              label: "État de santé",            Icon: Stethoscope },
-  { key: "medicaments",        label: "Médicaments",              Icon: Pill },
-  { key: "message_educatrice", label: "Message éducatrice",       Icon: MessageCircle },
+const MEALS_FIELDS: FieldConfig[] = [
+  { key: "menu", label: "Notes sur les repas", Icon: StickyNote },
+];
+
+const WELLBEING_FIELDS: FieldConfig[] = [
+  { key: "temperature",     label: "Température",              Icon: Sun },
+  { key: "appetit",         label: "Appétit",                  Icon: Smile },
+  { key: "humeur",          label: "Humeur",                   Icon: Heart },
+  { key: "sommeil_minutes", label: "Sommeil",                  Icon: Moon },
+  { key: "sante",           label: "État de santé",            Icon: Stethoscope },
+  { key: "medicaments",     label: "Médicaments",              Icon: Pill },
+];
+
+const MESSAGE_FIELDS: FieldConfig[] = [
+  { key: "message_educatrice", label: "Message de l'éducatrice", Icon: MessageCircle },
   { key: "observations",       label: "Observations / Anecdotes", Icon: BookOpen },
 ];
 
@@ -247,22 +253,71 @@ export function DayFieldList({
 
       {/* Fields — dimmed when absent */}
       <div className={isAbsent ? "opacity-30 pointer-events-none select-none" : ""}>
-        {FIELD_CONFIGS.map((cfg) => {
-          // In readOnly mode, skip the menu (food note) field if it is empty
-          if (cfg.key === "menu" && readOnly && !day.menu) return null;
+        {/* Section: Repas du jour */}
+        <div className="border-t border-slate-200 bg-gradient-to-r from-orange-50 to-transparent">
+          <div className="px-4 pt-4 pb-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-orange-700 mb-3 flex items-center gap-2">
+              <span>🍽️</span>
+              Repas du jour
+            </h3>
+          </div>
+          {MEALS_FIELDS.map((cfg) => {
+            if (cfg.key === "menu" && readOnly && !day.menu) return null;
+            return (
+              <div key={cfg.key} className="px-4 py-3 border-t border-orange-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <cfg.Icon className="w-4 h-4 text-orange-400 flex-shrink-0" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-orange-600">
+                    {cfg.label}
+                  </span>
+                </div>
+                <div>{renderControl(cfg)}</div>
+              </div>
+            );
+          })}
+        </div>
 
-          return (
-            <div key={cfg.key} className="px-4 py-3 border-t border-slate-100">
+        {/* Section: Bien-être et observations */}
+        <div className="border-t border-slate-200 bg-gradient-to-r from-emerald-50 to-transparent">
+          <div className="px-4 pt-4 pb-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-3 flex items-center gap-2">
+              <span>💚</span>
+              Bien-être et observations
+            </h3>
+          </div>
+          {WELLBEING_FIELDS.map((cfg) => (
+            <div key={cfg.key} className="px-4 py-3 border-t border-emerald-100">
               <div className="flex items-center gap-2 mb-2">
-                <cfg.Icon className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <cfg.Icon className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
                   {cfg.label}
                 </span>
               </div>
               <div>{renderControl(cfg)}</div>
             </div>
-          );
-        })}
+          ))}
+        </div>
+
+        {/* Section: Message et notes */}
+        <div className="border-t border-slate-200 bg-gradient-to-r from-blue-50 to-transparent">
+          <div className="px-4 pt-4 pb-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-3 flex items-center gap-2">
+              <span>💬</span>
+              Message et notes
+            </h3>
+          </div>
+          {MESSAGE_FIELDS.map((cfg) => (
+            <div key={cfg.key} className="px-4 py-3 border-t border-blue-100">
+              <div className="flex items-center gap-2 mb-2">
+                <cfg.Icon className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                <span className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+                  {cfg.label}
+                </span>
+              </div>
+              <div>{renderControl(cfg)}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

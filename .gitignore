@@ -56,3 +56,6 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+
+# Infrastructure (local setup)
+PROXMOX_VM_SETUP.md

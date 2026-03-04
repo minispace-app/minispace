@@ -8,6 +8,7 @@ import {
   Upload, X, Globe, Users, Baby, Pencil, Trash2,
   Lock, ChevronLeft, ChevronRight, Download, CheckSquare, Square
 } from "lucide-react";
+import { BottomSheet } from "../../../../components/BottomSheet";
 
 interface MediaItem {
   id: string;
@@ -809,6 +810,7 @@ function ChildMultiSelect({
   placeholder: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -827,43 +829,67 @@ function ChildMultiSelect({
     ? placeholder
     : children.filter((c) => selected.includes(c.id)).map((c) => c.first_name).join(", ");
 
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 hover:bg-slate-50 transition min-w-32 max-w-48"
-      >
-        <Baby className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-        <span className="truncate">{label}</span>
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 min-w-48 max-h-64 overflow-y-auto">
-          {children.length === 0 && (
-            <div className="px-3 py-2 text-xs text-slate-400">—</div>
-          )}
-          {children.map((c) => (
-            <label
-              key={c.id}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 cursor-pointer"
-            >
-              <div className="shrink-0">
-                {selected.includes(c.id)
-                  ? <CheckSquare className="w-4 h-4 text-blue-600" />
-                  : <Square className="w-4 h-4 text-slate-300" />}
-              </div>
-              <input
-                type="checkbox"
-                checked={selected.includes(c.id)}
-                onChange={() => toggle(c.id)}
-                className="hidden"
-              />
-              <span className="text-xs text-slate-700">{c.first_name} {c.last_name}</span>
-            </label>
-          ))}
-        </div>
+  const childrenList = (
+    <>
+      {children.length === 0 && (
+        <div className="px-3 py-2 text-xs text-slate-400">—</div>
       )}
-    </div>
+      {children.map((c) => (
+        <label
+          key={c.id}
+          className="flex items-center gap-2 px-3 py-3 hover:bg-slate-50 cursor-pointer md:py-2"
+        >
+          <div className="shrink-0">
+            {selected.includes(c.id)
+              ? <CheckSquare className="w-4 h-4 text-blue-600" />
+              : <Square className="w-4 h-4 text-slate-300" />}
+          </div>
+          <input
+            type="checkbox"
+            checked={selected.includes(c.id)}
+            onChange={() => toggle(c.id)}
+            className="hidden"
+          />
+          <span className="text-sm md:text-xs text-slate-700">{c.first_name} {c.last_name}</span>
+        </label>
+      ))}
+    </>
+  );
+
+  return (
+    <>
+      <div ref={ref} className="relative">
+        <button
+          type="button"
+          onClick={() => {
+            const isMobile = window.innerWidth < 768;
+            if (isMobile) setSheetOpen(true);
+            else setOpen(!open);
+          }}
+          className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-700 hover:bg-slate-50 transition min-w-32 max-w-48"
+        >
+          <Baby className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+          <span className="truncate">{label}</span>
+        </button>
+        {/* Desktop dropdown */}
+        {open && (
+          <div className="hidden md:block absolute top-full left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 min-w-48 max-h-64 overflow-y-auto">
+            {childrenList}
+          </div>
+        )}
+      </div>
+
+      {/* Mobile bottom sheet */}
+      <BottomSheet
+        isOpen={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        title="Sélectionner les enfants"
+      >
+        <div className="space-y-1">
+          {childrenList}
+        </div>
+      </BottomSheet>
+    </>
   );
 }
 
