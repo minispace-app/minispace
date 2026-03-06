@@ -203,24 +203,26 @@ function MenusSection() {
         monday = addDays(monday, 7);
       }
       const allResponses = await Promise.all(mondayDates.map((d) => menusApi.getWeek(d)));
-      const allMenus: DailyMenuData[] = allResponses.flatMap((r) => (r as any).data?.data ?? []);
+      const allMenus: DailyMenuData[] = allResponses.flatMap((r) => (r as any).data ?? []);
 
       const getMonthMenu = (dateStr: string, section: "collation_matin" | "diner" | "collation_apres_midi") =>
         allMenus.find((m) => m.date === dateStr)?.[section] ?? "";
 
-      // 2. Convert logo to base64 if available
+      // 2. Convert logo to base64 (tenant logo or fallback to /logo.png)
+      const fetchToBase64 = async (url: string): Promise<string> => {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        return new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      };
       let logoBase64 = "";
-      if (garderieLogoUrl) {
-        try {
-          const res = await fetch(garderieLogoUrl);
-          const blob = await res.blob();
-          logoBase64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
-        } catch { /* skip logo if fetch fails */ }
-      }
+      try {
+        logoBase64 = await fetchToBase64(garderieLogoUrl || "/logo.png");
+      } catch { /* skip logo if fetch fails */ }
 
       // 3. Build HTML for PDF
       const monthLabel = format(currentMonth, "MMMM yyyy", { locale: fr });
@@ -250,10 +252,7 @@ function MenusSection() {
         <div style="width:277mm;padding:8mm 8mm 6mm;font-family:Arial,sans-serif;background:#fff;box-sizing:border-box;">
           <!-- Header -->
           <div style="display:flex;align-items:center;gap:16px;margin-bottom:8mm;border-bottom:2px solid #e2e8f0;padding-bottom:5mm;">
-            ${logoBase64
-              ? `<img src="${logoBase64}" style="height:52px;width:auto;object-fit:contain;" />`
-              : `<div style="width:52px;height:52px;background:#3b82f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;">🌱</div>`
-            }
+            ${logoBase64 ? `<img src="${logoBase64}" style="height:52px;width:auto;object-fit:contain;" />` : ""}
             <div>
               <div style="font-size:18px;font-weight:700;color:#1e293b;">${garderieName || "minispace.app"}</div>
               <div style="font-size:13px;color:#475569;margin-top:2px;">Menus — ${monthLabel}</div>
