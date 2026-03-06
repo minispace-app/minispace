@@ -71,6 +71,13 @@ function MenusSection() {
   });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Menu sections configuration
+  const menuSections = [
+    { key: "collation_matin" as const, tKey: "sectionMatin" },
+    { key: "diner" as const, tKey: "sectionDiner" },
+    { key: "collation_apres_midi" as const, tKey: "sectionSoir" },
+  ];
+
   const weekDates = WEEK_DAYS.map((_, i) => addDays(weekStart, i));
   const weekStartStr = formatDate(weekStart);
   const today = formatDateInMontreal(getTodayInMontreal());
@@ -251,38 +258,17 @@ function MenusSection() {
 
                 {/* 3 Menu Sections in column */}
                 <div className="space-y-4">
-                  {/* Collation Matin */}
-                  <div className="flex flex-col">
-                    <label className="text-xs font-semibold text-slate-700 mb-2">🌅 Collation matin</label>
-                    <TextareaField
-                      value={getMenuForDate(dateStr, "collation_matin")}
-                      onChange={(v) => updateMenu(dateStr, "collation_matin", v)}
-                      placeholder={t("placeholder")}
-                      rows={3}
-                    />
-                  </div>
-
-                  {/* Dîner */}
-                  <div className="flex flex-col">
-                    <label className="text-xs font-semibold text-slate-700 mb-2">🍽️ Dîner</label>
-                    <TextareaField
-                      value={getMenuForDate(dateStr, "diner")}
-                      onChange={(v) => updateMenu(dateStr, "diner", v)}
-                      placeholder={t("placeholder")}
-                      rows={3}
-                    />
-                  </div>
-
-                  {/* Collation Après-midi */}
-                  <div className="flex flex-col">
-                    <label className="text-xs font-semibold text-slate-700 mb-2">🌙 Collation après-midi</label>
-                    <TextareaField
-                      value={getMenuForDate(dateStr, "collation_apres_midi")}
-                      onChange={(v) => updateMenu(dateStr, "collation_apres_midi", v)}
-                      placeholder={t("placeholder")}
-                      rows={3}
-                    />
-                  </div>
+                  {menuSections.map((section) => (
+                    <div key={section.key} className="flex flex-col">
+                      <label className="text-xs font-semibold text-slate-700 mb-2">{t(section.tKey)}</label>
+                      <TextareaField
+                        value={getMenuForDate(dateStr, section.key)}
+                        onChange={(v) => updateMenu(dateStr, section.key, v)}
+                        placeholder={t("placeholder")}
+                        rows={3}
+                      />
+                    </div>
+                  ))}
                 </div>
               </div>
             );
@@ -298,16 +284,12 @@ function MenusSection() {
             <div className="grid gap-1" style={{ gridTemplateColumns: "auto repeat(3, 1fr)" }}>
               {/* Header row: empty cell + section labels */}
               <div /> {/* Empty corner cell */}
-              {[
-                { key: "collation_matin", label: "🌅 Matin" },
-                { key: "diner", label: "🍽️ Dîner" },
-                { key: "collation_apres_midi", label: "🌙 Soir" },
-              ].map((section) => (
+              {menuSections.map((section) => (
                 <div
                   key={`header-${section.key}`}
                   className="text-center px-2 py-2 font-semibold text-xs bg-slate-100 text-slate-700 border border-slate-200"
                 >
-                  {section.label}
+                  {t(section.tKey)}
                 </div>
               ))}
 
@@ -333,11 +315,7 @@ function MenusSection() {
                     </div>
 
                     {/* Section cells for this day */}
-                    {[
-                      { key: "collation_matin", label: "🌅 Matin" },
-                      { key: "diner", label: "🍽️ Dîner" },
-                      { key: "collation_apres_midi", label: "🌙 Soir" },
-                    ].map((section) => {
+                    {menuSections.map((section) => {
                       const hasLocal = localData[dateStr] !== undefined;
 
                       return (
@@ -348,9 +326,9 @@ function MenusSection() {
                           }`}
                         >
                           <TextareaField
-                            value={getMenuForDate(dateStr, section.key as "collation_matin" | "diner" | "collation_apres_midi")}
+                            value={getMenuForDate(dateStr, section.key)}
                             onChange={(v) =>
-                              updateMenu(dateStr, section.key as "collation_matin" | "diner" | "collation_apres_midi", v)
+                              updateMenu(dateStr, section.key, v)
                             }
                             placeholder={t("placeholder")}
                             rows={2}
@@ -862,13 +840,13 @@ export default function PlanningPage() {
           active={activeTab === "menus"}
           onClick={() => setActiveTab("menus")}
         >
-          🍽️ Menu
+          {t("tabMenu")}
         </TabButton>
         <TabButton
           active={activeTab === "activities"}
           onClick={() => setActiveTab("activities")}
         >
-          🎉 Activités
+          {t("tabActivities")}
         </TabButton>
       </div>
 

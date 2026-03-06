@@ -92,6 +92,11 @@
     "welcome": "Welcome, {name}!",
     "recentMessages": "Recent messages",
     "recentMedia": "Recent photos",
+    "weekPresence": "Weekly presence",
+    "absences": "Absences",
+    "allPresent": "✓ {total}/{total}",
+    "presentCount": "{present}/{total} present",
+    "allPresentMobile": "✓ {total}/{total} present",
     "childrenCount": "{count, plural, =0 {No children} one {# child} other {# children}}",
     "groupsCount": "{count, plural, =0 {No groups} one {# group} other {# groups}}"
   },
@@ -383,10 +388,15 @@
     "prevWeek": "Previous week",
     "nextWeek": "Next week",
     "placeholder": "Today's menu...",
-    "menuOfDay": "Today's menu"
+    "menuOfDay": "Today's menu",
+    "sectionMatin": "🌅 Morning snack",
+    "sectionDiner": "🍽️ Lunch",
+    "sectionSoir": "🌙 Afternoon snack"
   },
   "planning": {
-    "title": "Planning"
+    "title": "Planning",
+    "tabMenu": "🍽️ Menu",
+    "tabActivities": "🎉 Activities"
   },
   "auditLog": {
     "title": "Audit Log",

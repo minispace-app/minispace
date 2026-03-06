@@ -92,6 +92,11 @@
     "welcome": "Bienvenue, {name}!",
     "recentMessages": "Messages récents",
     "recentMedia": "Photos récentes",
+    "weekPresence": "Présence de la semaine",
+    "absences": "Absences",
+    "allPresent": "✓ {total}/{total}",
+    "presentCount": "{present}/{total} présents",
+    "allPresentMobile": "✓ {total}/{total} présents",
     "childrenCount": "{count, plural, =0 {Aucun enfant} one {# enfant} other {# enfants}}",
     "groupsCount": "{count, plural, =0 {Aucun groupe} one {# groupe} other {# groupes}}"
   },
@@ -383,10 +388,15 @@
     "prevWeek": "Semaine précédente",
     "nextWeek": "Semaine suivante",
     "placeholder": "Menu du jour...",
-    "menuOfDay": "Menu du jour"
+    "menuOfDay": "Menu du jour",
+    "sectionMatin": "🌅 Collation matin",
+    "sectionDiner": "🍽️ Dîner",
+    "sectionSoir": "🌙 Collation après-midi"
   },
   "planning": {
-    "title": "Planification"
+    "title": "Planification",
+    "tabMenu": "🍽️ Menu",
+    "tabActivities": "🎉 Activités"
   },
   "auditLog": {
     "title": "Journal d'audit",
