@@ -276,73 +276,68 @@ function MenusSection() {
         </div>
       </div>
 
-      {/* Desktop: Inverted grid (days × sections) */}
+      {/* Desktop: Grid (days × sections) */}
       <div className="hidden md:flex md:flex-col flex-1 overflow-auto">
         <div className="overflow-auto flex-1">
-          <div>
-            {/* Grid: auto column for day headers + 3 columns for sections */}
-            <div className="grid gap-1" style={{ gridTemplateColumns: "auto repeat(3, 1fr)" }}>
-              {/* Header row: empty cell + section labels */}
-              <div /> {/* Empty corner cell */}
-              {menuSections.map((section) => (
+          {/* Grid: auto column for days + 3 columns for sections */}
+          <div className="grid gap-1 inline-grid" style={{ gridTemplateColumns: "auto repeat(3, 1fr)" }}>
+            {/* Header row: empty cell + section labels */}
+            <div /> {/* Empty corner cell */}
+            {menuSections.map((section) => (
+              <div
+                key={`header-${section.key}`}
+                className="text-center px-2 py-2 font-semibold text-xs bg-slate-100 text-slate-700 border border-slate-200"
+              >
+                {t(section.tKey)}
+              </div>
+            ))}
+
+            {/* All rows: day header + section cells */}
+            {weekDates.flatMap((date, dayIndex) => {
+              const dateStr = formatDate(date);
+              const isToday = dateStr === today;
+              const dayLabel = tj(`days.${WEEK_DAYS[dayIndex]}`);
+              const dateLabel = date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
+
+              return [
+                // Day header cell
                 <div
-                  key={`header-${section.key}`}
-                  className="text-center px-2 py-2 font-semibold text-xs bg-slate-100 text-slate-700 border border-slate-200"
+                  key={`day-header-${dateStr}`}
+                  className={`px-2 py-2 font-semibold text-xs border border-slate-200 ${
+                    isToday
+                      ? "bg-amber-100 text-amber-800"
+                      : "bg-slate-50 text-slate-700"
+                  }`}
                 >
-                  {t(section.tKey)}
-                </div>
-              ))}
-
-              {/* Day rows */}
-              {weekDates.map((date, dayIndex) => {
-                const dateStr = formatDate(date);
-                const isToday = dateStr === today;
-                const dayLabel = tj(`days.${WEEK_DAYS[dayIndex]}`);
-                const dateLabel = date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
-
-                return (
-                  <div key={`day-${dateStr}`}>
-                    {/* Day header (left side) */}
+                  <div>{dayLabel}</div>
+                  <div className="font-normal text-xs">{dateLabel}</div>
+                </div>,
+                // Section cells for this day
+                ...menuSections.map((section) => {
+                  const hasLocal = localData[dateStr] !== undefined;
+                  return (
                     <div
-                      className={`px-2 py-2 font-semibold text-xs border border-slate-200 ${
-                        isToday
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-slate-50 text-slate-700"
+                      key={`cell-${dateStr}-${section.key}`}
+                      className={`p-1 border border-slate-200 ${
+                        isToday ? "bg-amber-50" : "bg-white"
                       }`}
                     >
-                      <div>{dayLabel}</div>
-                      <div className="font-normal text-xs">{dateLabel}</div>
+                      <TextareaField
+                        value={getMenuForDate(dateStr, section.key)}
+                        onChange={(v) =>
+                          updateMenu(dateStr, section.key, v)
+                        }
+                        placeholder={t("placeholder")}
+                        rows={2}
+                      />
+                      {hasLocal && (
+                        <div className="text-xs text-orange-500 mt-0.5 font-medium">● Modifié</div>
+                      )}
                     </div>
-
-                    {/* Section cells for this day */}
-                    {menuSections.map((section) => {
-                      const hasLocal = localData[dateStr] !== undefined;
-
-                      return (
-                        <div
-                          key={`cell-${dateStr}-${section.key}`}
-                          className={`p-1 border border-slate-200 ${
-                            isToday ? "bg-amber-50" : "bg-white"
-                          }`}
-                        >
-                          <TextareaField
-                            value={getMenuForDate(dateStr, section.key)}
-                            onChange={(v) =>
-                              updateMenu(dateStr, section.key, v)
-                            }
-                            placeholder={t("placeholder")}
-                            rows={2}
-                          />
-                          {hasLocal && (
-                            <div className="text-xs text-orange-500 mt-0.5 font-medium">● Modifié</div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                }),
+              ];
+            })}
           </div>
         </div>
       </div>
