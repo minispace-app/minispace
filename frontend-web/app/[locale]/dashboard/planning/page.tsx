@@ -137,14 +137,18 @@ function MenusSection() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setLocalData({});
     setSaveStatus("idle");
-    setWeekStart(addDays(weekStart, -7));
+    const newWeekStart = addDays(weekStart, -7);
+    setWeekStart(newWeekStart);
+    setSelectedDate(newWeekStart); // Update calendar too
   };
 
   const nextWeek = () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setLocalData({});
     setSaveStatus("idle");
-    setWeekStart(addDays(weekStart, 7));
+    const newWeekStart = addDays(weekStart, 7);
+    setWeekStart(newWeekStart);
+    setSelectedDate(newWeekStart); // Update calendar too
   };
 
   const handleSelectWeek = (date: Date) => {
@@ -386,9 +390,28 @@ function MenusSection() {
         </div>
 
         {/* Main: Week Grid */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto flex flex-col">
+          {/* Week navigation header */}
+          <div className="flex items-center gap-2 mb-4 flex-shrink-0">
+            <button
+              onClick={prevWeek}
+              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
+            >
+              <ChevronLeft className="w-4 h-4 text-slate-600" />
+            </button>
+            <span className="text-sm text-slate-600 font-medium min-w-fit">
+              {weekStart.toLocaleDateString("fr-CA", { day: "numeric", month: "short", year: "numeric" })}
+            </span>
+            <button
+              onClick={nextWeek}
+              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
+            >
+              <ChevronRight className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
+
           {/* Grid: 5 columns for days + 1 for section labels */}
-          <div className="grid gap-1 inline-grid" style={{ gridTemplateColumns: "auto repeat(5, 1fr)" }}>
+          <div className="grid gap-1 inline-grid overflow-auto" style={{ gridTemplateColumns: "auto repeat(5, 1fr)" }}>
             {/* Header row: empty cell + day headers */}
             <div /> {/* Empty corner cell */}
             {weekDates.map((date, dayIndex) => {
