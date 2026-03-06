@@ -5,7 +5,9 @@ import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import { activitiesApi, menusApi, groupsApi } from "../../../../lib/api";
 import { useAuth } from "../../../../hooks/useAuth";
-import { ChevronLeft, ChevronRight, Edit2, Trash2, Plus, X, Loader2, Check, UtensilsCrossed, PartyPopper } from "lucide-react";
+import { ChevronLeft, ChevronRight, Edit2, Trash2, Plus, X, Loader2, Check, UtensilsCrossed, PartyPopper, Download } from "lucide-react";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 import { format, parse, startOfMonth, endOfMonth, addMonths, subMonths, getISODay, startOfWeek, eachDayOfInterval, isToday as isDateToday, isSameMonth, isSameDay } from "date-fns";
 import { fr } from "date-fns/locale";
 import { TextareaField } from "../../../../components/journal/TextareaField";
@@ -184,6 +186,100 @@ function MenusSection() {
   const calendarEnd = startOfWeek(monthEnd);
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: monthEnd });
 
+  // Export month to PDF
+  const exportMonthToPDF = async () => {
+    const element = document.createElement("div");
+    element.style.padding = "20px";
+    element.style.backgroundColor = "white";
+    element.style.width = "280mm"; // A4 landscape width
+    element.style.fontFamily = "Arial, sans-serif";
+    element.style.fontSize = "11px";
+
+    // Header
+    const headerDiv = document.createElement("div");
+    headerDiv.style.marginBottom = "20px";
+    headerDiv.innerHTML = `
+      <div style="text-align: center; margin-bottom: 10px;">
+        <h1 style="margin: 0; font-size: 18px; font-weight: bold;">Garderie Les Petits Explorateurs</h1>
+        <h2 style="margin: 5px 0; font-size: 14px;">Menus - ${format(currentMonth, "MMMM yyyy", { locale: fr })}</h2>
+        <p style="margin: 5px 0; font-size: 10px; color: #666;">Exporté le ${format(new Date(), "d MMMM yyyy", { locale: fr })}</p>
+      </div>
+    `;
+    element.appendChild(headerDiv);
+
+    // Calendar grid
+    const gridDiv = document.createElement("div");
+    gridDiv.style.display = "grid";
+    gridDiv.style.gridTemplateColumns = "repeat(7, 1fr)";
+    gridDiv.style.gap = "1px";
+    gridDiv.style.backgroundColor = "#ddd";
+    gridDiv.style.padding = "1px";
+
+    // Day headers
+    ["D", "L", "M", "M", "J", "V", "S"].forEach((day) => {
+      const dayHeader = document.createElement("div");
+      dayHeader.style.backgroundColor = "#f3f4f6";
+      dayHeader.style.padding = "4px";
+      dayHeader.style.textAlign = "center";
+      dayHeader.style.fontWeight = "bold";
+      dayHeader.style.fontSize = "10px";
+      dayHeader.textContent = day;
+      gridDiv.appendChild(dayHeader);
+    });
+
+    // Days with menus
+    calendarDays.forEach((date) => {
+      const dayCell = document.createElement("div");
+      dayCell.style.backgroundColor = isSameMonth(date, currentMonth) ? "white" : "#f9fafb";
+      dayCell.style.padding = "4px";
+      dayCell.style.minHeight = "60px";
+      dayCell.style.fontSize = "9px";
+      dayCell.style.overflow = "hidden";
+      dayCell.style.borderRight = "1px solid #ddd";
+      dayCell.style.borderBottom = "1px solid #ddd";
+
+      const dateStr = formatDate(date);
+      const dayNumber = document.createElement("div");
+      dayNumber.style.fontWeight = "bold";
+      dayNumber.style.marginBottom = "2px";
+      dayNumber.textContent = date.getDate().toString();
+      dayCell.appendChild(dayNumber);
+
+      // Get menus for this day
+      const matin = getMenuForDate(dateStr, "collation_matin");
+      const diner = getMenuForDate(dateStr, "diner");
+      const soir = getMenuForDate(dateStr, "collation_apres_midi");
+
+      if (matin || diner || soir) {
+        const menuDiv = document.createElement("div");
+        menuDiv.style.fontSize = "8px";
+        menuDiv.innerHTML = `
+          ${matin ? `<strong>M:</strong> ${matin}<br/>` : ""}
+          ${diner ? `<strong>D:</strong> ${diner}<br/>` : ""}
+          ${soir ? `<strong>S:</strong> ${soir}` : ""}
+        `;
+        dayCell.appendChild(menuDiv);
+      }
+
+      gridDiv.appendChild(dayCell);
+    });
+
+    element.appendChild(gridDiv);
+
+    // Render to canvas and PDF
+    try {
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("l", "mm", "a4"); // landscape
+      const imgWidth = 280; // A4 landscape width in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      pdf.addImage(imgData, "PNG", 5, 5, imgWidth, imgHeight);
+      pdf.save(`Menus_${format(currentMonth, "MMMM_yyyy", { locale: fr })}.pdf`);
+    } catch (error) {
+      console.error("PDF export error:", error);
+    }
+  };
+
   function SaveIndicator() {
     if (saveStatus === "saving")
       return (
@@ -202,36 +298,6 @@ function MenusSection() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-4 px-6 py-4 border-b border-slate-100 flex-shrink-0 flex-wrap">
-        <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold text-slate-800">{t("title")}</h2>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={prevWeek}
-            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
-            title={t("prevWeek")}
-          >
-            <ChevronLeft className="w-4 h-4 text-slate-600" />
-          </button>
-          <span className="text-sm text-slate-600 font-medium whitespace-nowrap">
-            {weekStart.toLocaleDateString("fr-CA", { day: "numeric", month: "short", year: "numeric" })}
-          </span>
-          <button
-            onClick={nextWeek}
-            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
-            title={t("nextWeek")}
-          >
-            <ChevronRight className="w-4 h-4 text-slate-600" />
-          </button>
-        </div>
-
-        <div className="ml-auto">
-          <SaveIndicator />
-        </div>
-      </div>
 
       {/* Mobile: Day chips + single day view */}
       <div className="md:hidden flex-1 overflow-auto flex flex-col">
@@ -387,6 +453,15 @@ function MenusSection() {
               );
             })}
           </div>
+
+          {/* Export PDF button */}
+          <button
+            onClick={exportMonthToPDF}
+            className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm"
+          >
+            <Download className="w-4 h-4" />
+            Export PDF
+          </button>
         </div>
 
         {/* Main: Week Grid */}
