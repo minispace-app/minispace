@@ -266,17 +266,24 @@ function MenusSection() {
 
     element.appendChild(gridDiv);
 
-    // Render to canvas and PDF
+    // Must be in DOM for html2canvas to render
+    element.style.position = "fixed";
+    element.style.top = "-9999px";
+    element.style.left = "-9999px";
+    document.body.appendChild(element);
+
     try {
       const canvas = await html2canvas(element, { scale: 2, useCORS: true });
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("l", "mm", "a4"); // landscape
-      const imgWidth = 280; // A4 landscape width in mm
+      const pdf = new jsPDF("l", "mm", "a4");
+      const imgWidth = 280;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       pdf.addImage(imgData, "PNG", 5, 5, imgWidth, imgHeight);
       pdf.save(`Menus_${format(currentMonth, "MMMM_yyyy", { locale: fr })}.pdf`);
     } catch (error) {
       console.error("PDF export error:", error);
+    } finally {
+      document.body.removeChild(element);
     }
   };
 
@@ -466,25 +473,6 @@ function MenusSection() {
 
         {/* Main: Week Grid */}
         <div className="flex-1 overflow-auto flex flex-col">
-          {/* Week navigation header */}
-          <div className="flex items-center gap-2 mb-4 flex-shrink-0">
-            <button
-              onClick={prevWeek}
-              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
-            >
-              <ChevronLeft className="w-4 h-4 text-slate-600" />
-            </button>
-            <span className="text-sm text-slate-600 font-medium min-w-fit">
-              {weekStart.toLocaleDateString("fr-CA", { day: "numeric", month: "short", year: "numeric" })}
-            </span>
-            <button
-              onClick={nextWeek}
-              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
-            >
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-            </button>
-          </div>
-
           {/* Grid: 5 columns for days + 1 for section labels */}
           <div className="grid gap-1 inline-grid overflow-auto" style={{ gridTemplateColumns: "auto repeat(5, 1fr)" }}>
             {/* Header row: empty cell + day headers */}
