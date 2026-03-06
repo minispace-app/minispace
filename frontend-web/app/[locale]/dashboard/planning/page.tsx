@@ -60,6 +60,7 @@ function TabButton({
 function MenusSection() {
   const t = useTranslations("menus");
   const tj = useTranslations("journal");
+  const tc = useTranslations("calendar");
 
   const todayInMontreal = getTodayInMontreal();
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(todayInMontreal));
@@ -146,12 +147,20 @@ function MenusSection() {
     setWeekStart(addDays(weekStart, 7));
   };
 
-  const handleSelectDate = (date: Date) => {
-    setSelectedDate(date);
-    const newWeekStart = getMonday(date);
-    if (!isSameDay(newWeekStart, weekStart)) {
-      setWeekStart(newWeekStart);
+  const handleSelectWeek = (date: Date) => {
+    // Select Monday of that week
+    const monday = getMonday(date);
+    setSelectedDate(monday);
+    if (!isSameDay(monday, weekStart)) {
+      setWeekStart(monday);
     }
+  };
+
+  // Check if a date is in the selected week
+  const isInSelectedWeek = (date: Date) => {
+    const dateMonday = getMonday(date);
+    const selectedMonday = getMonday(selectedDate);
+    return isSameDay(dateMonday, selectedMonday);
   };
 
   const prevMonth = () => {
@@ -304,50 +313,50 @@ function MenusSection() {
       {/* Desktop: Mini Calendar + Week Grid */}
       <div className="hidden md:flex flex-1 overflow-hidden gap-4 px-6 py-4">
         {/* Sidebar: Mini Calendar */}
-        <div className="flex flex-col flex-shrink-0 w-56 bg-slate-50 border border-slate-200 rounded-lg p-4">
+        <div className="flex flex-col flex-shrink-0 w-48 bg-slate-50 border border-slate-200 rounded-lg p-3">
           {/* Month navigation */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3">
             <button
               onClick={prevMonth}
               className="p-1 hover:bg-slate-200 rounded transition"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-3 h-3" />
             </button>
-            <h3 className="text-sm font-semibold text-slate-800">
+            <h3 className="text-xs font-semibold text-slate-800">
               {format(currentMonth, "MMMM yyyy", { locale: fr })}
             </h3>
             <button
               onClick={nextMonth}
               className="p-1 hover:bg-slate-200 rounded transition"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-3 h-3" />
             </button>
           </div>
 
           {/* Day labels */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {["L", "M", "M", "J", "V", "S", "D"].map((day, i) => (
-              <div key={i} className="text-xs font-semibold text-center text-slate-500 py-1">
-                {day}
+          <div className="grid grid-cols-7 gap-0.5 mb-1">
+            {[tc("day_mon"), tc("day_tue"), tc("day_wed"), tc("day_thu"), tc("day_fri"), tc("day_sat"), tc("day_sun")].map((day, i) => (
+              <div key={i} className="text-xs font-semibold text-center text-slate-500 py-0.5">
+                {day.substring(0, 1)}
               </div>
             ))}
           </div>
 
           {/* Calendar days */}
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-0.5">
             {calendarDays.map((date, i) => {
               const isCurrentMonth = isSameMonth(date, currentMonth);
-              const isSelected = isSameDay(date, selectedDate);
+              const isInWeek = isInSelectedWeek(date);
               const isTodayDate = isDateToday(date);
 
               return (
                 <button
                   key={i}
-                  onClick={() => handleSelectDate(date)}
-                  className={`w-8 h-8 text-xs rounded font-medium transition ${
+                  onClick={() => handleSelectWeek(date)}
+                  className={`w-6 h-6 text-xs rounded font-medium transition ${
                     !isCurrentMonth
                       ? "text-slate-300"
-                      : isSelected
+                      : isInWeek
                       ? "bg-blue-600 text-white"
                       : isTodayDate
                       ? "bg-amber-200 text-amber-900"
@@ -363,65 +372,49 @@ function MenusSection() {
 
         {/* Main: Week Grid */}
         <div className="flex-1 overflow-auto">
-          {/* Week header navigation */}
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              onClick={prevWeek}
-              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
-            >
-              <ChevronLeft className="w-4 h-4 text-slate-600" />
-            </button>
-            <span className="text-sm text-slate-600 font-medium flex-1">
-              {weekStart.toLocaleDateString("fr-CA", { day: "numeric", month: "short", year: "numeric" })}
-            </span>
-            <button
-              onClick={nextWeek}
-              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
-            >
-              <ChevronRight className="w-4 h-4 text-slate-600" />
-            </button>
-          </div>
-
-          {/* Grid: auto column for days + 3 columns for sections */}
-          <div className="grid gap-1 inline-grid" style={{ gridTemplateColumns: "auto repeat(3, 1fr)" }}>
-            {/* Header row: empty cell + section labels */}
+          {/* Grid: 5 columns for days + 1 for section labels */}
+          <div className="grid gap-1 inline-grid" style={{ gridTemplateColumns: "auto repeat(5, 1fr)" }}>
+            {/* Header row: empty cell + day headers */}
             <div /> {/* Empty corner cell */}
-            {menuSections.map((section) => (
-              <div
-                key={`header-${section.key}`}
-                className="text-center px-2 py-2 font-semibold text-xs bg-slate-100 text-slate-700 border border-slate-200"
-              >
-                {t(section.tKey)}
-              </div>
-            ))}
-
-            {/* All rows: day header + section cells */}
-            {weekDates.flatMap((date, dayIndex) => {
+            {weekDates.map((date, dayIndex) => {
               const dateStr = formatDate(date);
               const isToday = dateStr === today;
               const dayLabel = tj(`days.${WEEK_DAYS[dayIndex]}`);
               const dateLabel = date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
 
-              return [
-                // Day header cell
+              return (
                 <div
                   key={`day-header-${dateStr}`}
-                  className={`px-2 py-2 font-semibold text-xs border border-slate-200 ${
+                  className={`px-3 py-2 font-semibold text-xs text-center border border-slate-200 ${
                     isToday
                       ? "bg-amber-100 text-amber-800"
-                      : "bg-slate-50 text-slate-700"
+                      : "bg-slate-100 text-slate-700"
                   }`}
                 >
                   <div>{dayLabel}</div>
                   <div className="font-normal text-xs">{dateLabel}</div>
-                </div>,
-                // Section cells for this day
-                ...menuSections.map((section) => {
+                </div>
+              );
+            })}
+
+            {/* Section rows */}
+            {menuSections.map((section) => (
+              <div key={`section-${section.key}`}>
+                {/* Section header (left) */}
+                <div className="px-2 py-2 font-semibold text-xs border border-slate-200 bg-slate-100 text-slate-700">
+                  {t(section.tKey)}
+                </div>
+
+                {/* Day cells for this section */}
+                {weekDates.map((date, dayIndex) => {
+                  const dateStr = formatDate(date);
+                  const isToday = dateStr === today;
                   const hasLocal = localData[dateStr] !== undefined;
+
                   return (
                     <div
                       key={`cell-${dateStr}-${section.key}`}
-                      className={`p-1 border border-slate-200 ${
+                      className={`p-2 border border-slate-200 ${
                         isToday ? "bg-amber-50" : "bg-white"
                       }`}
                     >
@@ -438,9 +431,9 @@ function MenusSection() {
                       )}
                     </div>
                   );
-                }),
-              ];
-            })}
+                })}
+              </div>
+            ))}
           </div>
         </div>
       </div>
