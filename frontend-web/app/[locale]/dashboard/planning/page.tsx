@@ -14,6 +14,7 @@ import { TextareaField } from "../../../../components/journal/TextareaField";
 import { WEEK_DAYS } from "../../../../components/journal/journalTypes";
 import { getMonday, formatDate, addDays } from "../../../../components/journal/journalUtils";
 import { getTodayInMontreal, formatDateInMontreal } from "../../../../lib/dateUtils";
+import { useTenantInfo } from "../../../../hooks/useTenantInfo";
 
 interface DailyMenuData {
   id?: string;
@@ -63,6 +64,7 @@ function MenusSection() {
   const t = useTranslations("menus");
   const tj = useTranslations("journal");
   const tc = useTranslations("calendar");
+  const { name: garderieName, logo_url: garderieLogoUrl } = useTenantInfo();
 
   const todayInMontreal = getTodayInMontreal();
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(todayInMontreal));
@@ -187,103 +189,118 @@ function MenusSection() {
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: monthEnd });
 
   // Export month to PDF
+  const [pdfExporting, setPdfExporting] = useState(false);
+
   const exportMonthToPDF = async () => {
-    const element = document.createElement("div");
-    element.style.padding = "20px";
-    element.style.backgroundColor = "white";
-    element.style.width = "280mm"; // A4 landscape width
-    element.style.fontFamily = "Arial, sans-serif";
-    element.style.fontSize = "11px";
-
-    // Header
-    const headerDiv = document.createElement("div");
-    headerDiv.style.marginBottom = "20px";
-    headerDiv.innerHTML = `
-      <div style="text-align: center; margin-bottom: 10px;">
-        <h1 style="margin: 0; font-size: 18px; font-weight: bold;">Garderie Les Petits Explorateurs</h1>
-        <h2 style="margin: 5px 0; font-size: 14px;">Menus - ${format(currentMonth, "MMMM yyyy", { locale: fr })}</h2>
-        <p style="margin: 5px 0; font-size: 10px; color: #666;">Exporté le ${format(new Date(), "d MMMM yyyy", { locale: fr })}</p>
-      </div>
-    `;
-    element.appendChild(headerDiv);
-
-    // Calendar grid
-    const gridDiv = document.createElement("div");
-    gridDiv.style.display = "grid";
-    gridDiv.style.gridTemplateColumns = "repeat(7, 1fr)";
-    gridDiv.style.gap = "1px";
-    gridDiv.style.backgroundColor = "#ddd";
-    gridDiv.style.padding = "1px";
-
-    // Day headers
-    ["D", "L", "M", "M", "J", "V", "S"].forEach((day) => {
-      const dayHeader = document.createElement("div");
-      dayHeader.style.backgroundColor = "#f3f4f6";
-      dayHeader.style.padding = "4px";
-      dayHeader.style.textAlign = "center";
-      dayHeader.style.fontWeight = "bold";
-      dayHeader.style.fontSize = "10px";
-      dayHeader.textContent = day;
-      gridDiv.appendChild(dayHeader);
-    });
-
-    // Days with menus
-    calendarDays.forEach((date) => {
-      const dayCell = document.createElement("div");
-      dayCell.style.backgroundColor = isSameMonth(date, currentMonth) ? "white" : "#f9fafb";
-      dayCell.style.padding = "4px";
-      dayCell.style.minHeight = "60px";
-      dayCell.style.fontSize = "9px";
-      dayCell.style.overflow = "hidden";
-      dayCell.style.borderRight = "1px solid #ddd";
-      dayCell.style.borderBottom = "1px solid #ddd";
-
-      const dateStr = formatDate(date);
-      const dayNumber = document.createElement("div");
-      dayNumber.style.fontWeight = "bold";
-      dayNumber.style.marginBottom = "2px";
-      dayNumber.textContent = date.getDate().toString();
-      dayCell.appendChild(dayNumber);
-
-      // Get menus for this day
-      const matin = getMenuForDate(dateStr, "collation_matin");
-      const diner = getMenuForDate(dateStr, "diner");
-      const soir = getMenuForDate(dateStr, "collation_apres_midi");
-
-      if (matin || diner || soir) {
-        const menuDiv = document.createElement("div");
-        menuDiv.style.fontSize = "8px";
-        menuDiv.innerHTML = `
-          ${matin ? `<strong>M:</strong> ${matin}<br/>` : ""}
-          ${diner ? `<strong>D:</strong> ${diner}<br/>` : ""}
-          ${soir ? `<strong>S:</strong> ${soir}` : ""}
-        `;
-        dayCell.appendChild(menuDiv);
-      }
-
-      gridDiv.appendChild(dayCell);
-    });
-
-    element.appendChild(gridDiv);
-
-    // Must be in DOM for html2canvas to render
-    element.style.position = "fixed";
-    element.style.top = "-9999px";
-    element.style.left = "-9999px";
-    document.body.appendChild(element);
+    setPdfExporting(true);
 
     try {
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+      // 1. Fetch all week data for the month
+      const mondayDates: string[] = [];
+      let monday = getMonday(monthStart);
+      while (monday <= monthEnd) {
+        mondayDates.push(formatDate(monday));
+        monday = addDays(monday, 7);
+      }
+      const allResponses = await Promise.all(mondayDates.map((d) => menusApi.getWeek(d)));
+      const allMenus: DailyMenuData[] = allResponses.flatMap((r) => (r as any).data?.data ?? []);
+
+      const getMonthMenu = (dateStr: string, section: "collation_matin" | "diner" | "collation_apres_midi") =>
+        allMenus.find((m) => m.date === dateStr)?.[section] ?? "";
+
+      // 2. Convert logo to base64 if available
+      let logoBase64 = "";
+      if (garderieLogoUrl) {
+        try {
+          const res = await fetch(garderieLogoUrl);
+          const blob = await res.blob();
+          logoBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        } catch { /* skip logo if fetch fails */ }
+      }
+
+      // 3. Build HTML for PDF
+      const monthLabel = format(currentMonth, "MMMM yyyy", { locale: fr });
+      const exportDate = format(new Date(), "d MMMM yyyy", { locale: fr });
+      const dayColors = ["#6366f1","#0ea5e9","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899"];
+
+      const dayCells = calendarDays.map((date) => {
+        const dateStr = formatDate(date);
+        const inMonth = isSameMonth(date, currentMonth);
+        const isWeekend = getISODay(date) >= 6;
+        const matin = inMonth ? getMonthMenu(dateStr, "collation_matin") : "";
+        const diner = inMonth ? getMonthMenu(dateStr, "diner") : "";
+        const soir  = inMonth ? getMonthMenu(dateStr, "collation_apres_midi") : "";
+        const bg = !inMonth ? "#f8fafc" : isWeekend ? "#f1f5f9" : "#ffffff";
+        const numColor = !inMonth ? "#cbd5e1" : isWeekend ? "#94a3b8" : "#1e293b";
+
+        return `
+          <div style="background:${bg};padding:5px;min-height:72px;border:1px solid #e2e8f0;overflow:hidden;">
+            <div style="font-size:11px;font-weight:700;color:${numColor};margin-bottom:4px;">${date.getDate()}</div>
+            ${matin ? `<div style="font-size:8px;color:#0369a1;white-space:pre-wrap;margin-bottom:2px;line-height:1.3;"><span style="font-weight:600;">M·</span>${matin}</div>` : ""}
+            ${diner ? `<div style="font-size:8px;color:#15803d;white-space:pre-wrap;margin-bottom:2px;line-height:1.3;"><span style="font-weight:600;">D·</span>${diner}</div>` : ""}
+            ${soir  ? `<div style="font-size:8px;color:#7e22ce;white-space:pre-wrap;line-height:1.3;"><span style="font-weight:600;">S·</span>${soir}</div>` : ""}
+          </div>`;
+      }).join("");
+
+      const html = `
+        <div style="width:277mm;padding:8mm 8mm 6mm;font-family:Arial,sans-serif;background:#fff;box-sizing:border-box;">
+          <!-- Header -->
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:8mm;border-bottom:2px solid #e2e8f0;padding-bottom:5mm;">
+            ${logoBase64
+              ? `<img src="${logoBase64}" style="height:52px;width:auto;object-fit:contain;" />`
+              : `<div style="width:52px;height:52px;background:#3b82f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;">🌱</div>`
+            }
+            <div>
+              <div style="font-size:18px;font-weight:700;color:#1e293b;">${garderieName || "minispace.app"}</div>
+              <div style="font-size:13px;color:#475569;margin-top:2px;">Menus — ${monthLabel}</div>
+            </div>
+            <div style="margin-left:auto;text-align:right;font-size:10px;color:#94a3b8;">
+              <div>Exporté le</div>
+              <div style="font-weight:600;color:#64748b;">${exportDate}</div>
+            </div>
+          </div>
+
+          <!-- Legend -->
+          <div style="display:flex;gap:16px;margin-bottom:4mm;font-size:9px;color:#64748b;">
+            <span><span style="color:#0369a1;font-weight:600;">M·</span> Collation matin</span>
+            <span><span style="color:#15803d;font-weight:600;">D·</span> Dîner</span>
+            <span><span style="color:#7e22ce;font-weight:600;">S·</span> Collation après-midi</span>
+          </div>
+
+          <!-- Calendar grid -->
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">
+            ${["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"].map((d, i) => `
+              <div style="background:#1e293b;color:#fff;text-align:center;padding:5px;font-size:10px;font-weight:700;">${d}</div>
+            `).join("")}
+            ${dayCells}
+          </div>
+        </div>`;
+
+      // 4. Render and export
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = html;
+      wrapper.style.position = "fixed";
+      wrapper.style.top = "-9999px";
+      wrapper.style.left = "-9999px";
+      document.body.appendChild(wrapper);
+
+      const canvas = await html2canvas(wrapper.firstElementChild as HTMLElement, { scale: 2, useCORS: true, logging: false });
+      document.body.removeChild(wrapper);
+
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("l", "mm", "a4");
-      const imgWidth = 280;
+      const imgWidth = 297; // A4 landscape width
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      pdf.addImage(imgData, "PNG", 5, 5, imgWidth, imgHeight);
+      pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight);
       pdf.save(`Menus_${format(currentMonth, "MMMM_yyyy", { locale: fr })}.pdf`);
     } catch (error) {
       console.error("PDF export error:", error);
     } finally {
-      document.body.removeChild(element);
+      setPdfExporting(false);
     }
   };
 
@@ -464,10 +481,11 @@ function MenusSection() {
           {/* Export PDF button */}
           <button
             onClick={exportMonthToPDF}
-            className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm"
+            disabled={pdfExporting}
+            className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm disabled:opacity-60"
           >
-            <Download className="w-4 h-4" />
-            Export PDF
+            {pdfExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {pdfExporting ? "Export..." : "Export PDF"}
           </button>
         </div>
 
