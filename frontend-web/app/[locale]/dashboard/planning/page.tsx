@@ -6,7 +6,7 @@ import useSWR from "swr";
 import { activitiesApi, menusApi, groupsApi } from "../../../../lib/api";
 import { useAuth } from "../../../../hooks/useAuth";
 import { ChevronLeft, ChevronRight, Edit2, Trash2, Plus, X, Loader2, Check, UtensilsCrossed, PartyPopper } from "lucide-react";
-import { format, parse, startOfMonth, endOfMonth, addMonths, subMonths, getISODay } from "date-fns";
+import { format, parse, startOfMonth, endOfMonth, addMonths, subMonths, getISODay, startOfWeek, eachDayOfInterval, isToday as isDateToday, isSameMonth, isSameDay } from "date-fns";
 import { fr } from "date-fns/locale";
 import { TextareaField } from "../../../../components/journal/TextareaField";
 import { WEEK_DAYS } from "../../../../components/journal/journalTypes";
@@ -61,12 +61,14 @@ function MenusSection() {
   const t = useTranslations("menus");
   const tj = useTranslations("journal");
 
-  const [weekStart, setWeekStart] = useState<Date>(() => getMonday(getTodayInMontreal()));
+  const todayInMontreal = getTodayInMontreal();
+  const [weekStart, setWeekStart] = useState<Date>(() => getMonday(todayInMontreal));
+  const [currentMonth, setCurrentMonth] = useState<Date>(todayInMontreal);
+  const [selectedDate, setSelectedDate] = useState<Date>(todayInMontreal);
   const [localData, setLocalData] = useState<Record<string, Partial<DailyMenuData>>>({});
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [activeDayIndex, setActiveDayIndex] = useState<number>(() => {
-    const today = getTodayInMontreal();
-    const dayOfWeek = getISODay(today); // 1=Monday, 7=Sunday
+    const dayOfWeek = getISODay(todayInMontreal); // 1=Monday, 7=Sunday
     return Math.min(Math.max(dayOfWeek - 1, 0), 4); // Clamp to 0-4
   });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -143,6 +145,29 @@ function MenusSection() {
     setSaveStatus("idle");
     setWeekStart(addDays(weekStart, 7));
   };
+
+  const handleSelectDate = (date: Date) => {
+    setSelectedDate(date);
+    const newWeekStart = getMonday(date);
+    if (!isSameDay(newWeekStart, weekStart)) {
+      setWeekStart(newWeekStart);
+    }
+  };
+
+  const prevMonth = () => {
+    setCurrentMonth(subMonths(currentMonth, 1));
+  };
+
+  const nextMonth = () => {
+    setCurrentMonth(addMonths(currentMonth, 1));
+  };
+
+  // Get calendar days (including overflow from prev/next month)
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const calendarStart = startOfWeek(monthStart);
+  const calendarEnd = startOfWeek(monthEnd);
+  const calendarDays = eachDayOfInterval({ start: calendarStart, end: monthEnd });
 
   function SaveIndicator() {
     if (saveStatus === "saving")
@@ -276,9 +301,87 @@ function MenusSection() {
         </div>
       </div>
 
-      {/* Desktop: Grid (days × sections) */}
-      <div className="hidden md:flex md:flex-col flex-1 overflow-auto">
-        <div className="overflow-auto flex-1">
+      {/* Desktop: Mini Calendar + Week Grid */}
+      <div className="hidden md:flex flex-1 overflow-hidden gap-4 px-6 py-4">
+        {/* Sidebar: Mini Calendar */}
+        <div className="flex flex-col flex-shrink-0 w-56 bg-slate-50 border border-slate-200 rounded-lg p-4">
+          {/* Month navigation */}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={prevMonth}
+              className="p-1 hover:bg-slate-200 rounded transition"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <h3 className="text-sm font-semibold text-slate-800">
+              {format(currentMonth, "MMMM yyyy", { locale: fr })}
+            </h3>
+            <button
+              onClick={nextMonth}
+              className="p-1 hover:bg-slate-200 rounded transition"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Day labels */}
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {["L", "M", "M", "J", "V", "S", "D"].map((day, i) => (
+              <div key={i} className="text-xs font-semibold text-center text-slate-500 py-1">
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar days */}
+          <div className="grid grid-cols-7 gap-1">
+            {calendarDays.map((date, i) => {
+              const isCurrentMonth = isSameMonth(date, currentMonth);
+              const isSelected = isSameDay(date, selectedDate);
+              const isTodayDate = isDateToday(date);
+
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleSelectDate(date)}
+                  className={`w-8 h-8 text-xs rounded font-medium transition ${
+                    !isCurrentMonth
+                      ? "text-slate-300"
+                      : isSelected
+                      ? "bg-blue-600 text-white"
+                      : isTodayDate
+                      ? "bg-amber-200 text-amber-900"
+                      : "text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  {date.getDate()}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Main: Week Grid */}
+        <div className="flex-1 overflow-auto">
+          {/* Week header navigation */}
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={prevWeek}
+              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
+            >
+              <ChevronLeft className="w-4 h-4 text-slate-600" />
+            </button>
+            <span className="text-sm text-slate-600 font-medium flex-1">
+              {weekStart.toLocaleDateString("fr-CA", { day: "numeric", month: "short", year: "numeric" })}
+            </span>
+            <button
+              onClick={nextWeek}
+              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition"
+            >
+              <ChevronRight className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
+
           {/* Grid: auto column for days + 3 columns for sections */}
           <div className="grid gap-1 inline-grid" style={{ gridTemplateColumns: "auto repeat(3, 1fr)" }}>
             {/* Header row: empty cell + section labels */}
