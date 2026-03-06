@@ -156,11 +156,13 @@ function MenusSection() {
     }
   };
 
-  // Check if a date is in the selected week
+  // Check if a date is in the selected week (Monday-Friday only)
   const isInSelectedWeek = (date: Date) => {
     const dateMonday = getMonday(date);
     const selectedMonday = getMonday(selectedDate);
-    return isSameDay(dateMonday, selectedMonday);
+    const dayOfWeek = getISODay(date); // 1=Mon, 7=Sun
+    // Only Mon-Fri (1-5)
+    return isSameDay(dateMonday, selectedMonday) && dayOfWeek >= 1 && dayOfWeek <= 5;
   };
 
   const prevMonth = () => {
@@ -348,7 +350,8 @@ function MenusSection() {
               const isCurrentMonth = isSameMonth(date, currentMonth);
               const isInWeek = isInSelectedWeek(date);
               const isTodayDate = isDateToday(date);
-              const dayOfWeek = getISODay(date); // 1=Mon, 5=Fri
+              const dayOfWeek = getISODay(date); // 1=Mon, 7=Sun
+              const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5; // Mon-Fri
 
               // Determine rounding for week range (Mon-Fri)
               let roundedClass = "rounded";
@@ -361,10 +364,13 @@ function MenusSection() {
               return (
                 <button
                   key={i}
-                  onClick={() => handleSelectWeek(date)}
+                  onClick={() => isWeekday && handleSelectWeek(date)}
+                  disabled={!isWeekday && isCurrentMonth}
                   className={`w-6 h-6 text-xs font-medium transition ${roundedClass} ${
                     !isCurrentMonth
                       ? "text-slate-300"
+                      : !isWeekday
+                      ? "text-slate-300 cursor-not-allowed"
                       : isInWeek
                       ? "bg-blue-600 text-white"
                       : isTodayDate
