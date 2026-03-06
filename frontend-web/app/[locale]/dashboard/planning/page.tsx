@@ -337,7 +337,7 @@ function MenusSection() {
 
           {/* Day labels */}
           <div className="grid grid-cols-7 gap-0.5 mb-1">
-            {[tc("day_mon"), tc("day_tue"), tc("day_wed"), tc("day_thu"), tc("day_fri"), tc("day_sat"), tc("day_sun")].map((day, i) => (
+            {[tc("day_sun"), tc("day_mon"), tc("day_tue"), tc("day_wed"), tc("day_thu"), tc("day_fri"), tc("day_sat")].map((day, i) => (
               <div key={i} className="text-xs font-semibold text-center text-slate-500 py-0.5">
                 {day.substring(0, 1)}
               </div>
