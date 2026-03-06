@@ -290,78 +290,80 @@ function MenusSection() {
         </div>
       </div>
 
-      {/* Desktop: Inverted grid (sections × days) */}
-      <div className="hidden md:flex md:flex-col flex-1 overflow-auto px-6 py-4">
-        <div className="overflow-x-auto">
-          <div className="inline-block min-w-full">
-            {/* Grid: auto column for row headers + 5 columns for days */}
-            <div className="grid gap-2" style={{ gridTemplateColumns: "auto repeat(5, 1fr)" }}>
-              {/* Header row: empty cell + day names with dates */}
+      {/* Desktop: Inverted grid (days × sections) */}
+      <div className="hidden md:flex md:flex-col flex-1 overflow-auto">
+        <div className="overflow-auto flex-1">
+          <div>
+            {/* Grid: auto column for day headers + 3 columns for sections */}
+            <div className="grid gap-1" style={{ gridTemplateColumns: "auto repeat(3, 1fr)" }}>
+              {/* Header row: empty cell + section labels */}
               <div /> {/* Empty corner cell */}
-              {weekDates.map((date, i) => {
+              {[
+                { key: "collation_matin", label: "🌅 Matin" },
+                { key: "diner", label: "🍽️ Dîner" },
+                { key: "collation_apres_midi", label: "🌙 Soir" },
+              ].map((section) => (
+                <div
+                  key={`header-${section.key}`}
+                  className="text-center px-2 py-2 font-semibold text-xs bg-slate-100 text-slate-700 border border-slate-200"
+                >
+                  {section.label}
+                </div>
+              ))}
+
+              {/* Day rows */}
+              {weekDates.map((date, dayIndex) => {
                 const dateStr = formatDate(date);
                 const isToday = dateStr === today;
-                const dayLabel = tj(`days.${WEEK_DAYS[i]}`);
+                const dayLabel = tj(`days.${WEEK_DAYS[dayIndex]}`);
                 const dateLabel = date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
 
                 return (
-                  <div
-                    key={`header-${dateStr}`}
-                    className={`text-center px-2 py-3 font-semibold text-sm rounded-t-lg ${
-                      isToday
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-slate-100 text-slate-700"
-                    }`}
-                  >
-                    <div>{dayLabel}</div>
-                    <div className="text-xs font-normal">{dateLabel}</div>
+                  <div key={`day-${dateStr}`}>
+                    {/* Day header (left side) */}
+                    <div
+                      className={`px-2 py-2 font-semibold text-xs border border-slate-200 ${
+                        isToday
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div>{dayLabel}</div>
+                      <div className="font-normal text-xs">{dateLabel}</div>
+                    </div>
+
+                    {/* Section cells for this day */}
+                    {[
+                      { key: "collation_matin", label: "🌅 Matin" },
+                      { key: "diner", label: "🍽️ Dîner" },
+                      { key: "collation_apres_midi", label: "🌙 Soir" },
+                    ].map((section) => {
+                      const hasLocal = localData[dateStr] !== undefined;
+
+                      return (
+                        <div
+                          key={`cell-${dateStr}-${section.key}`}
+                          className={`p-1 border border-slate-200 ${
+                            isToday ? "bg-amber-50" : "bg-white"
+                          }`}
+                        >
+                          <TextareaField
+                            value={getMenuForDate(dateStr, section.key as "collation_matin" | "diner" | "collation_apres_midi")}
+                            onChange={(v) =>
+                              updateMenu(dateStr, section.key as "collation_matin" | "diner" | "collation_apres_midi", v)
+                            }
+                            placeholder={t("placeholder")}
+                            rows={2}
+                          />
+                          {hasLocal && (
+                            <div className="text-xs text-orange-500 mt-0.5 font-medium">● Modifié</div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })}
-
-              {/* Section rows */}
-              {[
-                { key: "collation_matin", label: "🌅 Collation matin" },
-                { key: "diner", label: "🍽️ Dîner" },
-                { key: "collation_apres_midi", label: "🌙 Collation après-midi" },
-              ].map((section) => (
-                <div key={`section-${section.key}`}>
-                  {/* Row header */}
-                  <div className="px-3 py-2 font-semibold text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-l-lg h-full flex items-center justify-center min-w-fit">
-                    {section.label}
-                  </div>
-
-                  {/* Day cells */}
-                  {weekDates.map((date, i) => {
-                    const dateStr = formatDate(date);
-                    const isToday = dateStr === today;
-                    const hasLocal = localData[dateStr] !== undefined;
-
-                    return (
-                      <div
-                        key={`cell-${dateStr}-${section.key}`}
-                        className={`p-2 border ${
-                          isToday
-                            ? "border-amber-200 bg-amber-50"
-                            : "border-slate-200 bg-white"
-                        } ${i === 4 ? "rounded-r-lg" : ""}`}
-                      >
-                        <TextareaField
-                          value={getMenuForDate(dateStr, section.key as "collation_matin" | "diner" | "collation_apres_midi")}
-                          onChange={(v) =>
-                            updateMenu(dateStr, section.key as "collation_matin" | "diner" | "collation_apres_midi", v)
-                          }
-                          placeholder={t("placeholder")}
-                          rows={2}
-                        />
-                        {hasLocal && (
-                          <div className="text-xs text-orange-500 mt-1 font-medium">● Modifié</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
             </div>
           </div>
         </div>
