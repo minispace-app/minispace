@@ -6,7 +6,7 @@ import useSWR from "swr";
 import { activitiesApi, menusApi, groupsApi } from "../../../../lib/api";
 import { useAuth } from "../../../../hooks/useAuth";
 import { ChevronLeft, ChevronRight, Edit2, Trash2, Plus, X, Loader2, Check, UtensilsCrossed, PartyPopper } from "lucide-react";
-import { format, parse, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns";
+import { format, parse, startOfMonth, endOfMonth, addMonths, subMonths, getISODay } from "date-fns";
 import { fr } from "date-fns/locale";
 import { TextareaField } from "../../../../components/journal/TextareaField";
 import { WEEK_DAYS } from "../../../../components/journal/journalTypes";
@@ -64,6 +64,11 @@ function MenusSection() {
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(getTodayInMontreal()));
   const [localData, setLocalData] = useState<Record<string, Partial<DailyMenuData>>>({});
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [activeDayIndex, setActiveDayIndex] = useState<number>(() => {
+    const today = getTodayInMontreal();
+    const dayOfWeek = getISODay(today); // 1=Monday, 7=Sunday
+    return Math.min(Math.max(dayOfWeek - 1, 0), 4); // Clamp to 0-4
+  });
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const weekDates = WEEK_DAYS.map((_, i) => addDays(weekStart, i));
@@ -181,17 +186,45 @@ function MenusSection() {
         </div>
       </div>
 
-      {/* Day fields */}
-      <div className="flex-1 overflow-auto px-6 py-4">
-        <div className="space-y-6">
-          {weekDates.map((date, i) => {
+      {/* Mobile: Day chips + single day view */}
+      <div className="md:hidden flex-1 overflow-auto flex flex-col">
+        {/* Day chips */}
+        <div className="flex-shrink-0 px-4 py-3 border-b border-slate-100">
+          <div className="flex gap-2 overflow-x-auto scrollbar-none">
+            {weekDates.map((date, i) => {
+              const dateStr = formatDate(date);
+              const isToday = dateStr === today;
+              const isActive = i === activeDayIndex;
+
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => setActiveDayIndex(i)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full font-medium text-sm transition whitespace-nowrap ${
+                    isActive
+                      ? "bg-blue-600 text-white"
+                      : isToday
+                      ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {tj(`days.${WEEK_DAYS[i]}`).substring(0, 3)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Active day content */}
+        <div className="flex-1 overflow-auto px-4 py-4">
+          {(() => {
+            const date = weekDates[activeDayIndex];
             const dateStr = formatDate(date);
             const isToday = dateStr === today;
             const hasLocal = localData[dateStr] !== undefined;
 
             return (
               <div
-                key={dateStr}
                 className={`rounded-xl border p-4 ${
                   isToday
                     ? "border-amber-300 bg-amber-50/60"
@@ -203,7 +236,7 @@ function MenusSection() {
                     isToday ? "text-amber-600" : "text-slate-500"
                   }`}
                 >
-                  {tj(`days.${WEEK_DAYS[i]}`)}
+                  {tj(`days.${WEEK_DAYS[activeDayIndex]}`)}
                 </div>
                 <div
                   className={`text-sm font-medium mb-4 flex items-center gap-1.5 ${
@@ -216,8 +249,8 @@ function MenusSection() {
                   )}
                 </div>
 
-                {/* 3 Menu Sections */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 3 Menu Sections in column */}
+                <div className="space-y-4">
                   {/* Collation Matin */}
                   <div className="flex flex-col">
                     <label className="text-xs font-semibold text-slate-700 mb-2">🌅 Collation matin</label>
@@ -253,7 +286,84 @@ function MenusSection() {
                 </div>
               </div>
             );
-          })}
+          })()}
+        </div>
+      </div>
+
+      {/* Desktop: Inverted grid (sections × days) */}
+      <div className="hidden md:flex md:flex-col flex-1 overflow-auto px-6 py-4">
+        <div className="overflow-x-auto">
+          <div className="inline-block min-w-full">
+            {/* Grid: auto column for row headers + 5 columns for days */}
+            <div className="grid gap-2" style={{ gridTemplateColumns: "auto repeat(5, 1fr)" }}>
+              {/* Header row: empty cell + day names with dates */}
+              <div /> {/* Empty corner cell */}
+              {weekDates.map((date, i) => {
+                const dateStr = formatDate(date);
+                const isToday = dateStr === today;
+                const dayLabel = tj(`days.${WEEK_DAYS[i]}`);
+                const dateLabel = date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
+
+                return (
+                  <div
+                    key={`header-${dateStr}`}
+                    className={`text-center px-2 py-3 font-semibold text-sm rounded-t-lg ${
+                      isToday
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    <div>{dayLabel}</div>
+                    <div className="text-xs font-normal">{dateLabel}</div>
+                  </div>
+                );
+              })}
+
+              {/* Section rows */}
+              {[
+                { key: "collation_matin", label: "🌅 Collation matin" },
+                { key: "diner", label: "🍽️ Dîner" },
+                { key: "collation_apres_midi", label: "🌙 Collation après-midi" },
+              ].map((section) => (
+                <div key={`section-${section.key}`}>
+                  {/* Row header */}
+                  <div className="px-3 py-2 font-semibold text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-l-lg h-full flex items-center justify-center min-w-fit">
+                    {section.label}
+                  </div>
+
+                  {/* Day cells */}
+                  {weekDates.map((date, i) => {
+                    const dateStr = formatDate(date);
+                    const isToday = dateStr === today;
+                    const hasLocal = localData[dateStr] !== undefined;
+
+                    return (
+                      <div
+                        key={`cell-${dateStr}-${section.key}`}
+                        className={`p-2 border ${
+                          isToday
+                            ? "border-amber-200 bg-amber-50"
+                            : "border-slate-200 bg-white"
+                        } ${i === 4 ? "rounded-r-lg" : ""}`}
+                      >
+                        <TextareaField
+                          value={getMenuForDate(dateStr, section.key as "collation_matin" | "diner" | "collation_apres_midi")}
+                          onChange={(v) =>
+                            updateMenu(dateStr, section.key as "collation_matin" | "diner" | "collation_apres_midi", v)
+                          }
+                          placeholder={t("placeholder")}
+                          rows={2}
+                        />
+                        {hasLocal && (
+                          <div className="text-xs text-orange-500 mt-1 font-medium">● Modifié</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
