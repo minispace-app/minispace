@@ -91,3 +91,18 @@ pub struct AssignInvitedParentRequest {
     pub email: String,
     pub role: String,
 }
+
+#[derive(Debug, Serialize)]
+pub struct ImportRowError {
+    pub row: usize,
+    pub reason: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ImportResult {
+    pub created_groups: usize,
+    pub created_children: usize,
+    pub added_pending_parents: usize,
+    pub invited_parents: usize,
+    pub skipped_rows: Vec<ImportRowError>,
+}

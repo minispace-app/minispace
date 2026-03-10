@@ -31,7 +31,7 @@ fn build_tenant_reset_url(base_url: &str, tenant: &str, token: &str) -> String {
     }
 }
 
-fn build_tenant_invite_url(base_url: &str, tenant: &str, token: &str) -> String {
+pub fn build_tenant_invite_url(base_url: &str, tenant: &str, token: &str) -> String {
     if let Some(idx) = base_url.find("://") {
         let scheme = &base_url[..idx];
         let domain = &base_url[idx + 3..];

@@ -32,6 +32,12 @@ apiClient.interceptors.request.use((config) => {
   if (token) config.headers["Authorization"] = `Bearer ${token}`;
   if (tenant) config.headers["X-Tenant"] = tenant;
 
+  // For FormData, remove the default Content-Type so the browser sets it
+  // automatically with the correct multipart boundary
+  if (config.data instanceof FormData) {
+    delete config.headers["Content-Type"];
+  }
+
   return config;
 });
 
@@ -253,6 +259,10 @@ export const childrenApi = {
   listAvailableInvitations: () => apiClient.get("/children/available-invitations"),
   delete: (childId: string) => apiClient.delete(`/children/${childId}`),
   export: (childId: string) => apiClient.get(`/children/${childId}/export`),
+  importExcel: (formData: FormData) =>
+    apiClient.post("/children/import", formData),
+  exportCsv: () =>
+    apiClient.get("/children/export", { responseType: "blob" }),
 };
 
 // Tenant user management (admin_garderie)

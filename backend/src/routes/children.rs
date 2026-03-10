@@ -1,10 +1,11 @@
 use axum::{
-    extract::{Path, State},
-    http::{HeaderMap, StatusCode},
+    body::Body,
+    extract::{Multipart, Path, State},
+    http::{header, HeaderMap, Response, StatusCode},
     Json,
 };
-use chrono::{DateTime, NaiveDate, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, NaiveDate, Utc, Local};
+use serde::Serialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -587,6 +588,102 @@ pub async fn remove_invited_parent(
     result
         .map(|_| Json(json!({ "message": "Parent invité retiré" })))
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
+}
+
+/// POST /children/import — import children from an xlsx/csv file (admin only)
+pub async fn import_children(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
+    user: AuthenticatedUser,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    if let Some(err) = require_admin(&user) {
+        return Err(err);
+    }
+
+    // Extract the file field from multipart
+    let mut file_bytes: Option<Vec<u8>> = None;
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Erreur multipart: {e}") })))
+    })? {
+        let name = field.name().unwrap_or("").to_string();
+        if name == "file" || file_bytes.is_none() {
+            let bytes = field.bytes().await.map_err(|e| {
+                (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Erreur lecture fichier: {e}") })))
+            })?;
+            file_bytes = Some(bytes.to_vec());
+        }
+    }
+
+    let bytes = file_bytes.ok_or_else(|| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": "Aucun fichier fourni (champ 'file' manquant)" })))
+    })?;
+
+    let result = ChildService::import_from_excel(
+        &state.db,
+        &tenant,
+        bytes,
+        state.email.clone(),
+        &state.config.app_base_url,
+        Some(user.user_id),
+    )
+    .await
+    .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({ "error": e.to_string() }))))?;
+
+    let label = format!("{} enfants créés", result.created_children);
+    audit::log(state.db.clone(), &tenant, AuditEntry {
+        user_id:        Some(user.user_id),
+        user_name:      None,
+        action:         "child.import".to_string(),
+        resource_type:  Some("child".to_string()),
+        resource_id:    None,
+        resource_label: Some(label),
+        ip_address:     client_ip(&headers),
+    });
+
+    Ok((StatusCode::OK, Json(serde_json::to_value(&result).unwrap())))
+}
+
+/// GET /children/export — export all active children as CSV (admin only)
+pub async fn export_all_children(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
+    user: AuthenticatedUser,
+) -> Result<Response<Body>, (StatusCode, Json<Value>)> {
+    if let Some(err) = require_admin(&user) {
+        return Err(err);
+    }
+
+    let csv_bytes = ChildService::export_all_as_csv(&state.db, &tenant)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    let today = Local::now().format("%Y-%m-%d").to_string();
+    let filename = format!("enfants-{today}.csv");
+
+    audit::log(state.db.clone(), &tenant, AuditEntry {
+        user_id:        Some(user.user_id),
+        user_name:      None,
+        action:         "child.export_all".to_string(),
+        resource_type:  Some("child".to_string()),
+        resource_id:    None,
+        resource_label: Some(filename.clone()),
+        ip_address:     client_ip(&headers),
+    });
+
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/csv; charset=utf-8")
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{filename}\""),
+        )
+        .body(Body::from(csv_bytes))
+        .unwrap();
+
+    Ok(response)
 }
 
 pub async fn list_available_invitations(

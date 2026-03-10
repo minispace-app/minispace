@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import { useAuth } from "../../../../hooks/useAuth";
 import { useTenantInfo } from "../../../../hooks/useTenantInfo";
-import { authApi, tenantApi, settingsApi } from "../../../../lib/api";
-import { Eye, EyeOff, Save, AlertCircle, Check, Upload, Trash2, Clock } from "lucide-react";
+import { authApi, tenantApi, settingsApi, childrenApi } from "../../../../lib/api";
+import { Eye, EyeOff, Save, AlertCircle, Check, Upload, Trash2, Clock, Download, FileUp, FileDown } from "lucide-react";
 
 export default function ProfilePage() {
   const t = useTranslations("profile");
@@ -95,6 +95,70 @@ export default function ProfilePage() {
       setLogoLoading(false);
     }
   };
+  // Import/export state
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    created_groups: number;
+    created_children: number;
+    added_pending_parents: number;
+    invited_parents: number;
+    skipped_rows: { row: number; reason: string }[];
+  } | null>(null);
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImportLoading(true);
+    setImportResult(null);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", importFile);
+      const res = await childrenApi.importExcel(fd);
+      setImportResult(res.data);
+      setImportFile(null);
+      if (importFileRef.current) importFileRef.current.value = "";
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e?.response?.data?.error || "Erreur lors de l'import");
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    setExportLoading(true);
+    try {
+      const res = await childrenApi.exportCsv();
+      const url = URL.createObjectURL(new Blob([res.data], { type: "text/csv;charset=utf-8;" }));
+      const a = document.createElement("a");
+      const today = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `enfants-${today}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e?.response?.data?.error || "Erreur lors de l'export");
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const header = "Groupe,Prénom,Nom,Date de naissance,Date de début,Jours (1=Lun…5=Ven),Email parent 1,Relation parent 1,Email parent 2,Relation parent 2,Notes";
+    const example = "Poupons,Emma,Tremblay,2023-04-15,2024-09-01,\"1,2,3,4,5\",parent@email.com,parent,,,";
+    const blob = new Blob(["\uFEFF" + header + "\n" + example + "\n"], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "modele-import-enfants.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const [showPasswords, setShowPasswords] = useState(false);
 
   const [passwordForm, setPasswordForm] = useState({
@@ -400,6 +464,87 @@ export default function ProfilePage() {
                 )}
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Import */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <FileUp className="w-5 h-5 text-slate-600" />
+              <h2 className="text-xl font-bold text-slate-800">Importer des enfants</h2>
+            </div>
+            <p className="text-sm text-slate-500 mb-4">
+              Téléchargez un fichier Excel (.xlsx) ou CSV pour créer automatiquement les groupes, enfants et parents.
+            </p>
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              className="text-xs text-blue-600 hover:text-blue-700 underline mb-3 block"
+            >
+              <Download className="w-3.5 h-3.5 inline mr-1" />
+              Télécharger le modèle CSV
+            </button>
+            <div className="space-y-3">
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".xlsx,.csv"
+                onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                className="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              <button
+                type="button"
+                onClick={handleImport}
+                disabled={!importFile || importLoading}
+                className="w-full px-4 py-2 bg-ink text-white rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50 flex items-center justify-center gap-2 text-body"
+              >
+                <Upload className="w-4 h-4" />
+                {importLoading ? "Import en cours…" : "Importer"}
+              </button>
+            </div>
+
+            {importResult && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm space-y-1">
+                <p className="font-medium text-green-800">Import terminé</p>
+                <p className="text-green-700">{importResult.created_groups} groupe(s) créé(s)</p>
+                <p className="text-green-700">{importResult.created_children} enfant(s) créé(s)</p>
+                <p className="text-green-700">{importResult.added_pending_parents} parent(s) en attente ajouté(s)</p>
+                <p className="text-green-700">{importResult.invited_parents} invitation(s) envoyée(s)</p>
+                {importResult.skipped_rows.length > 0 && (
+                  <div className="mt-2">
+                    <p className="font-medium text-amber-700">{importResult.skipped_rows.length} ligne(s) ignorée(s) :</p>
+                    <ul className="list-disc list-inside text-amber-600 text-xs mt-1 space-y-0.5">
+                      {importResult.skipped_rows.map((r) => (
+                        <li key={r.row}>Ligne {r.row} : {r.reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Export */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <FileDown className="w-5 h-5 text-slate-600" />
+              <h2 className="text-xl font-bold text-slate-800">Exporter les enfants</h2>
+            </div>
+            <p className="text-sm text-slate-500 mb-4">
+              Téléchargez la liste complète des enfants actifs au format CSV (groupes, dates, parents en attente inclus).
+            </p>
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={exportLoading}
+              className="w-full px-4 py-2 bg-ink text-white rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50 flex items-center justify-center gap-2 text-body"
+            >
+              <Download className="w-4 h-4" />
+              {exportLoading ? "Export en cours…" : "Exporter en CSV"}
+            </button>
           </div>
         </div>
       )}
