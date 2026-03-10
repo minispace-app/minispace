@@ -64,6 +64,13 @@ interface PendingParent {
   created_at: string;
 }
 
+interface InvitedParent {
+  email: string;
+  role: string;
+  expires_at: string;
+  created_at: string;
+}
+
 interface UserOption {
   id: string;
   first_name: string;
@@ -160,6 +167,11 @@ function ChildDetails({
     () => childrenApi.listPendingParents(child.id)
   );
 
+  const { data: invitedParentsData, mutate: mutateInvitedParents } = useSWR(
+    `child-invited-parents-${child.id}`,
+    () => childrenApi.listInvitedParents(child.id)
+  );
+
   const { data: usersData } = useSWR(
     "users-list-for-parents",
     () => usersApi.list()
@@ -167,6 +179,7 @@ function ChildDetails({
 
   const parents: ParentUser[] = (parentsData as { data: ParentUser[] } | undefined)?.data ?? [];
   const pendingParents: PendingParent[] = (pendingParentsData as { data: PendingParent[] } | undefined)?.data ?? [];
+  const invitedParents: InvitedParent[] = (invitedParentsData as { data: InvitedParent[] } | undefined)?.data ?? [];
   const allUsers: UserOption[] = (usersData as { data: UserOption[] } | undefined)?.data ?? [];
   const parentOptions = allUsers.filter((u) => u.role === "parent");
   const assignedIds = new Set(parents.map((p) => p.user_id));
@@ -214,6 +227,13 @@ function ChildDetails({
     if (!confirm(t("confirmRemoveParent"))) return;
     await childrenApi.removePendingParent(child.id, email);
     mutatePendingParents();
+    onUpdated();
+  };
+
+  const handleRemoveInvitedParent = async (email: string) => {
+    if (!confirm(t("confirmRemoveParent"))) return;
+    await childrenApi.removeInvitedParent(child.id, email);
+    mutateInvitedParents();
     onUpdated();
   };
 
@@ -406,7 +426,7 @@ function ChildDetails({
         </div>
 
         <div className="px-5 py-4">
-          {parents.length === 0 && pendingParents.length === 0 ? (
+          {parents.length === 0 && pendingParents.length === 0 && invitedParents.length === 0 ? (
             <p className="text-sm text-slate-400">{t("noParents")}</p>
           ) : (
             <ul className="space-y-2 mb-4">
@@ -439,7 +459,7 @@ function ChildDetails({
                 </li>
               ))}
 
-              {/* Pending parents */}
+              {/* Pending parents (by email) */}
               {pendingParents.map((p) => (
                 <li
                   key={`pending-${p.email}`}
@@ -463,6 +483,39 @@ function ChildDetails({
                   {canWrite && (
                     <button
                       onClick={() => handleRemovePendingParent(p.email)}
+                      className="text-slate-400 hover:text-red-500 transition ml-3 flex-shrink-0"
+                      title={t("remove")}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </li>
+              ))}
+
+              {/* Invited parents (invitation tokens) */}
+              {invitedParents.map((p) => (
+                <li
+                  key={`invited-${p.email}`}
+                  className="flex items-center justify-between bg-blue-50 rounded-lg px-3 py-2"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs bg-blue-200 text-blue-800 rounded px-2 py-1 font-medium">
+                        {t("invitation")}
+                      </span>
+                      <span className="text-sm font-medium text-slate-800">
+                        {p.email}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-slate-500">
+                        {p.role}
+                      </span>
+                    </div>
+                  </div>
+                  {canWrite && (
+                    <button
+                      onClick={() => handleRemoveInvitedParent(p.email)}
                       className="text-slate-400 hover:text-red-500 transition ml-3 flex-shrink-0"
                       title={t("remove")}
                     >

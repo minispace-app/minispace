@@ -245,6 +245,11 @@ export const childrenApi = {
     apiClient.post(`/children/${childId}/pending-parents`, { email, relationship }),
   removePendingParent: (childId: string, email: string) =>
     apiClient.delete(`/children/${childId}/pending-parents/${encodeURIComponent(email)}`),
+  listInvitedParents: (childId: string) => apiClient.get(`/children/${childId}/invited-parents`),
+  assignInvitedParent: (childId: string, email: string, role: string) =>
+    apiClient.post(`/children/${childId}/invited-parents`, { email, role }),
+  removeInvitedParent: (childId: string, email: string) =>
+    apiClient.delete(`/children/${childId}/invited-parents/${encodeURIComponent(email)}`),
   delete: (childId: string) => apiClient.delete(`/children/${childId}`),
   export: (childId: string) => apiClient.get(`/children/${childId}/export`),
 };

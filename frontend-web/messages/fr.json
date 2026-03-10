@@ -235,6 +235,7 @@
     "addByEmail": "Ajouter par email",
     "noPendingParents": "Aucun parent en attente",
     "pending": "En attente",
+    "invitation": "Invitation",
     "emailPlaceholder": "adresse@email.com",
     "add": "Ajouter",
     "relationship": "Relation",

@@ -13,7 +13,7 @@ use crate::{
     middleware::tenant::TenantSlug,
     models::{
         auth::AuthenticatedUser,
-        child::{AssignParentRequest, AssignPendingParentRequest, CreateChildRequest, UpdateChildRequest},
+        child::{AssignInvitedParentRequest, AssignParentRequest, AssignPendingParentRequest, CreateChildRequest, UpdateChildRequest},
         user::UserRole,
     },
     services::{audit::{self, AuditEntry}, children::ChildService, cron::CronService},
@@ -471,5 +471,111 @@ pub async fn remove_pending_parent(
 
     result
         .map(|_| Json(json!({ "message": "Parent en attente retiré" })))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
+}
+
+pub async fn list_invited_parents(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    user: AuthenticatedUser,
+    Path(child_id): Path<Uuid>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if let Some(err) = require_admin(&user) {
+        return Err(err);
+    }
+
+    ChildService::list_invited_parents_for_child(&state.db, &tenant, child_id)
+        .await
+        .map(|p| Json(serde_json::to_value(p).unwrap()))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
+}
+
+pub async fn assign_invited_parent(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
+    user: AuthenticatedUser,
+    Path(child_id): Path<Uuid>,
+    Json(body): Json<AssignInvitedParentRequest>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if let Some(err) = require_admin(&user) {
+        return Err(err);
+    }
+
+    let schema = schema_name(&tenant);
+
+    // Find the invitation token by email and role
+    let token_id: Option<Uuid> = sqlx::query_scalar(&format!(
+        "SELECT id FROM {schema}.invitation_tokens WHERE email = $1 AND role::TEXT = $2 AND used = FALSE LIMIT 1"
+    ))
+    .bind(&body.email)
+    .bind(&body.role)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    let token_id = token_id
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({ "error": "Invitation non trouvée" }))))?;
+
+    let result = ChildService::assign_invited_parent(&state.db, &tenant, child_id, token_id).await;
+
+    if result.is_ok() {
+        audit::log(state.db.clone(), &tenant, AuditEntry {
+            user_id:        Some(user.user_id),
+            user_name:      None,
+            action:         "child.assign_invited_parent".to_string(),
+            resource_type:  Some("child".to_string()),
+            resource_id:    Some(child_id.to_string()),
+            resource_label: Some(body.email.clone()),
+            ip_address:     client_ip(&headers),
+        });
+    }
+
+    result
+        .map(|_| Json(json!({ "message": "Parent invité assigné" })))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
+}
+
+pub async fn remove_invited_parent(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
+    user: AuthenticatedUser,
+    Path((child_id, email)): Path<(Uuid, String)>,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if let Some(err) = require_admin(&user) {
+        return Err(err);
+    }
+
+    let schema = schema_name(&tenant);
+
+    // Find the invitation token by email
+    let token_id: Option<Uuid> = sqlx::query_scalar(&format!(
+        "SELECT id FROM {schema}.invitation_tokens WHERE email = $1 AND used = FALSE LIMIT 1"
+    ))
+    .bind(&email)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    let token_id = token_id
+        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({ "error": "Invitation non trouvée" }))))?;
+
+    let result = ChildService::remove_invited_parent(&state.db, &tenant, child_id, token_id).await;
+
+    if result.is_ok() {
+        audit::log(state.db.clone(), &tenant, AuditEntry {
+            user_id:        Some(user.user_id),
+            user_name:      None,
+            action:         "child.remove_invited_parent".to_string(),
+            resource_type:  Some("child".to_string()),
+            resource_id:    Some(child_id.to_string()),
+            resource_label: Some(email.clone()),
+            ip_address:     client_ip(&headers),
+        });
+    }
+
+    result
+        .map(|_| Json(json!({ "message": "Parent invité retiré" })))
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
 }

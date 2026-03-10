@@ -210,6 +210,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/children/{id}/parents/{user_id}", delete(routes::children::remove_parent))
         .route("/children/{id}/pending-parents", get(routes::children::list_pending_parents).post(routes::children::assign_pending_parent))
         .route("/children/{id}/pending-parents/{email}", delete(routes::children::remove_pending_parent))
+        .route("/children/{id}/invited-parents", get(routes::children::list_invited_parents).post(routes::children::assign_invited_parent))
+        .route("/children/{id}/invited-parents/{email}", delete(routes::children::remove_invited_parent))
         .route("/children/{id}/export", get(routes::children::export_child))
         // WebSocket
         .route("/ws", get(routes::websocket::ws_handler))

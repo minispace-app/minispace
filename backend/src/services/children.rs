@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::{
     db::tenant::schema_name,
-    models::child::{AssignParentRequest, AssignPendingParentRequest, Child, ChildParentUser, CreateChildRequest, PendingParent, UpdateChildRequest},
+    models::child::{AssignInvitedParentRequest, AssignParentRequest, AssignPendingParentRequest, Child, ChildParentUser, CreateChildRequest, InvitedParent, PendingParent, UpdateChildRequest},
 };
 
 pub struct ChildService;
@@ -286,5 +286,60 @@ impl ChildService {
         .fetch_all(pool)
         .await?;
         Ok(results)
+    }
+
+    pub async fn list_invited_parents_for_child(
+        pool: &PgPool,
+        tenant: &str,
+        child_id: Uuid,
+    ) -> anyhow::Result<Vec<InvitedParent>> {
+        let schema = schema_name(tenant);
+        let invited = sqlx::query_as::<_, InvitedParent>(&format!(
+            "SELECT it.email, it.role::TEXT, it.expires_at, it.created_at
+             FROM {schema}.child_invitations ci
+             JOIN {schema}.invitation_tokens it ON it.id = ci.invitation_token_id
+             WHERE ci.child_id = $1 AND it.used = FALSE
+             ORDER BY it.created_at DESC"
+        ))
+        .bind(child_id)
+        .fetch_all(pool)
+        .await?;
+        Ok(invited)
+    }
+
+    pub async fn assign_invited_parent(
+        pool: &PgPool,
+        tenant: &str,
+        child_id: Uuid,
+        invitation_token_id: Uuid,
+    ) -> anyhow::Result<()> {
+        let schema = schema_name(tenant);
+        sqlx::query(&format!(
+            "INSERT INTO {schema}.child_invitations (child_id, invitation_token_id)
+             VALUES ($1, $2)
+             ON CONFLICT (child_id, invitation_token_id) DO NOTHING"
+        ))
+        .bind(child_id)
+        .bind(invitation_token_id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn remove_invited_parent(
+        pool: &PgPool,
+        tenant: &str,
+        child_id: Uuid,
+        invitation_token_id: Uuid,
+    ) -> anyhow::Result<()> {
+        let schema = schema_name(tenant);
+        sqlx::query(&format!(
+            "DELETE FROM {schema}.child_invitations WHERE child_id = $1 AND invitation_token_id = $2"
+        ))
+        .bind(child_id)
+        .bind(invitation_token_id)
+        .execute(pool)
+        .await?;
+        Ok(())
     }
 }
