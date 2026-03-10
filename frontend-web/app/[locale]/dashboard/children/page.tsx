@@ -156,6 +156,9 @@ function ChildDetails({
   const [pendingEmail, setPendingEmail] = useState("");
   const [pendingRelationship, setPendingRelationship] = useState("parent");
   const [savingPendingParent, setSavingPendingParent] = useState(false);
+  const [showAddInvitedParent, setShowAddInvitedParent] = useState(false);
+  const [selectedInvitation, setSelectedInvitation] = useState("");
+  const [savingInvitedParent, setSavingInvitedParent] = useState(false);
 
   const { data: parentsData, mutate: mutateParents } = useSWR(
     `child-parents-${child.id}`,
@@ -172,6 +175,11 @@ function ChildDetails({
     () => childrenApi.listInvitedParents(child.id)
   );
 
+  const { data: availableInvitationsData } = useSWR(
+    "available-invitations",
+    () => childrenApi.listAvailableInvitations()
+  );
+
   const { data: usersData } = useSWR(
     "users-list-for-parents",
     () => usersApi.list()
@@ -181,10 +189,13 @@ function ChildDetails({
   const pendingParents: PendingParent[] = (pendingParentsData as { data: PendingParent[] } | undefined)?.data ?? [];
   const invitedParents: InvitedParent[] = (invitedParentsData as { data: InvitedParent[] } | undefined)?.data ?? [];
   const allUsers: UserOption[] = (usersData as { data: UserOption[] } | undefined)?.data ?? [];
+  const availableInvitations: any[] = (availableInvitationsData as { data: any[] } | undefined)?.data ?? [];
   const parentOptions = allUsers.filter((u) => u.role === "parent");
   const assignedIds = new Set(parents.map((p) => p.user_id));
   const availableOptions = parentOptions.filter((u) => !assignedIds.has(u.id));
   const pendingEmails = new Set(pendingParents.map((p) => p.email));
+  const invitedEmails = new Set(invitedParents.map((p) => p.email));
+  const availableInvitationsForChild = availableInvitations.filter((inv) => !invitedEmails.has(inv.email));
 
   const handleAddParent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,6 +246,21 @@ function ChildDetails({
     await childrenApi.removeInvitedParent(child.id, email);
     mutateInvitedParents();
     onUpdated();
+  };
+
+  const handleAddInvitedParent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInvitation) return;
+    const [invId, email, role] = selectedInvitation.split("|");
+    setSavingInvitedParent(true);
+    try {
+      await childrenApi.assignInvitedParent(child.id, email, role);
+      setSelectedInvitation("");
+      setShowAddInvitedParent(false);
+      mutateInvitedParents();
+    } finally {
+      setSavingInvitedParent(false);
+    }
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -404,7 +430,7 @@ function ChildDetails({
               <UserPlus className="w-4 h-4 text-slate-500" />
               {t("associatedParents")}
             </h3>
-            {canWrite && !showAddParent && !showAddPendingParent && (
+            {canWrite && !showAddParent && !showAddPendingParent && !showAddInvitedParent && (
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowAddParent(true)}
@@ -420,6 +446,15 @@ function ChildDetails({
                   <UserPlus className="w-3.5 h-3.5" />
                   {t("addByEmail")}
                 </button>
+                {availableInvitationsForChild.length > 0 && (
+                  <button
+                    onClick={() => setShowAddInvitedParent(true)}
+                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium transition"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    {t("linkInvitation")}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -609,6 +644,44 @@ function ChildDetails({
                   onClick={() => {
                     setShowAddPendingParent(false);
                     setPendingEmail("");
+                  }}
+                  className="px-3 py-1.5 border border-slate-200 text-slate-600 text-xs font-medium rounded-lg hover:bg-white"
+                >
+                  {tc("cancel")}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Add invited parent form */}
+          {canWrite && showAddInvitedParent && (
+            <form onSubmit={handleAddInvitedParent} className="bg-green-50 border border-green-100 rounded-lg p-3 space-y-2 mt-2">
+              <select
+                value={selectedInvitation}
+                onChange={(e) => setSelectedInvitation(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                required
+              >
+                <option value="">{t("chooseInvitation")}</option>
+                {availableInvitationsForChild.map((inv) => (
+                  <option key={inv.id} value={`${inv.id}|${inv.email}|${inv.role}`}>
+                    {inv.email} ({inv.role}) - {new Date(inv.expires_at).toLocaleDateString()}
+                  </option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={savingInvitedParent || !selectedInvitation}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingInvitedParent ? tc("loading") : t("link")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddInvitedParent(false);
+                    setSelectedInvitation("");
                   }}
                   className="px-3 py-1.5 border border-slate-200 text-slate-600 text-xs font-medium rounded-lg hover:bg-white"
                 >

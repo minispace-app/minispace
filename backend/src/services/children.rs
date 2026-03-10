@@ -307,6 +307,41 @@ impl ChildService {
         Ok(invited)
     }
 
+    pub async fn promote_invited_parents(
+        pool: &PgPool,
+        tenant: &str,
+        user_id: Uuid,
+        email: &str,
+    ) -> anyhow::Result<()> {
+        let schema = schema_name(tenant);
+        // Move child_invitations to child_parents for this email's invitation token (now used)
+        sqlx::query(&format!(
+            "INSERT INTO {schema}.child_parents (child_id, user_id, relationship)
+             SELECT ci.child_id, $1, 'parent'
+             FROM {schema}.child_invitations ci
+             JOIN {schema}.invitation_tokens it ON it.id = ci.invitation_token_id
+             WHERE it.email = $2 AND it.used = TRUE
+             ON CONFLICT (child_id, user_id) DO UPDATE SET relationship = EXCLUDED.relationship"
+        ))
+        .bind(user_id)
+        .bind(email)
+        .execute(pool)
+        .await?;
+
+        // Remove the child_invitations entries (token is marked used)
+        sqlx::query(&format!(
+            "DELETE FROM {schema}.child_invitations
+             WHERE invitation_token_id IN (
+               SELECT id FROM {schema}.invitation_tokens WHERE email = $1 AND used = TRUE
+             )"
+        ))
+        .bind(email)
+        .execute(pool)
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn assign_invited_parent(
         pool: &PgPool,
         tenant: &str,

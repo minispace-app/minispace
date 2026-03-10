@@ -250,6 +250,7 @@ export const childrenApi = {
     apiClient.post(`/children/${childId}/invited-parents`, { email, role }),
   removeInvitedParent: (childId: string, email: string) =>
     apiClient.delete(`/children/${childId}/invited-parents/${encodeURIComponent(email)}`),
+  listAvailableInvitations: () => apiClient.get("/children/available-invitations"),
   delete: (childId: string) => apiClient.delete(`/children/${childId}`),
   export: (childId: string) => apiClient.get(`/children/${childId}/export`),
 };

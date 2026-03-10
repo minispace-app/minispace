@@ -205,6 +205,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/settings", get(routes::settings::get_settings).put(routes::settings::update_settings))
         // Children
         .route("/children", get(routes::children::list_children).post(routes::children::create_child))
+        .route("/children/available-invitations", get(routes::children::list_available_invitations))
         .route("/children/{id}", put(routes::children::update_child).delete(routes::children::delete_child))
         .route("/children/{id}/parents", get(routes::children::list_parents).post(routes::children::assign_parent))
         .route("/children/{id}/parents/{user_id}", delete(routes::children::remove_parent))

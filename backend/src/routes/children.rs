@@ -4,7 +4,7 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, NaiveDate, Utc};
-use serde::{Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -67,6 +67,15 @@ struct ExportConsent {
     accepted_at: DateTime<Utc>,
     policy_version: String,
     language: String,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+struct AvailableInvitation {
+    id: Uuid,
+    email: String,
+    role: String,
+    expires_at: DateTime<Utc>,
     created_at: DateTime<Utc>,
 }
 
@@ -578,4 +587,32 @@ pub async fn remove_invited_parent(
     result
         .map(|_| Json(json!({ "message": "Parent invité retiré" })))
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
+}
+
+pub async fn list_available_invitations(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    user: AuthenticatedUser,
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
+    if let Some(err) = require_admin(&user) {
+        return Err(err);
+    }
+
+    let schema = schema_name(&tenant);
+
+    // Get all invitations that are not used and not yet linked to any child
+    let invitations: Vec<AvailableInvitation> = sqlx::query_as::<_, AvailableInvitation>(&format!(
+        "SELECT it.id, it.email, it.role::TEXT as role, it.expires_at, it.created_at
+         FROM {schema}.invitation_tokens it
+         WHERE it.used = FALSE
+         AND NOT EXISTS (
+           SELECT 1 FROM {schema}.child_invitations ci WHERE ci.invitation_token_id = it.id
+         )
+         ORDER BY it.created_at DESC"
+    ))
+    .fetch_all(&state.db)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    Ok(Json(serde_json::to_value(invitations).unwrap()))
 }
