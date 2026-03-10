@@ -1,4 +1,15 @@
+import React from "react";
 import { EmojiOption } from "./EmojiPicker";
+import {
+  IconMoodTresBien,
+  IconMoodBien,
+  IconMoodDifficile,
+  IconMoodPleurs,
+  IconAppetitBeaucoup,
+  IconAppetitNormal,
+  IconAppetitPeu,
+  IconAppetitRefuse,
+} from "./JournalIcons";
 
 export interface DailyJournal {
   id?: string;
@@ -21,17 +32,17 @@ export type DayData = Omit<DailyJournal, "child_id" | "id">;
 export const WEEK_DAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi"] as const;
 
 export const APPETIT_OPTIONS: EmojiOption[] = [
-  { value: "comme_habitude", emoji: "Normal", label: "Normal" },
-  { value: "peu",             emoji: "Peu", label: "Peu" },
-  { value: "beaucoup",        emoji: "Beaucoup", label: "Beaucoup" },
-  { value: "refuse",          emoji: "Refuse", label: "Refuse" },
+  { value: "comme_habitude", emoji: "Normal",   label: "Normal",   icon: React.createElement(IconAppetitNormal,   { size: 20 }) },
+  { value: "peu",             emoji: "Peu",      label: "Peu",      icon: React.createElement(IconAppetitPeu,     { size: 20 }) },
+  { value: "beaucoup",        emoji: "Beaucoup", label: "Beaucoup", icon: React.createElement(IconAppetitBeaucoup,{ size: 20 }) },
+  { value: "refuse",          emoji: "Refuse",   label: "Refuse",   icon: React.createElement(IconAppetitRefuse,  { size: 20 }) },
 ];
 
 export const HUMEUR_OPTIONS: EmojiOption[] = [
-  { value: "tres_bien",  emoji: "😄", label: "Très bien" },
-  { value: "bien",       emoji: "🙂", label: "Bien" },
-  { value: "difficile",  emoji: "😕", label: "Difficile" },
-  { value: "pleurs",     emoji: "😢", label: "Pleurs" },
+  { value: "tres_bien",  emoji: "😄", label: "Très bien", icon: React.createElement(IconMoodTresBien,  { size: 20 }) },
+  { value: "bien",       emoji: "🙂", label: "Bien",      icon: React.createElement(IconMoodBien,      { size: 20 }) },
+  { value: "difficile",  emoji: "😕", label: "Difficile", icon: React.createElement(IconMoodDifficile, { size: 20 }) },
+  { value: "pleurs",     emoji: "😢", label: "Pleurs",    icon: React.createElement(IconMoodPleurs,    { size: 20 }) },
 ];
 
 export const FIELD_ROWS = [

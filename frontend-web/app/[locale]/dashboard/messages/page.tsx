@@ -262,7 +262,7 @@ export default function MessagesPage() {
       </div>
 
       {/* Chat panel — hidden on mobile when no thread selected */}
-      <div className={`${activeThread ? "flex" : "hidden"} md:flex flex-1 flex-col min-w-0 md:my-3 md:mr-3 md:rounded-xl md:overflow-hidden md:shadow-soft`}>
+      <div className={`${activeThread ? "flex" : "hidden"} md:flex flex-1 flex-col min-w-0 md:my-3 md:ml-3 md:mr-3 md:rounded-xl md:overflow-hidden md:shadow-soft`}>
         {activeThread ? (
           <>
             {/* Header */}
