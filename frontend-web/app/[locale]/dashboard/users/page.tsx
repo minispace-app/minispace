@@ -148,7 +148,7 @@ export default function UsersPage() {
         </div>
         <button
           onClick={() => { setShowInvite(true); setError(""); setInviteSuccess(""); }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+          className="flex items-center gap-2 px-4 py-2 bg-ink text-white rounded-pill text-body hover:opacity-90 transition-all duration-[180ms]"
         >
           <Mail className="w-4 h-4" />
           {t("inviteUser")}
@@ -209,7 +209,7 @@ export default function UsersPage() {
                     {tc("cancel")}
                   </button>
                   <button type="submit" disabled={saving}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition">
+                    className="flex-1 px-4 py-2 bg-ink text-white rounded-pill text-body hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50">
                     {saving ? t("inviteSending") : t("inviteSend")}
                   </button>
                 </div>
@@ -285,7 +285,7 @@ export default function UsersPage() {
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-1.5">
                         <button onClick={() => handleUpdate(u.id)} disabled={saving}
-                          className="p-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                          className="p-1.5 bg-ink text-white rounded-pill hover:opacity-90 transition-all duration-[180ms]">
                           <Check className="w-3.5 h-3.5" />
                         </button>
                         <button onClick={() => setEditId(null)}
@@ -390,7 +390,7 @@ export default function UsersPage() {
                 </div>
                 <p className="text-xs text-slate-500 mb-4">{t("tempPasswordNote")}</p>
                 <button onClick={() => { setResetModalOpen(false); setResetPassword(null); setResetUserId(null); }}
-                  className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition">
+                  className="w-full px-4 py-2 bg-ink text-white rounded-pill text-body hover:opacity-90 transition-all duration-[180ms]">
                   {t("close")}
                 </button>
               </div>

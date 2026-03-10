@@ -195,9 +195,9 @@ export default function MessagesPage() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Sidebar — full width on mobile when no thread selected, fixed width on desktop */}
-      <div className={`${activeThread ? "hidden" : "flex"} md:flex w-full md:w-72 border-r border-slate-200 bg-white flex-col flex-shrink-0`}>
-        <div className="px-4 py-4 border-b border-slate-100">
-          <h1 className="text-base font-semibold text-slate-800">{t("title")}</h1>
+      <div className={`${activeThread ? "hidden" : "flex"} md:flex w-full md:w-72 bg-white/80 backdrop-blur-sm shadow-soft flex-col flex-shrink-0 md:my-3 md:ml-3 md:rounded-xl md:overflow-hidden`}>
+        <div className="px-4 py-4 border-b border-border-soft/50">
+          <h1 className="text-body font-semibold text-ink">{t("title")}</h1>
         </div>
 
         <div className="flex-1 overflow-y-auto py-2">
@@ -215,7 +215,7 @@ export default function MessagesPage() {
           {groups.length > 0 && (
             <>
               <div className="px-4 pt-4 pb-1">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <span className="text-caption font-semibold text-ink-muted uppercase tracking-wider">
                   {t("groupsSection")}
                 </span>
               </div>
@@ -233,7 +233,7 @@ export default function MessagesPage() {
 
           {/* Individual conversations section */}
           <div className="px-4 pt-4 pb-1 flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            <span className="text-caption font-semibold text-ink-muted uppercase tracking-wider">
               {t("directSection")}
             </span>
             {isStaff && (
@@ -262,15 +262,15 @@ export default function MessagesPage() {
       </div>
 
       {/* Chat panel — hidden on mobile when no thread selected */}
-      <div className={`${activeThread ? "flex" : "hidden"} md:flex flex-1 flex-col min-w-0`}>
+      <div className={`${activeThread ? "flex" : "hidden"} md:flex flex-1 flex-col min-w-0 md:my-3 md:mr-3 md:rounded-xl md:overflow-hidden md:shadow-soft`}>
         {activeThread ? (
           <>
             {/* Header */}
-            <div className="px-4 md:px-6 py-4 border-b border-slate-200 bg-white flex items-center gap-3">
+            <div className="px-4 md:px-6 py-4 border-b border-border-soft bg-white/80 backdrop-blur-sm flex items-center gap-3 flex-shrink-0">
               {/* Back button — mobile only */}
               <button
                 onClick={() => setActiveThread(null)}
-                className="md:hidden p-1.5 -ml-1 text-slate-500 hover:bg-slate-100 rounded-lg flex-shrink-0"
+                className="md:hidden w-9 h-9 flex items-center justify-center text-ink-secondary hover:bg-surface-soft rounded-pill flex-shrink-0"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -286,7 +286,7 @@ export default function MessagesPage() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-surface-soft">
               {messages.length === 0 ? (
                 <p className="text-center text-slate-400 mt-16 text-sm">{t("noMessages")}</p>
               ) : (
@@ -302,14 +302,14 @@ export default function MessagesPage() {
 
             {/* Input bar */}
             {canWrite ? (
-              <div className="p-1.5 md:p-4 bg-white border-t border-slate-200 overflow-hidden">
+              <div className="p-2 md:p-4 bg-white/80 backdrop-blur-sm border-t border-border-soft overflow-hidden flex-shrink-0">
                 <div className="flex gap-1.5 md:gap-3 items-end">
                   <textarea
                     value={newMsg}
                     onChange={(e) => setNewMsg(e.target.value)}
                     placeholder={t("placeholder")}
                     rows={1}
-                    className="flex-1 px-3 md:px-4 py-1.5 md:py-3 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="flex-1 px-3 md:px-4 py-2 md:py-3 border-0 bg-surface-soft rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 text-body transition-all duration-[180ms]"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -320,15 +320,15 @@ export default function MessagesPage() {
                   <button
                     onClick={sendMessage}
                     disabled={sending || !newMsg.trim()}
-                    className="p-1.5 md:p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50 transition flex-shrink-0"
+                    className="p-1.5 md:p-3 bg-ink text-white rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50 flex-shrink-0"
                   >
                     <Send className="w-4 h-4" />
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="p-4 bg-white border-t border-slate-200">
-                <div className="flex items-center justify-center gap-2 py-2 px-4 bg-slate-100 rounded-xl text-sm text-slate-500">
+              <div className="p-4 bg-white/80 border-t border-border-soft flex-shrink-0">
+                <div className="flex items-center justify-center gap-2 py-2 px-4 bg-surface-soft rounded-xl text-body text-ink-muted">
                   <MessageSquare className="w-4 h-4" />
                   {t("readOnly")}
                 </div>
@@ -336,9 +336,9 @@ export default function MessagesPage() {
             )}
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center flex-col gap-3 text-slate-400">
-            <MessageSquare className="w-12 h-12 opacity-30" />
-            <p className="text-sm">{t("selectConversation")}</p>
+          <div className="flex-1 flex items-center justify-center flex-col gap-3 text-ink-muted bg-surface-soft">
+            <MessageSquare size={48} strokeWidth={1.5} className="opacity-30" />
+            <p className="text-body">{t("selectConversation")}</p>
           </div>
         )}
       </div>
@@ -399,16 +399,16 @@ function SidebarItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-start gap-3 px-4 py-3 text-left transition border-l-2 ${
+      className={`w-full flex items-start gap-3 px-3 py-2.5 mx-2 rounded-lg text-left transition-all duration-[180ms] ${
         isActive
-          ? "bg-blue-50 border-l-blue-600"
-          : "border-l-transparent hover:bg-slate-50"
+          ? "bg-ink text-white"
+          : "hover:bg-surface-soft"
       }`}
     >
       <div className="flex-shrink-0 mt-0.5">
         {item.kind === "group" && item.color ? (
           <div
-            className="w-4 h-4 rounded-full border border-slate-300"
+            className="w-4 h-4 rounded-pill border border-white/30"
             style={{ backgroundColor: item.color }}
           />
         ) : (
@@ -418,8 +418,8 @@ function SidebarItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
           <span
-            className={`text-sm font-medium truncate ${
-              isActive ? "text-blue-700" : "text-slate-700"
+            className={`text-body font-medium truncate ${
+              isActive ? "text-white" : "text-ink"
             }`}
           >
             {item.name}

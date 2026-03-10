@@ -130,8 +130,8 @@ export default function ParentPrivacyPage() {
         </div>
 
         {/* Info box */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-900">{t("law25Info")}</p>
+        <div className="bg-primary-soft border-0 rounded-lg p-4">
+          <p className="text-sm text-ink">{t("law25Info")}</p>
         </div>
 
         {/* Consent section */}
@@ -191,12 +191,12 @@ export default function ParentPrivacyPage() {
               <button
                 onClick={handleSaveConsent}
                 disabled={savingConsent || photosAccepted === consent.photos_accepted}
-                className={`w-full px-4 py-2 rounded-lg font-medium transition ${
+                className={`w-full px-4 py-2 rounded-pill font-medium transition-all duration-[180ms] ${
                   savingConsent
                     ? "bg-blue-50 text-blue-600 cursor-wait"
                     : photosAccepted === consent.photos_accepted
                       ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
+                      : "bg-ink text-white hover:opacity-90"
                 }`}
               >
                 {savingConsent ? t("common.saving") : t("consentSave")}
@@ -262,12 +262,12 @@ export default function ParentPrivacyPage() {
                   <button
                     onClick={() => handleExport(child)}
                     disabled={exportingId === child.id}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded-pill font-medium transition-all duration-[180ms] ${
                       successId === child.id
                         ? "bg-emerald-50 text-emerald-700"
                         : exportingId === child.id
                           ? "bg-blue-50 text-blue-600 cursor-wait"
-                          : "bg-blue-600 text-white hover:bg-blue-700"
+                          : "bg-ink text-white hover:opacity-90"
                     }`}
                   >
                     {successId === child.id ? (

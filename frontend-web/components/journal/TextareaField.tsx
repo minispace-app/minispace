@@ -17,9 +17,9 @@ export function TextareaField({
 }: Props) {
   if (readOnly) {
     return value ? (
-      <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{value}</div>
+      <div className="text-body text-ink whitespace-pre-wrap leading-relaxed">{value}</div>
     ) : (
-      <div className="text-sm text-slate-300 italic">—</div>
+      <div className="text-body text-ink-muted italic">—</div>
     );
   }
 
@@ -29,7 +29,7 @@ export function TextareaField({
       onChange={(e) => onChange?.(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      className="w-full px-3 py-2 md:px-2 md:py-1.5 text-base md:text-sm border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+      className="w-full px-3 py-2 text-body border-0 bg-surface-soft rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all duration-[180ms] placeholder:text-ink-muted"
     />
   );
 }

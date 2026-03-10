@@ -49,10 +49,10 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
+      className={`px-4 py-1.5 rounded-pill text-body font-medium transition-all duration-[180ms] ease-out ${
         active
-          ? "border-blue-600 text-blue-600"
-          : "border-transparent text-slate-600 hover:text-slate-800"
+          ? "bg-ink text-white shadow-soft"
+          : "text-ink-secondary hover:text-ink hover:bg-surface-soft"
       }`}
     >
       {children}
@@ -306,14 +306,14 @@ function MenusSection() {
   function SaveIndicator() {
     if (saveStatus === "saving")
       return (
-        <span className="text-xs text-slate-400 flex items-center gap-1">
-          <Loader2 className="w-3 h-3 animate-spin" /> Enregistrement...
+        <span className="text-caption text-ink-muted flex items-center gap-1">
+          <Loader2 size={12} strokeWidth={1.5} className="animate-spin" /> Enregistrement...
         </span>
       );
     if (saveStatus === "saved")
       return (
-        <span className="text-xs text-green-600 flex items-center gap-1">
-          <Check className="w-3 h-3" /> Enregistré
+        <span className="text-caption text-status-success flex items-center gap-1">
+          <Check size={12} strokeWidth={1.5} /> Enregistré
         </span>
       );
     return null;
@@ -325,23 +325,22 @@ function MenusSection() {
       {/* Mobile: Day chips + single day view */}
       <div className="md:hidden flex-1 overflow-auto flex flex-col">
         {/* Day chips */}
-        <div className="flex-shrink-0 px-4 py-3 border-b border-slate-100">
+        <div className="flex-shrink-0 px-4 py-3 border-b border-border-soft/50">
           <div className="flex gap-2 overflow-x-auto scrollbar-none">
             {weekDates.map((date, i) => {
               const dateStr = formatDate(date);
               const isToday = dateStr === today;
               const isActive = i === activeDayIndex;
-
               return (
                 <button
                   key={dateStr}
                   onClick={() => setActiveDayIndex(i)}
-                  className={`flex-shrink-0 px-4 py-2 rounded-full font-medium text-sm transition whitespace-nowrap ${
+                  className={`flex-shrink-0 px-4 py-1.5 rounded-pill font-medium text-body transition-all duration-[180ms] whitespace-nowrap ${
                     isActive
-                      ? "bg-blue-600 text-white"
+                      ? "bg-ink text-white shadow-soft"
                       : isToday
-                      ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      ? "bg-accent-yellow/40 text-ink"
+                      : "bg-surface-soft text-ink-secondary hover:bg-border-soft"
                   }`}
                 >
                   {tj(`days.${WEEK_DAYS[i]}`).substring(0, 3)}
@@ -358,38 +357,19 @@ function MenusSection() {
             const dateStr = formatDate(date);
             const isToday = dateStr === today;
             const hasLocal = localData[dateStr] !== undefined;
-
             return (
-              <div
-                className={`rounded-xl border p-4 ${
-                  isToday
-                    ? "border-amber-300 bg-amber-50/60"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
-                <div
-                  className={`text-xs font-semibold uppercase tracking-wide mb-0.5 ${
-                    isToday ? "text-amber-600" : "text-slate-500"
-                  }`}
-                >
+              <div className={`bg-surface-card rounded-xl shadow-card p-4 ${isToday ? "ring-2 ring-accent-yellow/60" : ""}`}>
+                <div className={`text-caption font-semibold uppercase tracking-wide mb-0.5 ${isToday ? "text-ink" : "text-ink-muted"}`}>
                   {tj(`days.${WEEK_DAYS[activeDayIndex]}`)}
                 </div>
-                <div
-                  className={`text-sm font-medium mb-4 flex items-center gap-1.5 ${
-                    isToday ? "text-amber-700" : "text-slate-700"
-                  }`}
-                >
+                <div className="text-body font-medium mb-4 flex items-center gap-1.5 text-ink">
                   {date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" })}
-                  {hasLocal && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400 flex-shrink-0" />
-                  )}
+                  {hasLocal && <span className="w-1.5 h-1.5 rounded-pill bg-accent-orange flex-shrink-0" />}
                 </div>
-
-                {/* 3 Menu Sections in column */}
                 <div className="space-y-4">
                   {menuSections.map((section) => (
                     <div key={section.key} className="flex flex-col">
-                      <label className="text-xs font-semibold text-slate-700 mb-2">{t(section.tKey)}</label>
+                      <label className="text-caption font-semibold text-ink-secondary mb-2">{t(section.tKey)}</label>
                       <TextareaField
                         value={getMenuForDate(dateStr, section.key)}
                         onChange={(v) => updateMenu(dateStr, section.key, v)}
@@ -408,30 +388,24 @@ function MenusSection() {
       {/* Desktop: Mini Calendar + Week Grid */}
       <div className="hidden md:flex flex-1 overflow-hidden gap-4 px-6 py-4">
         {/* Sidebar: Mini Calendar */}
-        <div className="flex flex-col flex-shrink-0 w-48 bg-slate-50 border border-slate-200 rounded-lg p-3">
+        <div className="flex flex-col flex-shrink-0 w-48 bg-surface-card shadow-soft rounded-xl p-3">
           {/* Month navigation */}
           <div className="flex items-center justify-between mb-3">
-            <button
-              onClick={prevMonth}
-              className="p-1 hover:bg-slate-200 rounded transition"
-            >
-              <ChevronLeft className="w-3 h-3" />
+            <button onClick={prevMonth} className="w-6 h-6 flex items-center justify-center hover:bg-surface-soft rounded-pill transition-all duration-[180ms]">
+              <ChevronLeft size={12} strokeWidth={2} className="text-ink-secondary" />
             </button>
-            <h3 className="text-xs font-semibold text-slate-800">
+            <h3 className="text-caption font-semibold text-ink">
               {format(currentMonth, "MMMM yyyy", { locale: fr })}
             </h3>
-            <button
-              onClick={nextMonth}
-              className="p-1 hover:bg-slate-200 rounded transition"
-            >
-              <ChevronRight className="w-3 h-3" />
+            <button onClick={nextMonth} className="w-6 h-6 flex items-center justify-center hover:bg-surface-soft rounded-pill transition-all duration-[180ms]">
+              <ChevronRight size={12} strokeWidth={2} className="text-ink-secondary" />
             </button>
           </div>
 
           {/* Day labels */}
           <div className="grid grid-cols-7 gap-0.5 mb-1">
             {[tc("day_sun"), tc("day_mon"), tc("day_tue"), tc("day_wed"), tc("day_thu"), tc("day_fri"), tc("day_sat")].map((day, i) => (
-              <div key={i} className="text-xs font-semibold text-center text-slate-500 py-0.5">
+              <div key={i} className="text-[10px] font-semibold text-center text-ink-muted py-0.5">
                 {day.substring(0, 1)}
               </div>
             ))}
@@ -443,15 +417,14 @@ function MenusSection() {
               const isCurrentMonth = isSameMonth(date, currentMonth);
               const isInWeek = isInSelectedWeek(date);
               const isTodayDate = isDateToday(date);
-              const dayOfWeek = getISODay(date); // 1=Mon, 7=Sun
-              const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5; // Mon-Fri
+              const dayOfWeek = getISODay(date);
+              const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
 
-              // Determine rounding for week range (Mon-Fri)
-              let roundedClass = "rounded";
+              let roundedClass = "rounded-xs";
               if (isInWeek) {
-                if (dayOfWeek === 1) roundedClass = "rounded-l"; // Monday
-                else if (dayOfWeek === 5) roundedClass = "rounded-r"; // Friday
-                else roundedClass = ""; // Middle days: no rounding
+                if (dayOfWeek === 1) roundedClass = "rounded-l-xs";
+                else if (dayOfWeek === 5) roundedClass = "rounded-r-xs";
+                else roundedClass = "";
               }
 
               return (
@@ -459,16 +432,16 @@ function MenusSection() {
                   key={i}
                   onClick={() => isWeekday && handleSelectWeek(date)}
                   disabled={!isWeekday && isCurrentMonth}
-                  className={`w-6 h-6 text-xs font-medium transition ${roundedClass} ${
+                  className={`w-6 h-6 text-[10px] font-medium transition-all duration-[180ms] ${roundedClass} ${
                     !isCurrentMonth
-                      ? "text-slate-300"
+                      ? "text-ink-muted/40"
                       : !isWeekday
-                      ? "text-slate-300 cursor-not-allowed"
+                      ? "text-ink-muted/40 cursor-not-allowed"
                       : isInWeek
-                      ? "bg-blue-600 text-white"
+                      ? "bg-ink text-white"
                       : isTodayDate
-                      ? "bg-amber-200 text-amber-900"
-                      : "text-slate-700 hover:bg-slate-200"
+                      ? "bg-accent-yellow/50 text-ink font-semibold"
+                      : "text-ink hover:bg-surface-soft"
                   }`}
                 >
                   {date.getDate()}
@@ -481,77 +454,67 @@ function MenusSection() {
           <button
             onClick={exportMonthToPDF}
             disabled={pdfExporting}
-            className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm disabled:opacity-60"
+            className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2 bg-ink text-white rounded-pill hover:opacity-90 transition-all duration-[180ms] text-caption font-medium disabled:opacity-50"
           >
-            {pdfExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {pdfExporting ? <Loader2 size={13} strokeWidth={1.5} className="animate-spin" /> : <Download size={13} strokeWidth={1.5} />}
             {pdfExporting ? "Export..." : "Export PDF"}
           </button>
         </div>
 
         {/* Main: Week Grid */}
         <div className="flex-1 overflow-auto flex flex-col">
-          {/* Grid: 5 columns for days + 1 for section labels */}
-          <div className="grid gap-1 inline-grid overflow-auto" style={{ gridTemplateColumns: "auto repeat(5, 1fr)" }}>
-            {/* Header row: empty cell + day headers */}
-            <div /> {/* Empty corner cell */}
-            {weekDates.map((date, dayIndex) => {
-              const dateStr = formatDate(date);
-              const isToday = dateStr === today;
-              const dayLabel = tj(`days.${WEEK_DAYS[dayIndex]}`);
-              const dateLabel = date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
-
-              return (
-                <div
-                  key={`day-header-${dateStr}`}
-                  className={`px-3 py-2 font-semibold text-xs text-center border border-slate-200 ${
-                    isToday
-                      ? "bg-amber-100 text-amber-800"
-                      : "bg-slate-100 text-slate-700"
-                  }`}
-                >
-                  <div>{dayLabel}</div>
-                  <div className="font-normal text-xs">{dateLabel}</div>
-                </div>
-              );
-            })}
-
-            {/* Section rows - flattened for proper grid layout */}
-            {menuSections.flatMap((section) => [
-              // Section header (left side)
-              <div
-                key={`section-header-${section.key}`}
-                className="px-2 py-2 font-semibold text-xs border border-slate-200 bg-slate-100 text-slate-700 flex items-center justify-center"
-              >
-                {t(section.tKey)}
-              </div>,
-              // Day cells for this section (5 columns)
-              ...weekDates.map((date, dayIndex) => {
+          <div className="rounded-xl overflow-hidden shadow-soft">
+            <div className="grid bg-border-soft/60 gap-px" style={{ gridTemplateColumns: "auto repeat(5, 1fr)" }}>
+              {/* Empty corner */}
+              <div className="bg-surface-soft" />
+              {/* Day headers */}
+              {weekDates.map((date, dayIndex) => {
                 const dateStr = formatDate(date);
                 const isToday = dateStr === today;
-                const hasLocal = localData[dateStr] !== undefined;
-
+                const dayLabel = tj(`days.${WEEK_DAYS[dayIndex]}`);
+                const dateLabel = date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
                 return (
                   <div
-                    key={`cell-${dateStr}-${section.key}`}
-                    className={`p-2 border border-slate-200 ${
-                      isToday ? "bg-amber-50" : "bg-white"
-                    }`}
+                    key={`day-header-${dateStr}`}
+                    className={`px-3 py-2 text-center ${isToday ? "bg-accent-yellow/30" : "bg-surface-soft"}`}
                   >
-                    <TextareaField
-                      value={getMenuForDate(dateStr, section.key)}
-                      onChange={(v) =>
-                        updateMenu(dateStr, section.key, v)
-                      }
-                      placeholder={t("placeholder")}
-                      rows={2}
-                    />
-                    {hasLocal && (
-                      <div className="text-xs text-orange-500 mt-0.5 font-medium">● Modifié</div>
-                    )}
+                    <div className={`text-caption font-semibold uppercase tracking-wide ${isToday ? "text-ink" : "text-ink-muted"}`}>{dayLabel}</div>
+                    <div className="text-caption font-medium mt-0.5 text-ink">{dateLabel}</div>
                   </div>
                 );
-              }),
-            ])}
+              })}
+
+              {/* Section rows */}
+              {menuSections.flatMap((section) => [
+                <div
+                  key={`section-header-${section.key}`}
+                  className="px-3 py-3 bg-surface-soft flex items-center justify-center"
+                >
+                  <span className="text-caption font-semibold text-ink-secondary text-center">{t(section.tKey)}</span>
+                </div>,
+                ...weekDates.map((date, dayIndex) => {
+                  const dateStr = formatDate(date);
+                  const isToday = dateStr === today;
+                  const hasLocal = localData[dateStr] !== undefined;
+                  return (
+                    <div
+                      key={`cell-${dateStr}-${section.key}`}
+                      className={`p-2 ${isToday ? "bg-accent-yellow/10" : "bg-surface-card"}`}
+                    >
+                      <TextareaField
+                        value={getMenuForDate(dateStr, section.key)}
+                        onChange={(v) => updateMenu(dateStr, section.key, v)}
+                        placeholder={t("placeholder")}
+                        rows={2}
+                      />
+                      {hasLocal && (
+                        <div className="text-caption text-accent-orange mt-0.5 font-medium">● Modifié</div>
+                      )}
+                    </div>
+                  );
+                }),
+              ])}
+            </div>
           </div>
         </div>
       </div>
@@ -658,40 +621,32 @@ function ActivitiesSection() {
   return (
     <div className="space-y-6 px-6 py-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold text-slate-800">{t("title")}</h2>
-        </div>
+        <h2 className="text-h3 font-semibold text-ink">{t("title")}</h2>
         <button
           onClick={() => handleOpenForm()}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-ink text-white rounded-pill hover:opacity-90 transition-all duration-[180ms] text-body font-medium"
         >
-          <Plus className="w-4 h-4" />
+          <Plus size={16} strokeWidth={1.5} />
           {t("create")}
         </button>
       </div>
 
       {/* Month navigation */}
-      <div className="bg-white rounded-lg shadow p-4 flex items-center justify-between">
-        <button
-          onClick={handlePrevMonth}
-          className="p-2 hover:bg-slate-100 rounded-lg transition"
-        >
-          <ChevronLeft className="w-5 h-5" />
+      <div className="bg-surface-card rounded-xl shadow-soft p-4 flex items-center justify-between">
+        <button onClick={handlePrevMonth} className="w-9 h-9 flex items-center justify-center hover:bg-surface-soft rounded-pill transition-all duration-[180ms]">
+          <ChevronLeft size={18} strokeWidth={1.5} className="text-ink-secondary" />
         </button>
-        <h3 className="text-lg font-semibold text-slate-800">
+        <h3 className="text-h3 font-semibold text-ink">
           {format(currentMonth, "MMMM yyyy", { locale: fr })}
         </h3>
-        <button
-          onClick={handleNextMonth}
-          className="p-2 hover:bg-slate-100 rounded-lg transition"
-        >
-          <ChevronRight className="w-5 h-5" />
+        <button onClick={handleNextMonth} className="w-9 h-9 flex items-center justify-center hover:bg-surface-soft rounded-pill transition-all duration-[180ms]">
+          <ChevronRight size={18} strokeWidth={1.5} className="text-ink-secondary" />
         </button>
       </div>
 
       {/* Activities list */}
       {activities.length === 0 ? (
-        <div className="bg-slate-50 border border-slate-200 rounded-lg p-8 text-center text-slate-600">
+        <div className="bg-surface-card rounded-xl shadow-soft p-8 text-center text-body text-ink-muted">
           {t("empty")}
         </div>
       ) : (
@@ -699,48 +654,43 @@ function ActivitiesSection() {
           {activities.map((activity: Activity) => (
             <div
               key={activity.id}
-              className="bg-white border border-slate-200 rounded-lg p-4 flex items-start justify-between hover:shadow-md transition"
+              className="bg-surface-card rounded-xl shadow-card p-4 flex items-start justify-between hover:shadow-hover hover:-translate-y-0.5 transition-all duration-[180ms]"
             >
               <div className="flex-1">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h4 className="font-bold text-slate-800">{activity.title}</h4>
-                  <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-semibold text-ink text-body">{activity.title}</h4>
+                  <span className={`text-caption font-semibold rounded-pill px-2 py-1 ${
                     activity.type === "theme"
-                      ? "bg-violet-100 text-violet-700"
-                      : "bg-orange-100 text-orange-700"
+                      ? "bg-[#EAE8FF] text-accent-purple"
+                      : "bg-accent-orange/20 text-accent-orange"
                   }`}>
                     {activity.type === "theme" ? `📚 ${t("form.typeTheme")}` : `🚌 ${t("form.typeSortie")}`}
                   </span>
                   {activity.group_id && groupsData.find((g: any) => g.id === activity.group_id) && (
-                    <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
+                    <span className="text-caption font-semibold rounded-pill px-2 py-1 bg-primary-soft text-primary">
                       {groupsData.find((g: any) => g.id === activity.group_id)?.name}
                     </span>
                   )}
                 </div>
                 {activity.description && (
-                  <p className="text-slate-600 text-sm mt-1">{activity.description}</p>
+                  <p className="text-body text-ink-secondary mt-1">{activity.description}</p>
                 )}
-                <div className="flex gap-4 mt-2 text-sm text-slate-600 flex-wrap">
+                <div className="flex gap-4 mt-2 text-body text-ink-muted flex-wrap">
                   <span>📅 {format(parse(activity.date, "yyyy-MM-dd", new Date()), "d MMMM yyyy", { locale: fr })}
                     {activity.end_date && activity.end_date !== activity.date &&
                       ` – ${format(parse(activity.end_date, "yyyy-MM-dd", new Date()), "d MMMM yyyy", { locale: fr })}`}
                   </span>
                   {activity.capacity && (
-                    <span>
-                      👥 {activity.registration_count || 0}/{activity.capacity} {t("registered")}
-                    </span>
+                    <span>👥 {activity.registration_count || 0}/{activity.capacity} {t("registered")}</span>
                   )}
                 </div>
               </div>
 
-              <div className="flex gap-2 ml-4">
+              <div className="flex gap-1 ml-4">
                 {activity.type !== "theme" && (
                   <button
-                    onClick={() => {
-                      setSelectedActivityForRegistrations(activity.id);
-                      setShowRegistrations(true);
-                    }}
-                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition"
+                    onClick={() => { setSelectedActivityForRegistrations(activity.id); setShowRegistrations(true); }}
+                    className="w-9 h-9 flex items-center justify-center text-status-success hover:bg-status-success/10 rounded-pill transition-all duration-[180ms]"
                     title={t("registrations")}
                   >
                     👥
@@ -748,15 +698,15 @@ function ActivitiesSection() {
                 )}
                 <button
                   onClick={() => handleOpenForm(activity)}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                  className="w-9 h-9 flex items-center justify-center text-ink-secondary hover:bg-surface-soft rounded-pill transition-all duration-[180ms]"
                 >
-                  <Edit2 className="w-4 h-4" />
+                  <Edit2 size={16} strokeWidth={1.5} />
                 </button>
                 <button
                   onClick={() => handleDelete(activity.id)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                  className="w-9 h-9 flex items-center justify-center text-status-danger hover:bg-status-danger/10 rounded-pill transition-all duration-[180ms]"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 size={16} strokeWidth={1.5} />
                 </button>
               </div>
             </div>
@@ -813,46 +763,35 @@ function RegistrationsModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6">
+      <div className="bg-surface-card rounded-xl shadow-hover max-w-2xl w-full p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-slate-800">
-            {t("registrations")} - {activity?.title}
+          <h3 className="text-h3 font-semibold text-ink">
+            {t("registrations")} — {activity?.title}
           </h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-700">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center text-ink-secondary hover:bg-surface-soft rounded-pill transition-all duration-[180ms]">
+            <X size={18} strokeWidth={1.5} />
           </button>
         </div>
 
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {registrationsData.length === 0 ? (
-            <p className="text-slate-600 text-center py-4">{t("noRegistrations")}</p>
+            <p className="text-body text-ink-muted text-center py-4">{t("noRegistrations")}</p>
           ) : (
             <div>
-              <p className="text-sm text-slate-600 mb-3">
+              <p className="text-body text-ink-secondary mb-3">
                 {registrationsData.length} {t("inscribed")} {activity?.capacity ? `/ ${activity.capacity}` : ""}
               </p>
               {registrationsData.map((reg: any) => (
-                <div
-                  key={reg.id}
-                  className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200"
-                >
-                  <div className="flex-1">
-                    <p className="font-semibold text-slate-800">
-                      {reg.first_name} {reg.last_name}
-                    </p>
-                  </div>
+                <div key={reg.id} className="flex items-center gap-3 p-3 bg-surface-soft rounded-lg hover:bg-border-soft transition-all duration-[180ms]">
+                  <p className="text-body font-semibold text-ink">{reg.first_name} {reg.last_name}</p>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        <div className="flex gap-3 pt-4 mt-4 border-t border-slate-200">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition font-medium"
-          >
+        <div className="flex gap-3 pt-4 mt-4 border-t border-border-soft">
+          <button type="button" onClick={onClose} className="flex-1 px-4 py-2 bg-surface-soft text-ink rounded-pill hover:bg-border-soft transition-all duration-[180ms] text-body font-medium">
             {tc("close")}
           </button>
         </div>
@@ -879,150 +818,82 @@ function ActivityFormModal({
   const t = useTranslations("activities");
   const tc = useTranslations("common");
 
+  const inputCls = "w-full px-4 py-2.5 border-0 bg-surface-soft rounded-xl text-body focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all duration-[180ms] placeholder:text-ink-muted";
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-slate-800">
+      <div className="bg-surface-card rounded-xl shadow-hover max-w-2xl w-full p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-h3 font-semibold text-ink">
             {formData.action === "create" ? t("form.create") : t("form.edit")}
           </h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-700">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="w-9 h-9 flex items-center justify-center text-ink-secondary hover:bg-surface-soft rounded-pill transition-all duration-[180ms]">
+            <X size={18} strokeWidth={1.5} />
           </button>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4">
-          {/* Type selector */}
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              {t("form.type")}
-            </label>
+            <label className="block text-caption font-semibold text-ink-secondary mb-2">{t("form.type")}</label>
             <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => onChange("type", "theme")}
-                className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition font-medium text-sm ${
-                  formData.type === "theme"
-                    ? "border-violet-500 bg-violet-50 text-violet-700"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                }`}
-              >
+              <button type="button" onClick={() => onChange("type", "theme")}
+                className={`flex items-center gap-2 px-4 py-3 rounded-xl text-body font-medium transition-all duration-[180ms] ${
+                  formData.type === "theme" ? "bg-[#EAE8FF] text-accent-purple" : "bg-surface-soft text-ink-secondary hover:bg-border-soft"
+                }`}>
                 📚 {t("form.typeTheme")}
               </button>
-              <button
-                type="button"
-                onClick={() => onChange("type", "sortie")}
-                className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition font-medium text-sm ${
-                  (formData.type || "sortie") === "sortie"
-                    ? "border-orange-500 bg-orange-50 text-orange-700"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                }`}
-              >
+              <button type="button" onClick={() => onChange("type", "sortie")}
+                className={`flex items-center gap-2 px-4 py-3 rounded-xl text-body font-medium transition-all duration-[180ms] ${
+                  (formData.type || "sortie") === "sortie" ? "bg-accent-orange/20 text-accent-orange" : "bg-surface-soft text-ink-secondary hover:bg-border-soft"
+                }`}>
                 🚌 {t("form.typeSortie")}
               </button>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
-              {t("form.title")} *
-            </label>
-            <input
-              type="text"
-              value={formData.title || ""}
-              onChange={(e) => onChange("title", e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-caption font-semibold text-ink-secondary mb-1">{t("form.title")} *</label>
+            <input type="text" value={formData.title || ""} onChange={(e) => onChange("title", e.target.value)} required className={inputCls} />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
-              {t("form.description")}
-            </label>
-            <textarea
-              value={formData.description || ""}
-              onChange={(e) => onChange("description", e.target.value)}
-              rows={3}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-caption font-semibold text-ink-secondary mb-1">{t("form.description")}</label>
+            <textarea value={formData.description || ""} onChange={(e) => onChange("description", e.target.value)} rows={3} className={inputCls} />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
-              {t("form.date")} *
-            </label>
-            <input
-              type="date"
-              value={formData.date || ""}
-              onChange={(e) => onChange("date", e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-caption font-semibold text-ink-secondary mb-1">{t("form.date")} *</label>
+            <input type="date" value={formData.date || ""} onChange={(e) => onChange("date", e.target.value)} required className={inputCls} />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1">
-              {t("form.endDate")}
-            </label>
-            <input
-              type="date"
-              value={formData.end_date || ""}
-              onChange={(e) => onChange("end_date", e.target.value)}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <label className="block text-caption font-semibold text-ink-secondary mb-1">{t("form.endDate")}</label>
+            <input type="date" value={formData.end_date || ""} onChange={(e) => onChange("end_date", e.target.value)} className={inputCls} />
           </div>
 
           <div className={`grid gap-4 ${(formData.type || "sortie") === "sortie" ? "grid-cols-2" : "grid-cols-1"}`}>
             {(formData.type || "sortie") === "sortie" && (
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  {t("form.capacity")}
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={formData.capacity || ""}
-                  onChange={(e) => onChange("capacity", e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder={t("form.capacityPlaceholder")}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <label className="block text-caption font-semibold text-ink-secondary mb-1">{t("form.capacity")}</label>
+                <input type="number" min="1" value={formData.capacity || ""} onChange={(e) => onChange("capacity", e.target.value ? parseInt(e.target.value) : null)} placeholder={t("form.capacityPlaceholder")} className={inputCls} />
               </div>
             )}
-
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
-                {t("form.group")}
-              </label>
-              <select
-                value={formData.group_id || ""}
-                onChange={(e) => onChange("group_id", e.target.value || null)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+              <label className="block text-caption font-semibold text-ink-secondary mb-1">{t("form.group")}</label>
+              <select value={formData.group_id || ""} onChange={(e) => onChange("group_id", e.target.value || null)} className={inputCls}>
                 <option value="">{t("form.noGroup")}</option>
                 {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
+                  <option key={group.id} value={group.id}>{group.name}</option>
                 ))}
               </select>
             </div>
           </div>
 
           <div className="flex gap-3 pt-4">
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 bg-ink text-white rounded-pill hover:opacity-90 transition-all duration-[180ms] text-body font-medium disabled:opacity-50">
               {loading ? t("form.saving") : t("form.save")}
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading}
-              className="flex-1 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition font-medium disabled:opacity-50"
-            >
+            <button type="button" onClick={onClose} disabled={loading} className="flex-1 px-4 py-2.5 bg-surface-soft text-ink rounded-pill hover:bg-border-soft transition-all duration-[180ms] text-body font-medium disabled:opacity-50">
               {tc("cancel")}
             </button>
           </div>
@@ -1039,24 +910,20 @@ export default function PlanningPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
-        <h1 className="text-base font-semibold text-slate-800">{t("title")}</h1>
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft/50 flex-shrink-0">
+        <h1 className="text-h3 font-semibold text-ink">{t("title")}</h1>
       </div>
 
       {/* Tab bar */}
-      <div className="flex border-b border-slate-200 px-6 flex-shrink-0">
-        <TabButton
-          active={activeTab === "menus"}
-          onClick={() => setActiveTab("menus")}
-        >
-          {t("tabMenu")}
-        </TabButton>
-        <TabButton
-          active={activeTab === "activities"}
-          onClick={() => setActiveTab("activities")}
-        >
-          {t("tabActivities")}
-        </TabButton>
+      <div className="px-6 py-3 flex-shrink-0">
+        <div className="flex items-center gap-1 bg-white/60 backdrop-blur-sm rounded-pill px-2 py-1.5 shadow-soft w-fit">
+          <TabButton active={activeTab === "menus"} onClick={() => setActiveTab("menus")}>
+            {t("tabMenu")}
+          </TabButton>
+          <TabButton active={activeTab === "activities"} onClick={() => setActiveTab("activities")}>
+            {t("tabActivities")}
+          </TabButton>
+        </div>
       </div>
 
       {/* Tab content */}

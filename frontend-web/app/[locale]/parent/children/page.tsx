@@ -72,10 +72,10 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
+      className={`px-4 py-1.5 rounded-pill text-body font-medium transition-all duration-[180ms] ease-out ${
         active
-          ? "border-blue-600 text-blue-600"
-          : "border-transparent text-slate-600 hover:text-slate-800"
+          ? "bg-ink text-white shadow-soft"
+          : "text-ink-secondary hover:text-ink hover:bg-surface-soft"
       }`}
     >
       {children}
@@ -95,37 +95,37 @@ function ParentJournalsSection({ child }: { child: Child }) {
 
   if (journals.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 rounded-xl p-6 text-center">
-        <p className="text-slate-500">Aucun journal de bord pour ce mois</p>
+      <div className="bg-surface-card rounded-xl p-6 shadow-soft text-center">
+        <p className="text-body text-ink-muted">Aucun journal de bord pour ce mois</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 bg-blue-50">
-          <h3 className="text-sm font-semibold text-slate-800">Journaux de bord du mois</h3>
+      <div className="bg-surface-card rounded-xl shadow-card overflow-hidden">
+        <div className="px-6 py-4 border-b border-border-soft bg-primary-soft">
+          <h3 className="text-body font-semibold text-ink">Journaux de bord du mois</h3>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {journals.map((journal) => (
               <div
                 key={journal.date}
-                className={`p-4 rounded-lg border-2 transition ${
+                className={`p-4 rounded-xl transition-all duration-[180ms] ${
                   journal.sent
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-yellow-50 border-yellow-200'
+                    ? 'bg-status-success/10'
+                    : 'bg-status-warning/10'
                 }`}
               >
                 <div className="flex items-start justify-between mb-2">
-                  <span className="font-semibold text-slate-800">
+                  <span className="font-semibold text-ink text-body">
                     {format(parseISO(journal.date), "EEEE d MMMM", { locale: fr })}
                   </span>
-                  <span className={`text-xs font-medium px-2 py-1 rounded ${
+                  <span className={`text-caption font-semibold rounded-pill px-2 py-1 ${
                     journal.sent
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-yellow-100 text-yellow-700'
+                      ? 'bg-status-success/20 text-status-success'
+                      : 'bg-status-warning/20 text-ink-secondary'
                   }`}>
                     {journal.sent ? '✓ Envoyé' : '⏳ Brouillon'}
                   </span>
@@ -142,17 +142,17 @@ function ParentJournalsSection({ child }: { child: Child }) {
 function ChildCard({ child, groupMap }: { child: Child; groupMap: Record<string, string> }) {
   const t = useTranslations("children");
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden p-5">
+    <div className="bg-surface-card rounded-xl shadow-card p-5">
       <div className="flex items-center gap-4">
         <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="lg" />
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-slate-800 text-lg">
+          <p className="font-semibold text-ink text-h3">
             {child.first_name} {child.last_name}
           </p>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-body text-ink-secondary mt-1">
             {age(child.birth_date, t("months"), t("years"))}
             {child.group_id && groupMap[child.group_id] && (
-              <span className="ml-2 text-blue-600">· {groupMap[child.group_id]}</span>
+              <span className="ml-2 text-primary font-medium">· {groupMap[child.group_id]}</span>
             )}
           </p>
         </div>
@@ -185,16 +185,16 @@ function ChildBirthDateEdit({ child, onUpdated }: { child: Child; onUpdated: () 
   };
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-          <Pencil className="w-4 h-4 text-slate-500" />
+    <div className="bg-surface-card rounded-xl shadow-card overflow-hidden">
+      <div className="px-5 py-4 border-b border-border-soft flex items-center justify-between">
+        <h3 className="text-body font-semibold text-ink flex items-center gap-2">
+          <Pencil size={14} strokeWidth={1.5} className="text-ink-secondary" />
           {t("birthDate")}
         </h3>
         {!editing && (
           <button
             onClick={() => setEditing(true)}
-            className="text-xs text-blue-600 hover:text-blue-700 font-medium transition"
+            className="text-caption text-primary hover:text-primary-light font-medium transition-all duration-[180ms]"
           >
             {tc("edit")}
           </button>
@@ -202,29 +202,29 @@ function ChildBirthDateEdit({ child, onUpdated }: { child: Child; onUpdated: () 
       </div>
       <div className="px-5 py-4">
         {!editing ? (
-          <p className="text-sm text-slate-700">{child.birth_date}</p>
+          <p className="text-body text-ink">{child.birth_date}</p>
         ) : (
           <div className="flex items-center gap-2">
             <input
               type="date"
               value={birthDate}
               onChange={(e) => setBirthDate(e.target.value)}
-              className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 border-0 bg-surface-soft rounded-xl text-body focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all duration-[180ms]"
             />
             <button
               onClick={handleSave}
               disabled={saving}
-              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="w-9 h-9 flex items-center justify-center bg-ink text-white rounded-pill hover:opacity-90 disabled:opacity-50 transition-all duration-[180ms]"
               title={tc("save")}
             >
-              <Check className="w-4 h-4" />
+              <Check size={14} strokeWidth={1.5} />
             </button>
             <button
               onClick={handleCancel}
-              className="p-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50"
+              className="w-9 h-9 flex items-center justify-center bg-surface-soft text-ink-secondary rounded-pill hover:bg-border-soft transition-all duration-[180ms]"
               title={tc("cancel")}
             >
-              <X className="w-4 h-4" />
+              <X size={14} strokeWidth={1.5} />
             </button>
           </div>
         )}
@@ -335,19 +335,19 @@ function DayDetailModal({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-t-2xl md:rounded-xl w-full md:max-w-lg max-h-[85vh] flex flex-col"
+        className="bg-surface-card rounded-t-xl md:rounded-xl w-full md:max-w-lg max-h-[85vh] flex flex-col shadow-hover"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0">
-          <h3 className="text-lg font-bold text-slate-800 capitalize">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-soft flex-shrink-0">
+          <h3 className="text-h3 font-semibold text-ink capitalize">
             {format(dateObj, "EEEE d MMMM", { locale: dateLocale })}
           </h3>
           <button
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-slate-600 transition"
+            className="w-9 h-9 flex items-center justify-center text-ink-secondary hover:bg-surface-soft rounded-pill transition-all duration-[180ms]"
           >
-            <X className="w-5 h-5" />
+            <X size={18} strokeWidth={1.5} />
           </button>
         </div>
 
@@ -355,12 +355,12 @@ function DayDetailModal({
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {/* ── ATTENDANCE ── */}
           <section>
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+            <h4 className="text-caption font-bold text-ink-muted uppercase tracking-wide mb-3">
               {t("dayDetail.attendance")}
             </h4>
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-sm">{ATTENDANCE_COLORS[currentStatus]?.icon}</span>
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-body">{ATTENDANCE_COLORS[currentStatus]?.icon}</span>
+              <span className="text-body font-medium text-ink">
                 {ATTENDANCE_COLORS[currentStatus]?.label}
               </span>
             </div>
@@ -377,14 +377,16 @@ function DayDetailModal({
                       key={status}
                       onClick={() => handleSetStatus(status)}
                       disabled={statusLoading}
-                      className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium transition border ${
+                      className={`flex-1 px-3 py-2.5 rounded-pill text-body font-medium transition-all duration-[180ms] ${
                         isActive
-                          ? `${ATTENDANCE_COLORS[status].bg} ${ATTENDANCE_COLORS[status].text} border-current`
-                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                          ? status === "present"
+                            ? "bg-status-success/20 text-status-success"
+                            : "bg-status-danger/20 text-status-danger"
+                          : "bg-surface-soft text-ink-secondary hover:bg-border-soft"
                       } disabled:opacity-50`}
                     >
                       {statusLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                        <Loader2 size={14} strokeWidth={1.5} className="animate-spin mx-auto" />
                       ) : (
                         labels[status]
                       )}
@@ -397,60 +399,60 @@ function DayDetailModal({
 
           {/* ── JOURNAL ── */}
           <section>
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+            <h4 className="text-caption font-bold text-ink-muted uppercase tracking-wide mb-3">
               {t("dayDetail.journal")}
             </h4>
             {journal ? (
-              <div className="bg-slate-50 rounded-lg p-4 space-y-2 text-sm">
+              <div className="bg-surface-soft rounded-xl p-4 space-y-2">
                 {journal.humeur && (
-                  <div className="flex gap-2">
-                    <span className="font-semibold text-slate-700">Humeur:</span>
-                    <span className="text-slate-600">{journal.humeur}</span>
+                  <div className="flex gap-2 text-body">
+                    <span className="font-semibold text-ink">Humeur:</span>
+                    <span className="text-ink-secondary">{journal.humeur}</span>
                   </div>
                 )}
                 {journal.appetit && (
-                  <div className="flex gap-2">
-                    <span className="font-semibold text-slate-700">Appétit:</span>
-                    <span className="text-slate-600">{journal.appetit}</span>
+                  <div className="flex gap-2 text-body">
+                    <span className="font-semibold text-ink">Appétit:</span>
+                    <span className="text-ink-secondary">{journal.appetit}</span>
                   </div>
                 )}
                 {journal.sommeil_minutes && (
-                  <div className="flex gap-2">
-                    <span className="font-semibold text-slate-700">Sommeil:</span>
-                    <span className="text-slate-600">{journal.sommeil_minutes} min</span>
+                  <div className="flex gap-2 text-body">
+                    <span className="font-semibold text-ink">Sommeil:</span>
+                    <span className="text-ink-secondary">{journal.sommeil_minutes} min</span>
                   </div>
                 )}
                 {journal.message_educatrice && (
-                  <div className="flex gap-2">
-                    <span className="font-semibold text-slate-700">Message:</span>
-                    <span className="text-slate-600">{journal.message_educatrice}</span>
+                  <div className="flex gap-2 text-body">
+                    <span className="font-semibold text-ink">Message:</span>
+                    <span className="text-ink-secondary">{journal.message_educatrice}</span>
                   </div>
                 )}
                 {journal.observations && (
-                  <div className="flex gap-2">
-                    <span className="font-semibold text-slate-700">Observations:</span>
-                    <span className="text-slate-600">{journal.observations}</span>
+                  <div className="flex gap-2 text-body">
+                    <span className="font-semibold text-ink">Observations:</span>
+                    <span className="text-ink-secondary">{journal.observations}</span>
                   </div>
                 )}
                 {journal.sante && (
-                  <div className="flex gap-2">
-                    <span className="font-semibold text-slate-700">Santé:</span>
-                    <span className="text-slate-600">{journal.sante}</span>
+                  <div className="flex gap-2 text-body">
+                    <span className="font-semibold text-ink">Santé:</span>
+                    <span className="text-ink-secondary">{journal.sante}</span>
                   </div>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-slate-400 italic">{t("dayDetail.noJournal")}</p>
+              <p className="text-body text-ink-muted italic">{t("dayDetail.noJournal")}</p>
             )}
           </section>
 
           {/* ── ACTIVITIES ── */}
           <section>
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
+            <h4 className="text-caption font-bold text-ink-muted uppercase tracking-wide mb-3">
               {t("dayDetail.activities")}
             </h4>
             {dayActivities.length === 0 ? (
-              <p className="text-sm text-slate-400 italic">{t("dayDetail.noActivities")}</p>
+              <p className="text-body text-ink-muted italic">{t("dayDetail.noActivities")}</p>
             ) : (
               <div className="space-y-3">
                 {dayActivities.map((activity) => {
@@ -462,39 +464,39 @@ function DayDetailModal({
                   return (
                     <div
                       key={activity.id}
-                      className={`rounded-xl border-2 p-4 ${
+                      className={`rounded-xl p-4 ${
                         isTheme
-                          ? "border-violet-200 bg-violet-50/50"
-                          : "border-orange-200 bg-orange-50/50"
+                          ? "bg-[#EAE8FF]"
+                          : "bg-accent-orange/20"
                       }`}
                     >
                       {/* Type badge */}
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`text-xs font-bold uppercase tracking-wide ${
-                          isTheme ? "text-violet-600" : "text-orange-600"
+                        <span className={`text-caption font-bold uppercase tracking-wide ${
+                          isTheme ? "text-accent-purple" : "text-accent-orange"
                         }`}>
                           {isTheme ? `📚 ${t("dayDetail.theme")}` : `🚌 ${t("dayDetail.sortie")}`}
                         </span>
                         {!isTheme && activity.capacity != null && (
-                          <span className="text-xs text-slate-500 ml-auto">
+                          <span className="text-caption text-ink-muted ml-auto">
                             {activity.registration_count || 0}/{activity.capacity}
                           </span>
                         )}
                       </div>
 
                       {/* Title */}
-                      <p className="font-semibold text-slate-800">{activity.title}</p>
+                      <p className="font-semibold text-ink text-body">{activity.title}</p>
 
                       {/* Date range if multi-day */}
                       {activity.end_date && activity.end_date !== activity.date && (
-                        <p className="text-xs text-slate-500 mt-1">
+                        <p className="text-caption text-ink-muted mt-1">
                           {format(parseISO(activity.date), "d MMM", { locale: dateLocale })} – {format(parseISO(activity.end_date), "d MMM", { locale: dateLocale })}
                         </p>
                       )}
 
                       {/* Description */}
                       {activity.description && (
-                        <p className="text-sm text-slate-600 mt-1">{activity.description}</p>
+                        <p className="text-body text-ink-secondary mt-1">{activity.description}</p>
                       )}
 
                       {/* Registration button for sortie only */}
@@ -504,10 +506,10 @@ function DayDetailModal({
                             <button
                               onClick={() => handleUnregister(activity.id)}
                               disabled={loading}
-                              className="w-full px-4 py-2.5 bg-green-100 text-green-700 border border-green-300 rounded-lg font-medium text-sm hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition disabled:opacity-50"
+                              className="w-full px-4 py-2.5 bg-status-success/20 text-status-success rounded-pill font-medium text-body hover:bg-status-danger/20 hover:text-status-danger transition-all duration-[180ms] disabled:opacity-50"
                             >
                               {loading ? (
-                                <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                                <Loader2 size={14} strokeWidth={1.5} className="animate-spin mx-auto" />
                               ) : (
                                 <>✓ {t("dayDetail.registered")} — {t("dayDetail.tapToUnregister")}</>
                               )}
@@ -515,7 +517,7 @@ function DayDetailModal({
                           ) : isFull ? (
                             <button
                               disabled
-                              className="w-full px-4 py-2.5 bg-slate-100 text-slate-400 border border-slate-200 rounded-lg font-medium text-sm cursor-not-allowed"
+                              className="w-full px-4 py-2.5 bg-surface-soft text-ink-muted rounded-pill font-medium text-body cursor-not-allowed"
                             >
                               {t("dayDetail.full")}
                             </button>
@@ -523,10 +525,10 @@ function DayDetailModal({
                             <button
                               onClick={() => handleRegister(activity.id)}
                               disabled={loading}
-                              className="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition disabled:opacity-50"
+                              className="w-full px-4 py-2.5 bg-ink text-white rounded-pill font-medium text-body hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50"
                             >
                               {loading ? (
-                                <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                                <Loader2 size={14} strokeWidth={1.5} className="animate-spin mx-auto" />
                               ) : (
                                 t("dayDetail.register")
                               )}
@@ -650,25 +652,25 @@ function ParentCalendarSection({
   return (
     <div className="space-y-4">
       {/* Desktop: Monthly Calendar */}
-      <div className="hidden md:block bg-white rounded-lg shadow p-6">
+      <div className="hidden md:block bg-surface-card rounded-xl shadow-card p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-slate-800">
+          <h2 className="text-h2 font-semibold text-ink">
             {format(currentMonth, "MMMM yyyy", { locale: dateLocale })}
           </h2>
           <div className="flex gap-2">
             <button
               onClick={() => { setSelectMode(!selectMode); setSelectedDates(new Set()); }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
-                selectMode ? "bg-blue-600 text-white border-blue-600" : "text-slate-600 border-slate-200 hover:bg-slate-50"
+              className={`px-3 py-1.5 rounded-pill text-caption font-medium transition-all duration-[180ms] ${
+                selectMode ? "bg-ink text-white" : "bg-surface-soft text-ink-secondary hover:bg-border-soft"
               }`}
             >
               {selectMode ? `✓ ${selectedDates.size} sélectionné(s)` : "Sélection multiple"}
             </button>
-            <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 rounded-lg transition">
-              <ChevronLeft className="w-5 h-5" />
+            <button onClick={handlePrevMonth} className="w-9 h-9 flex items-center justify-center hover:bg-surface-soft rounded-pill transition-all duration-[180ms]">
+              <ChevronLeft size={18} strokeWidth={1.5} className="text-ink-secondary" />
             </button>
-            <button onClick={handleNextMonth} className="p-2 hover:bg-slate-100 rounded-lg transition">
-              <ChevronRight className="w-5 h-5" />
+            <button onClick={handleNextMonth} className="w-9 h-9 flex items-center justify-center hover:bg-surface-soft rounded-pill transition-all duration-[180ms]">
+              <ChevronRight size={18} strokeWidth={1.5} className="text-ink-secondary" />
             </button>
           </div>
         </div>
@@ -711,7 +713,7 @@ function ParentCalendarSection({
                 className={`h-24 rounded-lg border-2 p-2 transition overflow-hidden flex flex-col ${
                   disabled ? "bg-slate-50 border-slate-100 cursor-not-allowed opacity-40"
                   : isSelected ? "bg-blue-100 border-blue-500 cursor-pointer ring-2 ring-blue-400/40"
-                  : isToday ? `${colors.bg} border-slate-900 cursor-pointer hover:shadow-md ring-2 ring-slate-900/20`
+                  : isToday ? `${colors.bg} border-accent-yellow cursor-pointer hover:shadow-md ring-2 ring-accent-yellow/50`
                   : `${colors.bg} border-slate-200 cursor-pointer hover:shadow-md`
                 }`}
               >
@@ -772,26 +774,26 @@ function ParentCalendarSection({
       </div>
 
       {/* Mobile: Small calendar grid */}
-      <div className="md:hidden bg-white rounded-lg shadow p-4 flex flex-col h-full overflow-hidden">
+      <div className="md:hidden bg-surface-card rounded-xl shadow-card p-4 flex flex-col h-full overflow-hidden">
         <div className="flex items-center justify-between mb-3 flex-shrink-0">
-          <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-100 rounded-lg transition">
-            <ChevronLeft className="w-4 h-4" />
+          <button onClick={handlePrevMonth} className="w-8 h-8 flex items-center justify-center hover:bg-surface-soft rounded-pill transition-all duration-[180ms]">
+            <ChevronLeft size={16} strokeWidth={1.5} className="text-ink-secondary" />
           </button>
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-slate-800">
+            <h2 className="text-body font-semibold text-ink">
               {format(currentMonth, "MMM yyyy", { locale: dateLocale })}
             </h2>
             <button
               onClick={() => { setSelectMode(!selectMode); setSelectedDates(new Set()); }}
-              className={`px-2 py-1 rounded text-xs font-medium border transition ${
-                selectMode ? "bg-blue-600 text-white border-blue-600" : "text-slate-600 border-slate-200"
+              className={`px-2 py-1 rounded-pill text-caption font-medium transition-all duration-[180ms] ${
+                selectMode ? "bg-ink text-white" : "bg-surface-soft text-ink-secondary"
               }`}
             >
               {selectMode ? `✓ ${selectedDates.size}` : "Multi"}
             </button>
           </div>
-          <button onClick={handleNextMonth} className="p-2 hover:bg-slate-100 rounded-lg transition">
-            <ChevronRight className="w-4 h-4" />
+          <button onClick={handleNextMonth} className="w-8 h-8 flex items-center justify-center hover:bg-surface-soft rounded-pill transition-all duration-[180ms]">
+            <ChevronRight size={16} strokeWidth={1.5} className="text-ink-secondary" />
           </button>
         </div>
 
@@ -828,7 +830,7 @@ function ParentCalendarSection({
                   className={`aspect-square rounded p-1 transition flex flex-col items-center justify-center text-xs ${
                     disabled ? "bg-slate-50 opacity-40 cursor-not-allowed"
                     : isSelected ? "bg-blue-100 border-2 border-blue-500"
-                    : isToday ? `${colors.bg} border border-slate-900 ring-1 ring-slate-900/20`
+                    : isToday ? `${colors.bg} border border-accent-yellow ring-1 ring-accent-yellow/50`
                     : `${colors.bg} hover:shadow-sm`
                   }`}
                 >
@@ -852,7 +854,7 @@ function ParentCalendarSection({
 
       {/* Bulk action bar */}
       {selectMode && selectedDates.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white rounded-xl shadow-2xl border border-slate-200 px-4 py-3 flex items-center gap-3 max-w-sm w-full mx-4">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-surface-card rounded-xl shadow-hover px-4 py-3 flex items-center gap-3 max-w-sm w-full mx-4">
           <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
             {selectedDates.size} jour{selectedDates.size > 1 ? "s" : ""}
           </span>
@@ -901,11 +903,6 @@ export default function ParentChildrenPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null);
 
-  // Reset to calendar tab when child changes
-  useEffect(() => {
-    setActiveTab("calendar");
-  }, [selectedChildId]);
-
   const { data, mutate } = useSWR("parent-children", () => childrenApi.list().then((r) => r.data as Child[]));
   const { data: groupsData } = useSWR("groups-parent", () => groupsApi.list());
 
@@ -918,13 +915,13 @@ export default function ParentChildrenPage() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex flex-col w-64 border-r border-slate-200 bg-white flex-shrink-0">
-        <div className="px-4 py-4 border-b border-slate-100">
-          <h1 className="text-base font-semibold text-slate-800">{t("myChildren")}</h1>
+      <aside className="hidden md:flex flex-col w-64 bg-white/80 backdrop-blur-sm shadow-soft flex-shrink-0 my-3 ml-3 rounded-xl overflow-hidden">
+        <div className="px-4 py-4 border-b border-border-soft">
+          <h1 className="text-body font-semibold text-ink">{t("myChildren")}</h1>
         </div>
-        <div className="flex-1 overflow-y-auto py-2">
+        <div className="flex-1 overflow-y-auto py-2 px-2">
           {children.length === 0 && (
-            <p className="px-4 py-3 text-sm text-slate-400">{t("noChildrenParent")}</p>
+            <p className="px-4 py-3 text-body text-ink-muted">{t("noChildrenParent")}</p>
           )}
           {children.map((child) => {
             const isActive = selectedChildId === child.id;
@@ -932,14 +929,14 @@ export default function ParentChildrenPage() {
               <button
                 key={child.id}
                 onClick={() => setSelectedChildId(child.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition border-l-2 ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-pill text-left transition-all duration-[180ms] ${
                   isActive
-                    ? "bg-blue-50 border-l-blue-600"
-                    : "border-l-transparent hover:bg-slate-50"
+                    ? "bg-ink text-white"
+                    : "text-ink-secondary hover:bg-surface-soft hover:text-ink"
                 }`}
               >
                 <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="sm" />
-                <span className={`text-sm truncate ${isActive ? "font-semibold text-blue-700" : "text-slate-700"}`}>
+                <span className={`text-body truncate ${isActive ? "font-semibold" : ""}`}>
                   {child.first_name} {child.last_name}
                 </span>
               </button>
@@ -950,31 +947,27 @@ export default function ParentChildrenPage() {
 
       {/* ── Desktop main content ── */}
       <div className="hidden md:flex flex-col flex-1 min-w-0 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex-shrink-0">
-          <h1 className="text-base font-semibold text-slate-800">{t("myChildren")}</h1>
+        <div className="px-6 py-4 border-b border-border-soft flex-shrink-0">
+          <h1 className="text-body font-semibold text-ink">{t("myChildren")}</h1>
         </div>
 
         {!selectedChildId ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400">
-            <Users className="w-12 h-12 opacity-30" />
-            <p className="text-sm">{t("selectChild")}</p>
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-ink-muted">
+            <Users size={48} strokeWidth={1.5} className="opacity-30" />
+            <p className="text-body">{t("selectChild")}</p>
           </div>
         ) : selectedChild ? (
           <div className="flex-1 overflow-hidden flex flex-col">
             {/* Tab bar */}
-            <div className="flex border-b border-slate-200 px-6 flex-shrink-0">
-              <TabButton
-                active={activeTab === "calendar"}
-                onClick={() => setActiveTab("calendar")}
-              >
-                📅 Calendrier
-              </TabButton>
-              <TabButton
-                active={activeTab === "profile"}
-                onClick={() => setActiveTab("profile")}
-              >
-                👤 Profil
-              </TabButton>
+            <div className="px-6 py-3 flex-shrink-0">
+              <div className="flex items-center gap-1 bg-white/60 backdrop-blur-sm rounded-pill px-2 py-1.5 shadow-soft w-fit">
+                <TabButton active={activeTab === "calendar"} onClick={() => setActiveTab("calendar")}>
+                  Calendrier
+                </TabButton>
+                <TabButton active={activeTab === "profile"} onClick={() => setActiveTab("profile")}>
+                  Profil
+                </TabButton>
+              </div>
             </div>
 
             {/* Tab content */}
@@ -1001,24 +994,24 @@ export default function ParentChildrenPage() {
 
       {/* ── Mobile ── */}
       <div className="md:hidden flex flex-col h-full w-full overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 flex-shrink-0">
-          <h1 className="text-base font-semibold text-slate-800">{t("myChildren")}</h1>
+        <div className="px-4 py-3 border-b border-border-soft flex-shrink-0">
+          <h1 className="text-body font-semibold text-ink">{t("myChildren")}</h1>
         </div>
 
         {/* Child chips */}
         {children.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto px-4 py-2.5 border-b border-slate-100 flex-shrink-0 scrollbar-none">
+          <div className="flex gap-2 overflow-x-auto px-4 py-2.5 border-b border-border-soft flex-shrink-0 scrollbar-none">
             {children.map((child) => {
               const isActive = selectedChildId === child.id;
               return (
                 <button
                   key={child.id}
                   onClick={() => setSelectedChildId(child.id)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition ${
-                    isActive ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-caption font-medium transition-all duration-[180ms] ${
+                    isActive ? "bg-ink text-white" : "bg-surface-soft text-ink-secondary"
                   }`}
                 >
-                  <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${
+                  <span className={`w-4 h-4 rounded-pill flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${
                     isActive ? "bg-white/25 text-white" : `${childAvatarColor(child.id)} text-white`
                   }`}>
                     {child.first_name[0]}
@@ -1031,26 +1024,22 @@ export default function ParentChildrenPage() {
         )}
 
         {!selectedChildId ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-slate-400">
-            <Users className="w-10 h-10 opacity-30" />
-            <p className="text-sm">{t("selectChild")}</p>
+          <div className="flex-1 flex flex-col items-center justify-center gap-3 text-ink-muted">
+            <Users size={40} strokeWidth={1.5} className="opacity-30" />
+            <p className="text-body">{t("selectChild")}</p>
           </div>
         ) : selectedChild ? (
           <div className="flex-1 overflow-hidden flex flex-col">
             {/* Tab bar */}
-            <div className="flex border-b border-slate-200 px-4 flex-shrink-0 overflow-x-auto">
-              <TabButton
-                active={activeTab === "calendar"}
-                onClick={() => setActiveTab("calendar")}
-              >
-                📅 Cal
-              </TabButton>
-              <TabButton
-                active={activeTab === "profile"}
-                onClick={() => setActiveTab("profile")}
-              >
-                👤 Profil
-              </TabButton>
+            <div className="px-4 py-3 flex-shrink-0">
+              <div className="flex items-center gap-1 bg-white/60 backdrop-blur-sm rounded-pill px-2 py-1.5 shadow-soft w-fit">
+                <TabButton active={activeTab === "calendar"} onClick={() => setActiveTab("calendar")}>
+                  Calendrier
+                </TabButton>
+                <TabButton active={activeTab === "profile"} onClick={() => setActiveTab("profile")}>
+                  Profil
+                </TabButton>
+              </div>
             </div>
 
             {/* Tab content */}

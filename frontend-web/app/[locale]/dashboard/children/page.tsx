@@ -377,10 +377,10 @@ function ChildDetails({
                     key={num}
                     type="button"
                     onClick={() => toggleDay(num)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                    className={`flex-1 py-1.5 rounded-pill text-caption font-semibold transition-all duration-[180ms] ${
                       scheduleDays.includes(num)
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white text-slate-400 border-slate-200"
+                        ? "bg-ink text-white"
+                        : "bg-surface-soft text-ink-muted hover:bg-border-soft"
                     }`}
                   >
                     {label}
@@ -392,7 +392,7 @@ function ChildDetails({
               <button
                 type="submit"
                 disabled={savingEdit}
-                className="px-4 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-ink text-white text-body font-medium rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50"
               >
                 {savingEdit ? tc("loading") : tc("save")}
               </button>
@@ -406,7 +406,7 @@ function ChildDetails({
                   setStartDate(child.start_date ?? "");
                   setScheduleDays(child.schedule_days ?? [1, 2, 3, 4, 5]);
                 }}
-                className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50"
+                className="px-4 py-2 bg-surface-soft text-ink-secondary text-body font-medium rounded-pill hover:bg-border-soft transition-all duration-[180ms]"
               >
                 {tc("reset")}
               </button>
@@ -592,7 +592,7 @@ function ChildDetails({
                 <button
                   type="submit"
                   disabled={savingParent || !selectedUserId}
-                  className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="px-3 py-1.5 bg-ink text-white text-body font-medium rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50"
                 >
                   {savingParent ? tc("loading") : t("associate")}
                 </button>
@@ -635,7 +635,7 @@ function ChildDetails({
                 <button
                   type="submit"
                   disabled={savingPendingParent || !pendingEmail}
-                  className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="px-3 py-1.5 bg-ink text-white text-body font-medium rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50"
                 >
                   {savingPendingParent ? tc("loading") : t("add")}
                 </button>
@@ -673,7 +673,7 @@ function ChildDetails({
                 <button
                   type="submit"
                   disabled={savingInvitedParent || !selectedInvitation}
-                  className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="px-3 py-1.5 bg-ink text-white text-body font-medium rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50"
                 >
                   {savingInvitedParent ? tc("loading") : t("link")}
                 </button>
@@ -708,10 +708,10 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
+      className={`px-4 py-1.5 rounded-pill text-body font-medium transition-all duration-[180ms] ease-out ${
         active
-          ? "border-blue-600 text-blue-600"
-          : "border-transparent text-slate-600 hover:text-slate-800"
+          ? "bg-ink text-white shadow-soft"
+          : "text-ink-secondary hover:text-ink hover:bg-surface-soft"
       }`}
     >
       {children}
@@ -1025,8 +1025,8 @@ function CalendarSection({
               onClick={() => { setSelectMode(!selectMode); setSelectedDates(new Set()); }}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
                 selectMode
-                  ? "bg-blue-600 text-white border-blue-600"
-                  : "text-slate-600 border-slate-200 hover:bg-slate-50"
+                  ? "bg-ink text-white"
+                  : "bg-surface-soft text-ink-secondary hover:bg-border-soft"
               }`}
             >
               {selectMode ? `✓ ${selectedDates.size} sélectionné(s)` : "Sélection multiple"}
@@ -1081,14 +1081,14 @@ function CalendarSection({
                     : isSelected
                     ? "bg-blue-100 border-blue-500 cursor-pointer ring-2 ring-blue-400/40"
                     : isToday
-                    ? `${colors.bg} border-slate-900 cursor-pointer hover:shadow-md ring-2 ring-slate-900/20`
+                    ? `${colors.bg} border-accent-yellow cursor-pointer hover:shadow-md ring-2 ring-accent-yellow/50`
                     : `${colors.bg} border-slate-200 cursor-pointer hover:shadow-md`
                 }`}
               >
                 <div className={`text-sm font-semibold ${disabled ? "text-slate-300" : "text-slate-800"} flex items-center justify-between`}>
                   {format(day, "d")}
                   <div className="flex gap-0.5 items-center">
-                    {isSelected && <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">✓</span>}
+                    {isSelected && <span className="w-4 h-4 rounded-pill bg-ink text-white flex items-center justify-center text-[10px] font-bold">✓</span>}
                     {!disabled && !isSelected && (hasTheme || hasSortie) && (
                       <>
                         {hasTheme && <span className="w-2 h-2 rounded-full bg-violet-500" />}
@@ -1159,7 +1159,7 @@ function CalendarSection({
             <button
               onClick={() => { setSelectMode(!selectMode); setSelectedDates(new Set()); }}
               className={`px-2 py-1 rounded text-xs font-medium border transition ${
-                selectMode ? "bg-blue-600 text-white border-blue-600" : "text-slate-600 border-slate-200"
+                selectMode ? "bg-ink text-white" : "bg-surface-soft text-ink-secondary"
               }`}
             >
               {selectMode ? `✓ ${selectedDates.size}` : "Multi"}
@@ -1202,7 +1202,7 @@ function CalendarSection({
                   className={`aspect-square rounded p-1 transition flex flex-col items-center justify-center text-xs ${
                     disabled ? "bg-slate-50 opacity-40 cursor-not-allowed"
                     : isSelected ? "bg-blue-100 border-2 border-blue-500"
-                    : isToday ? `${colors.bg} border border-slate-900 ring-1 ring-slate-900/20`
+                    : isToday ? `${colors.bg} border border-accent-yellow ring-1 ring-accent-yellow/50`
                     : `${colors.bg} hover:shadow-sm`
                   }`}
                 >
@@ -1556,102 +1556,104 @@ function JournalsSection({
 
       {/* Desktop: Grid */}
       <div className="hidden md:block overflow-x-auto">
-        <div className="grid min-w-[800px]" style={{ gridTemplateColumns: "160px repeat(5, 1fr)" }}>
-          {/* Header row */}
-          <div className="p-3 text-xs font-semibold text-slate-400 uppercase tracking-wide" />
-          {weekDates.map((date, i) => {
-            const dateStr = formatDate(date);
-            const isToday = dateStr === today;
-            const day = getDayData(dateStr);
-            const isAbsent = !!day.absent;
-            const hasUnsaved = !!(localData[dateStr] && hasDayData(localData[dateStr]));
-            const menuDuJour = getMenuForDate(dateStr);
-            return (
-              <div key={i} className={`p-3 text-center border-b border-slate-200 ${isAbsent ? "bg-red-50" : isToday ? "bg-blue-50" : ""}`}>
-                <div className={`text-xs font-semibold uppercase tracking-wide ${isAbsent ? "text-red-400" : isToday ? "text-blue-600" : "text-slate-500"}`}>
-                  {t(`days.${WEEK_DAYS[i]}`)}
+        <div className="rounded-xl overflow-hidden shadow-soft">
+          <div className="grid min-w-[800px] bg-border-soft/60 gap-px" style={{ gridTemplateColumns: "160px repeat(5, 1fr)" }}>
+            {/* Header row */}
+            <div className="bg-surface-soft p-3 text-caption font-semibold text-ink-muted uppercase tracking-wide" />
+            {weekDates.map((date, i) => {
+              const dateStr = formatDate(date);
+              const isToday = dateStr === today;
+              const day = getDayData(dateStr);
+              const isAbsent = !!day.absent;
+              const hasUnsaved = !!(localData[dateStr] && hasDayData(localData[dateStr]));
+              const menuDuJour = getMenuForDate(dateStr);
+              return (
+                <div key={i} className={`p-3 text-center ${isAbsent ? "bg-status-danger/8" : isToday ? "bg-accent-yellow/30" : "bg-surface-soft"}`}>
+                  <div className={`text-caption font-semibold uppercase tracking-wide ${isAbsent ? "text-status-danger" : isToday ? "text-ink" : "text-ink-muted"}`}>
+                    {t(`days.${WEEK_DAYS[i]}`)}
+                  </div>
+                  <div className={`text-body font-medium mt-0.5 ${isAbsent ? "text-status-danger" : "text-ink"}`}>
+                    {date.getDate()}{" "}
+                    <span className={`font-normal ${isToday ? "text-primary/70" : "text-ink-muted"}`}>
+                      {date.toLocaleDateString("fr-CA", { month: "short" })}
+                    </span>
+                  </div>
+                  {isAbsent ? (
+                    <div className="w-1.5 h-1.5 rounded-pill bg-status-danger mx-auto mt-1" />
+                  ) : hasUnsaved ? (
+                    <div className="w-1.5 h-1.5 rounded-pill bg-accent-orange mx-auto mt-1" />
+                  ) : isToday ? (
+                    <div className="w-1.5 h-1.5 rounded-pill bg-primary mx-auto mt-1" />
+                  ) : null}
+                  {menuDuJour && ((() => {
+                    const hasMenu = menuDuJour.collation_matin || menuDuJour.diner || menuDuJour.collation_apres_midi;
+                    if (!hasMenu) return null;
+                    return (
+                      <div className="mt-1.5 space-y-0.5">
+                        {menuDuJour.collation_matin && (
+                          <div className="text-caption text-accent-blue bg-accent-blue/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_matin}>
+                            🌅 {menuDuJour.collation_matin}
+                          </div>
+                        )}
+                        {menuDuJour.diner && (
+                          <div className="text-caption text-accent-orange bg-accent-orange/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.diner}>
+                            🍽️ {menuDuJour.diner}
+                          </div>
+                        )}
+                        {menuDuJour.collation_apres_midi && (
+                          <div className="text-caption text-accent-purple bg-accent-purple/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_apres_midi}>
+                            🌙 {menuDuJour.collation_apres_midi}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })())}
                 </div>
-                <div className={`text-sm font-medium mt-0.5 ${isAbsent ? "text-red-500" : isToday ? "text-blue-700" : "text-slate-700"}`}>
-                  {date.getDate()}{" "}
-                  <span className="font-normal text-slate-400">
-                    {date.toLocaleDateString("fr-CA", { month: "short" })}
-                  </span>
+              );
+            })}
+
+            {/* Absent toggle row */}
+            <div className="bg-surface-soft p-3 text-caption font-medium text-ink-secondary flex items-center gap-1.5">
+              Absent
+            </div>
+            {weekDates.map((date, di) => {
+              const dateStr = formatDate(date);
+              const day = getDayData(dateStr);
+              const isAbsent = !!day.absent;
+              const isToday = dateStr === today;
+              return (
+                <div key={`absent-${di}`} className={`p-2 flex items-center justify-center ${isAbsent ? "bg-status-danger/8" : isToday ? "bg-accent-yellow/15" : "bg-surface-card"}`}>
+                  <button
+                    type="button"
+                    onClick={() => updateField(dateStr, "absent" as keyof DayData, !isAbsent)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-pill transition-all duration-[180ms] focus:outline-none ${isAbsent ? "bg-status-danger" : "bg-border-soft"}`}
+                  >
+                    <span className={`inline-block h-3 w-3 transform rounded-pill bg-white shadow transition-transform duration-[180ms] ${isAbsent ? "translate-x-5" : "translate-x-1"}`} />
+                  </button>
                 </div>
-                {isAbsent ? (
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-400 mx-auto mt-1" />
-                ) : hasUnsaved ? (
-                  <div className="w-1.5 h-1.5 rounded-full bg-orange-400 mx-auto mt-1" />
-                ) : isToday ? (
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mx-auto mt-1" />
-                ) : null}
-                {menuDuJour && ((() => {
-                  const hasMenu = menuDuJour.collation_matin || menuDuJour.diner || menuDuJour.collation_apres_midi;
-                  if (!hasMenu) return null;
+              );
+            })}
+
+            {/* Field rows */}
+            {FIELD_ROWS.map((field) => (
+              <div key={`field-${field}`} className="contents">
+                <div className="bg-surface-soft p-3 text-caption font-medium text-ink-secondary flex items-start pt-4">
+                  {t(`fields.${field === "sommeil" ? "sommeil" : field}`)}
+                </div>
+                {weekDates.map((date, di) => {
+                  const dateStr = formatDate(date);
+                  const day = getDayData(dateStr);
+                  const isAbsent = !!day.absent;
+                  const isToday = dateStr === today;
                   return (
-                    <div className="mt-1.5 space-y-0.5">
-                      {menuDuJour.collation_matin && (
-                        <div className="text-xs text-blue-700 bg-blue-50 rounded px-1 py-0.5 truncate" title={menuDuJour.collation_matin}>
-                          🌅 {menuDuJour.collation_matin}
-                        </div>
-                      )}
-                      {menuDuJour.diner && (
-                        <div className="text-xs text-amber-700 bg-amber-50 rounded px-1 py-0.5 truncate" title={menuDuJour.diner}>
-                          🍽️ {menuDuJour.diner}
-                        </div>
-                      )}
-                      {menuDuJour.collation_apres_midi && (
-                        <div className="text-xs text-purple-700 bg-purple-50 rounded px-1 py-0.5 truncate" title={menuDuJour.collation_apres_midi}>
-                          🌙 {menuDuJour.collation_apres_midi}
-                        </div>
-                      )}
+                    <div key={`${field}-${di}`} className={`p-2 ${isAbsent ? "bg-status-danger/5 opacity-30 pointer-events-none select-none" : isToday ? "bg-accent-yellow/10" : "bg-surface-card"}`}>
+                      {renderField(field, day, dateStr)}
                     </div>
                   );
-                })())}
+                })}
               </div>
-            );
-          })}
-
-          {/* Absent toggle row */}
-          <div className="p-3 text-xs font-medium text-slate-500 border-b border-slate-100 flex items-center pt-4 gap-1.5">
-            Absent
+            ))}
           </div>
-          {weekDates.map((date, di) => {
-            const dateStr = formatDate(date);
-            const day = getDayData(dateStr);
-            const isAbsent = !!day.absent;
-            const isToday = dateStr === today;
-            return (
-              <div key={`absent-${di}`} className={`p-2 border-b border-slate-100 border-l border-l-slate-50 flex items-center justify-center ${isAbsent ? "bg-red-50" : isToday ? "bg-blue-50/40" : ""}`}>
-                <button
-                  type="button"
-                  onClick={() => updateField(dateStr, "absent" as keyof DayData, !isAbsent)}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${isAbsent ? "bg-red-500" : "bg-slate-200"}`}
-                >
-                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${isAbsent ? "translate-x-5" : "translate-x-1"}`} />
-                </button>
-              </div>
-            );
-          })}
-
-          {/* Field rows */}
-          {FIELD_ROWS.map((field) => (
-            <div key={`field-${field}`} className="contents">
-              <div className="p-3 text-xs font-medium text-slate-500 border-b border-slate-100 flex items-start pt-4">
-                {t(`fields.${field === "sommeil" ? "sommeil" : field}`)}
-              </div>
-              {weekDates.map((date, di) => {
-                const dateStr = formatDate(date);
-                const day = getDayData(dateStr);
-                const isAbsent = !!day.absent;
-                const isToday = dateStr === today;
-                return (
-                  <div key={`${field}-${di}`} className={`p-2 border-b border-slate-100 border-l border-l-slate-50 ${isAbsent ? "bg-red-50/40 opacity-30 pointer-events-none select-none" : isToday ? "bg-blue-50/40" : ""}`}>
-                    {renderField(field, day, dateStr)}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
         </div>
       </div>
 
@@ -1815,13 +1817,13 @@ export default function ChildrenPage() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* ── Desktop sidebar: child list ── */}
-      <aside className="hidden md:flex flex-col w-64 border-r border-slate-200 bg-white flex-shrink-0">
-        <div className="px-4 py-4 border-b border-slate-100">
-          <h1 className="text-base font-semibold text-slate-800">{t("title")}</h1>
+      <aside className="hidden md:flex flex-col w-64 bg-white/80 backdrop-blur-sm shadow-soft flex-shrink-0 my-3 ml-3 rounded-xl overflow-hidden">
+        <div className="px-4 py-4 border-b border-border-soft/50">
+          <h1 className="text-body font-semibold text-ink">{t("title")}</h1>
         </div>
-        <div className="flex-1 overflow-y-auto py-2">
+        <div className="flex-1 overflow-y-auto py-2 px-2">
           {children.length === 0 && (
-            <p className="px-4 py-3 text-sm text-slate-400">{t("noChildren")}</p>
+            <p className="px-4 py-3 text-body text-ink-muted">{t("noChildren")}</p>
           )}
           {children.map((child) => {
             const isActive = selectedChildId === child.id;
@@ -1829,14 +1831,14 @@ export default function ChildrenPage() {
               <button
                 key={child.id}
                 onClick={() => setSelectedChildId(child.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition border-l-2 ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-pill text-left transition-all duration-[180ms] ${
                   isActive
-                    ? "bg-blue-50 border-l-blue-600"
-                    : "border-l-transparent hover:bg-slate-50"
+                    ? "bg-ink text-white"
+                    : "text-ink-secondary hover:bg-surface-soft hover:text-ink"
                 }`}
               >
                 <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="sm" />
-                <span className={`text-sm truncate ${isActive ? "font-semibold text-blue-700" : "text-slate-700"}`}>
+                <span className={`text-body truncate ${isActive ? "font-semibold" : ""}`}>
                   {child.first_name} {child.last_name}
                 </span>
               </button>
@@ -1847,12 +1849,12 @@ export default function ChildrenPage() {
 
       {/* ── Desktop main content ── */}
       <div className="hidden md:flex flex-col flex-1 min-w-0 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
-          <h1 className="text-base font-semibold text-slate-800">{t("title")}</h1>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft/50 flex-shrink-0">
+          <h1 className="text-body font-semibold text-ink">{t("title")}</h1>
           {canWrite && (
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+              className="flex items-center gap-2 px-4 py-2 bg-ink text-white rounded-pill text-body font-medium hover:opacity-90 transition-all duration-[180ms]"
             >
               <Plus className="w-4 h-4" />
               {t("add")}
@@ -1868,25 +1870,18 @@ export default function ChildrenPage() {
         ) : selectedChild ? (
           <div className="flex-1 overflow-hidden flex flex-col">
             {/* Tab bar */}
-            <div className="flex border-b border-slate-200 px-6 flex-shrink-0">
-              <TabButton
-                active={activeTab === "calendar"}
-                onClick={() => setActiveTab("calendar")}
-              >
-                📅 Calendrier
-              </TabButton>
-              <TabButton
-                active={activeTab === "journals"}
-                onClick={() => setActiveTab("journals")}
-              >
-                📖 Journal de bord
-              </TabButton>
-              <TabButton
-                active={activeTab === "profile"}
-                onClick={() => setActiveTab("profile")}
-              >
-                👤 Profil
-              </TabButton>
+            <div className="px-6 py-3 flex-shrink-0">
+              <div className="flex items-center gap-1 bg-white/60 backdrop-blur-sm rounded-pill px-2 py-1.5 shadow-soft w-fit">
+                <TabButton active={activeTab === "calendar"} onClick={() => setActiveTab("calendar")}>
+                  Calendrier
+                </TabButton>
+                <TabButton active={activeTab === "journals"} onClick={() => setActiveTab("journals")}>
+                  Journal de bord
+                </TabButton>
+                <TabButton active={activeTab === "profile"} onClick={() => setActiveTab("profile")}>
+                  Profil
+                </TabButton>
+              </div>
             </div>
 
             {/* Tab content */}
@@ -1936,12 +1931,12 @@ export default function ChildrenPage() {
       {/* ── Mobile ── */}
       <div className="md:hidden flex flex-col h-full w-full overflow-hidden">
         {/* Mobile header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0">
-          <h1 className="text-base font-semibold text-slate-800">{t("title")}</h1>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-soft/50 flex-shrink-0">
+          <h1 className="text-body font-semibold text-ink">{t("title")}</h1>
           {canWrite && (
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition"
+              className="flex items-center gap-1 px-3 py-1.5 bg-ink text-white rounded-pill text-body font-medium hover:opacity-90 transition-all duration-[180ms]"
             >
               <Plus className="w-3.5 h-3.5" />
               {t("add")}
@@ -1951,17 +1946,17 @@ export default function ChildrenPage() {
 
         {/* Child chips */}
         {children.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto px-4 py-2.5 border-b border-slate-100 flex-shrink-0 scrollbar-none">
+          <div className="flex gap-2 overflow-x-auto px-4 py-2.5 border-b border-border-soft/50 flex-shrink-0 scrollbar-none">
             {children.map((child) => {
               const isActive = selectedChildId === child.id;
               return (
                 <button
                   key={child.id}
                   onClick={() => setSelectedChildId(child.id)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-body font-medium transition-all duration-[180ms] ${
                     isActive
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-100 text-slate-600"
+                      ? "bg-ink text-white"
+                      : "bg-surface-soft text-ink-secondary"
                   }`}
                 >
                   <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${
@@ -1984,25 +1979,18 @@ export default function ChildrenPage() {
         ) : selectedChild ? (
           <div className="flex-1 overflow-hidden flex flex-col">
             {/* Tab bar */}
-            <div className="flex border-b border-slate-200 px-4 flex-shrink-0">
-              <TabButton
-                active={activeTab === "calendar"}
-                onClick={() => setActiveTab("calendar")}
-              >
-                📅 Cal
-              </TabButton>
-              <TabButton
-                active={activeTab === "journals"}
-                onClick={() => setActiveTab("journals")}
-              >
-                📖 Journal de bord
-              </TabButton>
-              <TabButton
-                active={activeTab === "profile"}
-                onClick={() => setActiveTab("profile")}
-              >
-                👤 Profil
-              </TabButton>
+            <div className="px-4 py-3 flex-shrink-0 overflow-x-auto scrollbar-none">
+              <div className="flex items-center gap-1 bg-white/60 backdrop-blur-sm rounded-pill px-2 py-1.5 shadow-soft w-fit">
+                <TabButton active={activeTab === "calendar"} onClick={() => setActiveTab("calendar")}>
+                  Calendrier
+                </TabButton>
+                <TabButton active={activeTab === "journals"} onClick={() => setActiveTab("journals")}>
+                  Journal
+                </TabButton>
+                <TabButton active={activeTab === "profile"} onClick={() => setActiveTab("profile")}>
+                  Profil
+                </TabButton>
+              </div>
             </div>
 
             {/* Tab content */}
@@ -2123,8 +2111,8 @@ export default function ChildrenPage() {
                       onClick={() => toggleCreateDay(num)}
                       className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${
                         form.schedule_days.includes(num)
-                          ? "bg-blue-600 text-white border-blue-600"
-                          : "bg-white text-slate-400 border-slate-200"
+                          ? "bg-ink text-white"
+                          : "bg-surface-soft text-ink-muted hover:bg-border-soft"
                       }`}
                     >
                       {label}
@@ -2136,7 +2124,7 @@ export default function ChildrenPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="px-5 py-2 bg-ink text-white text-body rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50"
                 >
                   {saving ? tc("loading") : tc("create")}
                 </button>
