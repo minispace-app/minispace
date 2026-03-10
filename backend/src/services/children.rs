@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::{
     db::tenant::schema_name,
-    models::child::{AssignParentRequest, Child, ChildParentUser, CreateChildRequest, UpdateChildRequest},
+    models::child::{AssignInvitedParentRequest, AssignParentRequest, AssignPendingParentRequest, Child, ChildParentUser, CreateChildRequest, InvitedParent, PendingParent, UpdateChildRequest},
 };
 
 pub struct ChildService;
@@ -183,6 +183,196 @@ impl ChildService {
         .bind(child_id)
         .bind(req.user_id)
         .bind(&req.relationship)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn assign_pending_parent(
+        pool: &PgPool,
+        tenant: &str,
+        child_id: Uuid,
+        req: &AssignPendingParentRequest,
+    ) -> anyhow::Result<()> {
+        let schema = schema_name(tenant);
+        sqlx::query(&format!(
+            "INSERT INTO {schema}.child_pending_parents (child_id, email, relationship)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (child_id, email) DO UPDATE SET relationship = EXCLUDED.relationship"
+        ))
+        .bind(child_id)
+        .bind(&req.email)
+        .bind(&req.relationship)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn remove_pending_parent(
+        pool: &PgPool,
+        tenant: &str,
+        child_id: Uuid,
+        email: &str,
+    ) -> anyhow::Result<()> {
+        let schema = schema_name(tenant);
+        sqlx::query(&format!(
+            "DELETE FROM {schema}.child_pending_parents WHERE child_id = $1 AND email = $2"
+        ))
+        .bind(child_id)
+        .bind(email)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn list_pending_parents_for_child(
+        pool: &PgPool,
+        tenant: &str,
+        child_id: Uuid,
+    ) -> anyhow::Result<Vec<PendingParent>> {
+        let schema = schema_name(tenant);
+        let parents = sqlx::query_as::<_, PendingParent>(&format!(
+            "SELECT * FROM {schema}.child_pending_parents
+             WHERE child_id = $1
+             ORDER BY created_at DESC"
+        ))
+        .bind(child_id)
+        .fetch_all(pool)
+        .await?;
+        Ok(parents)
+    }
+
+    pub async fn promote_pending_parents(
+        pool: &PgPool,
+        tenant: &str,
+        user_id: Uuid,
+        email: &str,
+    ) -> anyhow::Result<()> {
+        let schema = schema_name(tenant);
+        // Move pending parent records to child_parents table
+        sqlx::query(&format!(
+            "INSERT INTO {schema}.child_parents (child_id, user_id, relationship)
+             SELECT child_id, $1, relationship FROM {schema}.child_pending_parents WHERE email = $2
+             ON CONFLICT (child_id, user_id) DO UPDATE SET relationship = EXCLUDED.relationship"
+        ))
+        .bind(user_id)
+        .bind(email)
+        .execute(pool)
+        .await?;
+
+        // Delete the pending records
+        sqlx::query(&format!(
+            "DELETE FROM {schema}.child_pending_parents WHERE email = $1"
+        ))
+        .bind(email)
+        .execute(pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn get_pending_parent_emails_for_children(
+        pool: &PgPool,
+        tenant: &str,
+        child_ids: &[Uuid],
+    ) -> anyhow::Result<Vec<(Uuid, String)>> {
+        let schema = schema_name(tenant);
+        let results: Vec<(Uuid, String)> = sqlx::query_as(&format!(
+            "SELECT child_id, email FROM {schema}.child_pending_parents
+             WHERE child_id = ANY($1)
+             ORDER BY child_id, email"
+        ))
+        .bind(child_ids)
+        .fetch_all(pool)
+        .await?;
+        Ok(results)
+    }
+
+    pub async fn list_invited_parents_for_child(
+        pool: &PgPool,
+        tenant: &str,
+        child_id: Uuid,
+    ) -> anyhow::Result<Vec<InvitedParent>> {
+        let schema = schema_name(tenant);
+        let invited = sqlx::query_as::<_, InvitedParent>(&format!(
+            "SELECT it.email, it.role::TEXT, it.expires_at, it.created_at
+             FROM {schema}.child_invitations ci
+             JOIN {schema}.invitation_tokens it ON it.id = ci.invitation_token_id
+             WHERE ci.child_id = $1 AND it.used = FALSE
+             ORDER BY it.created_at DESC"
+        ))
+        .bind(child_id)
+        .fetch_all(pool)
+        .await?;
+        Ok(invited)
+    }
+
+    pub async fn promote_invited_parents(
+        pool: &PgPool,
+        tenant: &str,
+        user_id: Uuid,
+        email: &str,
+    ) -> anyhow::Result<()> {
+        let schema = schema_name(tenant);
+        // Move child_invitations to child_parents for this email's invitation token (now used)
+        sqlx::query(&format!(
+            "INSERT INTO {schema}.child_parents (child_id, user_id, relationship)
+             SELECT ci.child_id, $1, 'parent'
+             FROM {schema}.child_invitations ci
+             JOIN {schema}.invitation_tokens it ON it.id = ci.invitation_token_id
+             WHERE it.email = $2 AND it.used = TRUE
+             ON CONFLICT (child_id, user_id) DO UPDATE SET relationship = EXCLUDED.relationship"
+        ))
+        .bind(user_id)
+        .bind(email)
+        .execute(pool)
+        .await?;
+
+        // Remove the child_invitations entries (token is marked used)
+        sqlx::query(&format!(
+            "DELETE FROM {schema}.child_invitations
+             WHERE invitation_token_id IN (
+               SELECT id FROM {schema}.invitation_tokens WHERE email = $1 AND used = TRUE
+             )"
+        ))
+        .bind(email)
+        .execute(pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn assign_invited_parent(
+        pool: &PgPool,
+        tenant: &str,
+        child_id: Uuid,
+        invitation_token_id: Uuid,
+    ) -> anyhow::Result<()> {
+        let schema = schema_name(tenant);
+        sqlx::query(&format!(
+            "INSERT INTO {schema}.child_invitations (child_id, invitation_token_id)
+             VALUES ($1, $2)
+             ON CONFLICT (child_id, invitation_token_id) DO NOTHING"
+        ))
+        .bind(child_id)
+        .bind(invitation_token_id)
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn remove_invited_parent(
+        pool: &PgPool,
+        tenant: &str,
+        child_id: Uuid,
+        invitation_token_id: Uuid,
+    ) -> anyhow::Result<()> {
+        let schema = schema_name(tenant);
+        sqlx::query(&format!(
+            "DELETE FROM {schema}.child_invitations WHERE child_id = $1 AND invitation_token_id = $2"
+        ))
+        .bind(child_id)
+        .bind(invitation_token_id)
         .execute(pool)
         .await?;
         Ok(())

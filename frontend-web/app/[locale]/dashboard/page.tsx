@@ -5,8 +5,9 @@ import { useTranslations } from "next-intl";
 import { useAuth } from "../../../hooks/useAuth";
 import useSWR from "swr";
 import { groupsApi, childrenApi, messagesApi, attendanceApi } from "../../../lib/api";
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, getISODay } from "date-fns";
-import { fr } from "date-fns/locale";
+import { format, startOfWeek, endOfWeek, eachDayOfInterval, getISODay, isSameDay } from "date-fns";
+import { fr, enUS } from "date-fns/locale";
+import { useParams } from "next/navigation";
 import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { ChildAvatar } from "../../../components/ChildAvatar";
 import { DayTabBar } from "../../../components/journal/DayTabBar";
@@ -22,8 +23,9 @@ interface Child {
 export default function DashboardPage() {
   const t = useTranslations("dashboard");
   const { user } = useAuth();
-  const dateLocale = fr;
-  const [activeDayIndex, setActiveDayIndex] = useState(0);
+  const params = useParams();
+  const locale = (params?.locale as string) || "fr";
+  const dateLocale = locale === "en" ? enUS : fr;
 
   const { data: messages } = useSWR("messages", () => messagesApi.list(1, 5));
   const { data: children } = useSWR("children", () => childrenApi.list());
@@ -49,6 +51,14 @@ export default function DashboardPage() {
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd }).filter(
     (d) => getISODay(d) <= 5
   );
+
+  // Initialize activeDayIndex to today's day in the week
+  const getTodayIndex = () => {
+    const todayStr = format(today, "yyyy-MM-dd");
+    const index = weekDays.findIndex((d) => format(d, "yyyy-MM-dd") === todayStr);
+    return index >= 0 ? index : 0;
+  };
+  const [activeDayIndex, setActiveDayIndex] = useState(() => getTodayIndex());
 
   // Group absent children by day + calculate totals
   const absentByDay: Record<string, Child[]> = {};
@@ -83,8 +93,8 @@ export default function DashboardPage() {
   const hasAbsentThisWeek = Object.keys(absentByDay).length > 0;
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold text-slate-800 mb-6">
+    <div className="px-8 pb-10 pt-8">
+      <h1 className="text-h1 font-bold text-ink mb-6">
         {user ? t("welcome", { name: user.first_name }) : "Tableau de bord"}
       </h1>
 
@@ -108,46 +118,64 @@ export default function DashboardPage() {
 
       {/* Absent children section - Week view with summary table */}
       {(user?.role === "educateur" || user?.role === "admin_garderie") && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-8">
+        <div className="bg-surface-card/80 backdrop-blur-sm rounded-xl p-6 mb-8 shadow-soft">
           <div className="flex items-center gap-2 mb-6">
-            <AlertCircle className="w-5 h-5 text-red-600" />
-            <h2 className="font-semibold text-red-900">
-              Récapitulatif de la semaine ({format(weekStart, "d MMM", { locale: dateLocale })} - {format(weekEnd, "d MMM", { locale: dateLocale })})
+            <AlertCircle size={18} strokeWidth={1.5} className="text-ink-secondary" />
+            <h2 className="text-h3 font-semibold text-ink">
+              {t("weekPresence")} ({format(weekStart, "d MMM", { locale: dateLocale })} - {format(weekEnd, "d MMM", { locale: dateLocale })})
             </h2>
           </div>
 
           {/* Desktop: Summary table with children */}
-          <div className="hidden md:block bg-white rounded-lg p-4 mb-6 overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="hidden md:block bg-surface-card rounded-xl p-4 mb-6 overflow-x-auto shadow-soft">
+            <table className="w-full text-body">
               <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left py-3 px-4 font-semibold text-slate-700 w-32">Jour</th>
-                  {weekDays.map((day) => (
-                    <th key={format(day, "yyyy-MM-dd")} className="py-3 px-4 font-semibold text-slate-700 min-w-max">
-                      <div className="text-center">
-                        {format(day, "EEE", { locale: dateLocale })}
-                        <div className="text-xs font-normal text-slate-500">
-                          {format(day, "d MMM", { locale: dateLocale })}
+                <tr className="border-b border-border-soft">
+                  <th className="text-left py-3 px-4 font-semibold text-ink w-32">Jour</th>
+                  {weekDays.map((day) => {
+                    const isToday = isSameDay(day, today);
+                    return (
+                      <th key={format(day, "yyyy-MM-dd")} className="py-3 px-2 font-semibold text-ink min-w-max">
+                        <div className="text-center">
+                          {isToday ? (
+                            <div className="inline-flex flex-col items-center bg-accent-yellow/40 rounded-xl px-4 py-1.5">
+                              <span className="text-caption font-bold text-ink uppercase tracking-wide">
+                                {format(day, "EEE", { locale: dateLocale })}
+                              </span>
+                              <span className="text-caption font-semibold text-ink">
+                                {format(day, "d MMM", { locale: dateLocale })}
+                              </span>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="text-caption font-semibold text-ink-muted uppercase tracking-wide">
+                                {format(day, "EEE", { locale: dateLocale })}
+                              </div>
+                              <div className="text-caption font-normal text-ink-muted">
+                                {format(day, "d MMM", { locale: dateLocale })}
+                              </div>
+                            </>
+                          )}
                         </div>
-                      </div>
-                    </th>
-                  ))}
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-t border-slate-200 hover:bg-slate-50">
-                  <td className="py-4 px-4 text-left font-medium text-slate-700 w-32">Absences</td>
-                  {weekDays.map((day, idx) => {
+                <tr className="border-t border-border-soft hover:bg-surface-soft transition-all duration-[180ms]">
+                  <td className="py-4 px-4 text-left font-medium text-ink w-32">{t("absences")}</td>
+                  {weekDays.map((day) => {
                     const dateStr = format(day, "yyyy-MM-dd");
                     const totals = totalByDay[dateStr];
                     const presentCount = (childrenList?.length ?? 0) - totals.absent;
                     const totalCount = childrenList?.length ?? 0;
                     const absentThisDay = absentByDay[dateStr] || [];
-
+                    const isToday = isSameDay(day, today);
                     return (
                       <td
                         key={dateStr}
-                        className="py-4 px-4 align-top"
+                        className={`py-4 px-4 align-top ${isToday ? "bg-accent-yellow/10" : ""}`}
                       >
                         <div className="space-y-2">
                           {absentThisDay.length > 0 ? (
@@ -155,7 +183,7 @@ export default function DashboardPage() {
                               {absentThisDay.map((child) => (
                                 <div
                                   key={child.id}
-                                  className="flex items-center gap-2 p-2 bg-red-50 rounded-lg border border-red-100"
+                                  className="flex items-center gap-2 p-2 bg-status-danger/10 rounded-lg"
                                 >
                                   <ChildAvatar
                                     id={child.id}
@@ -163,18 +191,18 @@ export default function DashboardPage() {
                                     lastName={child.last_name}
                                     size="sm"
                                   />
-                                  <span className="text-xs font-medium text-red-700 truncate">
+                                  <span className="text-caption font-medium text-status-danger truncate">
                                     {child.first_name}
                                   </span>
                                 </div>
                               ))}
-                              <div className="text-xs font-semibold text-slate-500 pt-2 border-t border-red-100">
+                              <div className="text-caption font-semibold text-ink-muted pt-2 border-t border-border-soft">
                                 {presentCount}/{totalCount}
                               </div>
                             </>
                           ) : (
-                            <div className="text-xs font-semibold text-green-600 p-2 bg-green-50 rounded-lg border border-green-100 text-center">
-                              ✓ {totalCount}/{totalCount}
+                            <div className="text-caption font-semibold text-status-success p-2 bg-status-success/10 rounded-lg text-center">
+                              {t("allPresent", { total: totalCount })}
                             </div>
                           )}
                         </div>
@@ -187,25 +215,25 @@ export default function DashboardPage() {
           </div>
 
           {/* Mobile: Full screen day view */}
-          <div className="md:hidden bg-white rounded-lg p-6 mb-6">
+          <div className="md:hidden bg-surface-card rounded-xl p-6 mb-6 shadow-soft">
             {/* Day navigation */}
             <div className="flex items-center justify-center gap-4 mb-8">
               <button
                 onClick={() => setActiveDayIndex(Math.max(0, activeDayIndex - 1))}
                 disabled={activeDayIndex === 0}
-                className="p-2 hover:bg-slate-100 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-9 h-9 flex items-center justify-center hover:bg-surface-soft rounded-pill transition-all duration-[180ms] disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <ChevronLeft className="w-6 h-6 text-slate-600" />
+                <ChevronLeft size={18} strokeWidth={1.5} className="text-ink-secondary" />
               </button>
 
               <div className="text-center flex-1">
                 {weekDays.length > 0 && activeDayIndex < weekDays.length && (() => {
                   const activeDay = weekDays[activeDayIndex];
                   return (
-                    <h3 className="text-2xl font-bold text-slate-800">
+                    <h3 className="text-h2 font-bold text-ink">
                       {format(activeDay, "EEEE", { locale: dateLocale })}
                       <br />
-                      <span className="text-lg font-semibold text-slate-600">
+                      <span className="text-h3 font-semibold text-ink-secondary">
                         {format(activeDay, "d MMMM", { locale: dateLocale })}
                       </span>
                     </h3>
@@ -216,9 +244,9 @@ export default function DashboardPage() {
               <button
                 onClick={() => setActiveDayIndex(Math.min(weekDays.length - 1, activeDayIndex + 1))}
                 disabled={activeDayIndex === weekDays.length - 1}
-                className="p-2 hover:bg-slate-100 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-9 h-9 flex items-center justify-center hover:bg-surface-soft rounded-pill transition-all duration-[180ms] disabled:opacity-30 disabled:cursor-not-allowed"
               >
-                <ChevronRight className="w-6 h-6 text-slate-600" />
+                <ChevronRight size={18} strokeWidth={1.5} className="text-ink-secondary" />
               </button>
             </div>
 
@@ -239,7 +267,7 @@ export default function DashboardPage() {
                         {absentThisDay.map((child) => (
                           <div
                             key={child.id}
-                            className="flex items-center gap-4 p-4 bg-red-50 rounded-lg border border-red-100"
+                            className="flex items-center gap-4 p-4 bg-status-danger/10 rounded-xl"
                           >
                             <ChildAvatar
                               id={child.id}
@@ -248,23 +276,23 @@ export default function DashboardPage() {
                               size="md"
                             />
                             <div className="flex-1">
-                              <span className="text-base font-semibold text-red-700">
+                              <span className="text-body-lg font-semibold text-status-danger">
                                 {child.first_name} {child.last_name}
                               </span>
-                              <div className="text-sm text-red-600 mt-1">
+                              <div className="text-body text-status-danger/70 mt-0.5">
                                 Absent
                               </div>
                             </div>
                           </div>
                         ))}
                       </div>
-                      <div className="text-lg font-bold text-slate-700 pt-6 border-t border-red-100 text-center py-4">
-                        {presentCount}/{totalCount} présents
+                      <div className="text-body-lg font-bold text-ink-secondary pt-6 border-t border-border-soft text-center py-4">
+                        {t("presentCount", { present: presentCount, total: totalCount })}
                       </div>
                     </>
                   ) : (
-                    <div className="text-lg font-bold text-green-600 p-6 bg-green-50 rounded-lg border-2 border-green-200 text-center">
-                      ✓ {totalCount}/{totalCount} présents
+                    <div className="text-body-lg font-bold text-status-success p-6 bg-status-success/10 rounded-xl text-center">
+                      {t("allPresentMobile", { total: totalCount })}
                     </div>
                   )}
                 </div>
@@ -275,26 +303,26 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <h2 className="font-semibold text-slate-800 mb-4">{t("recentMessages")}</h2>
+      <div className="bg-surface-card rounded-xl p-6 shadow-card">
+        <h2 className="text-h3 font-semibold text-ink mb-4">{t("recentMessages")}</h2>
         {recentMessages && recentMessages.length > 0 ? (
           <ul className="space-y-3">
             {recentMessages.map((msg) => (
               <li
                 key={msg.id}
-                className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg"
+                className="flex items-start gap-3 p-3 bg-surface-soft rounded-lg hover:bg-border-soft transition-all duration-[180ms]"
               >
-                <span className="flex-1 text-sm text-slate-700 line-clamp-2">
+                <span className="flex-1 text-body text-ink line-clamp-2">
                   {msg.content}
                 </span>
-                <span className="text-xs text-slate-400 whitespace-nowrap">
+                <span className="text-caption text-ink-muted whitespace-nowrap">
                   {new Date(msg.created_at).toLocaleDateString()}
                 </span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-slate-400">Aucun message récent</p>
+          <p className="text-body text-ink-muted">Aucun message récent</p>
         )}
       </div>
     </div>
@@ -310,16 +338,16 @@ function StatCard({
   value: number;
   color: "blue" | "green" | "purple";
 }) {
-  const colors = {
-    blue: "bg-blue-50 border-blue-100 text-blue-700",
-    green: "bg-emerald-50 border-emerald-100 text-emerald-700",
-    purple: "bg-violet-50 border-violet-100 text-violet-700",
+  const valueColors = {
+    blue: "text-primary",
+    green: "text-accent-green",
+    purple: "text-accent-purple",
   };
 
   return (
-    <div className={`rounded-xl border p-5 ${colors[color]}`}>
-      <p className="text-3xl font-bold">{value}</p>
-      <p className="text-sm mt-1 opacity-80">{label}</p>
+    <div className="bg-surface-card rounded-xl p-5 shadow-card hover:shadow-hover transition-all duration-[180ms] ease-out hover:-translate-y-0.5">
+      <p className={`text-display font-bold leading-none mb-1 ${valueColors[color]}`}>{value}</p>
+      <p className="text-caption text-ink-muted font-medium">{label}</p>
     </div>
   );
 }

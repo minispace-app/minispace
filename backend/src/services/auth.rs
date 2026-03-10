@@ -12,7 +12,7 @@ use crate::{
             UserRole,
         },
     },
-    services::email::EmailService,
+    services::{children::ChildService, email::EmailService},
 };
 
 /// Result of login step 1.
@@ -776,6 +776,16 @@ impl AuthService {
             {
                 tracing::warn!("Failed to persist consent record for user {}: {e}", user.id);
             }
+        }
+
+        // Promote pending parents to registered parents
+        if let Err(e) = ChildService::promote_pending_parents(pool, tenant, user.id, &invite.email).await {
+            tracing::warn!("Failed to promote pending parents for user {}: {e}", user.id);
+        }
+
+        // Promote invited parents (child_invitations) to registered parents
+        if let Err(e) = ChildService::promote_invited_parents(pool, tenant, user.id, &invite.email).await {
+            tracing::warn!("Failed to promote invited parents for user {}: {e}", user.id);
         }
 
         Ok(user.into())

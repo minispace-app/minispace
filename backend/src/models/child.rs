@@ -63,3 +63,31 @@ pub struct ChildParentUser {
     pub email: String,
     pub relationship: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct PendingParent {
+    pub child_id: Uuid,
+    pub email: String,
+    pub relationship: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AssignPendingParentRequest {
+    pub email: String,
+    pub relationship: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct InvitedParent {
+    pub email: String,
+    pub role: String,
+    pub expires_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AssignInvitedParentRequest {
+    pub email: String,
+    pub role: String,
+}

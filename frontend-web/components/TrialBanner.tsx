@@ -25,10 +25,10 @@ export function TrialBanner() {
   if (daysLeft === null) return null;
 
   return (
-    <div className={`text-sm py-2 px-4 text-center flex items-center justify-center gap-2 flex-shrink-0 ${
+    <div className={`text-caption py-2 px-4 text-center flex items-center justify-center gap-2 flex-shrink-0 font-medium ${
       daysLeft === 0
-        ? "bg-red-600 text-white"
-        : "bg-yellow-400 text-yellow-900"
+        ? "bg-status-danger text-white"
+        : "bg-status-warning/20 text-ink"
     }`}>
       <span aria-hidden="true">⏳</span>
       <span>

@@ -130,7 +130,7 @@ export default function DocumentsPage() {
         <h1 className="text-xl font-bold text-slate-800">{t("title")}</h1>
         <button
           onClick={() => setShowUpload(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition"
+          className="flex items-center gap-2 px-4 py-2 bg-ink text-white rounded-pill text-body hover:opacity-90 transition-all duration-[180ms]"
         >
           <Upload className="w-4 h-4" />
           {t("upload")}
@@ -289,7 +289,7 @@ export default function DocumentsPage() {
               <button
                 onClick={handleSave}
                 disabled={saving || !editForm.title}
-                className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition"
+                className="flex-1 py-2.5 bg-ink text-white rounded-pill text-body hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50"
               >
                 {saving ? tc("saving") : tc("save")}
               </button>

@@ -156,6 +156,35 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     .execute(pool)
     .await?;
 
+    // --- Pending parents (by email, for non-registered parents) ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE TABLE IF NOT EXISTS "{schema}".child_pending_parents (
+            child_id     UUID NOT NULL REFERENCES "{schema}".children(id) ON DELETE CASCADE,
+            email        VARCHAR(255) NOT NULL,
+            relationship VARCHAR(64) NOT NULL DEFAULT 'parent',
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (child_id, email)
+        );
+        CREATE INDEX IF NOT EXISTS idx_child_pending_parents_email ON "{schema}".child_pending_parents(email)"#
+    ))
+    .execute(pool)
+    .await?;
+
+    // --- Invited parents (invitation token linked to a child) ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE TABLE IF NOT EXISTS "{schema}".child_invitations (
+            id                 UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
+            child_id           UUID NOT NULL REFERENCES "{schema}".children(id) ON DELETE CASCADE,
+            invitation_token_id UUID NOT NULL REFERENCES "{schema}".invitation_tokens(id) ON DELETE CASCADE,
+            created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE (child_id, invitation_token_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_child_invitations_child ON "{schema}".child_invitations(child_id);
+        CREATE INDEX IF NOT EXISTS idx_child_invitations_token ON "{schema}".child_invitations(invitation_token_id)"#
+    ))
+    .execute(pool)
+    .await?;
+
     // --- Enum: message_type ---
     sqlx::raw_sql(&format!(
         "DO $$ BEGIN

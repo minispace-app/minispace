@@ -7,6 +7,7 @@ use crate::{
     models::journal::{
         DailyJournal, UpsertJournalRequest, APPETIT_LEVELS, HUMEUR_LEVELS, WEATHER_CONDITIONS,
     },
+    services::children::ChildService,
 };
 
 #[derive(Clone, Debug, sqlx::FromRow)]
@@ -279,6 +280,12 @@ impl JournalService {
         .fetch_all(pool)
         .await?;
 
+        // Fetch pending parents (non-registered) for the same children
+        let pending_parent_rows: Vec<(Uuid, String)> =
+            ChildService::get_pending_parent_emails_for_children(pool, tenant, &child_ids)
+                .await
+                .unwrap_or_default();
+
         // Group by parent_email
         let mut parent_children: std::collections::HashMap<String, (String, Vec<(String, String, DailyJournal)>)> =
             std::collections::HashMap::new();
@@ -288,6 +295,17 @@ impl JournalService {
                 parent_children
                     .entry(parent_email)
                     .or_insert_with(|| (parent_name.clone(), Vec::new()))
+                    .1
+                    .push((child_first.clone(), child_last.clone(), entry.clone()));
+            }
+        }
+
+        // Add pending parents to the same grouping
+        for (child_id, pending_email) in pending_parent_rows {
+            if let Some((child_first, child_last, entry)) = child_data.get(&child_id) {
+                parent_children
+                    .entry(pending_email.clone())
+                    .or_insert_with(|| ("Parent en attente".to_string(), Vec::new()))
                     .1
                     .push((child_first.clone(), child_last.clone(), entry.clone()));
             }
@@ -416,7 +434,13 @@ impl JournalService {
             .fetch_all(pool)
             .await?;
 
-            if parents.is_empty() {
+            // Fetch pending parents for this child
+            let pending_parents: Vec<(Uuid, String)> =
+                ChildService::get_pending_parent_emails_for_children(pool, tenant, &[*child_id])
+                    .await
+                    .unwrap_or_default();
+
+            if parents.is_empty() && pending_parents.is_empty() {
                 skipped += 1;
                 continue;
             }
@@ -446,8 +470,14 @@ impl JournalService {
                     child_last,
                     week_start.format("%d/%m/%Y")
                 );
+                // Send to registered parents
                 for (parent_email, parent_name) in &parents {
                     let _ = svc.send_journal(parent_email, parent_name, &html, &subject, &garderie_name).await;
+                    total_sent += 1;
+                }
+                // Send to pending parents
+                for (_child_id, parent_email) in &pending_parents {
+                    let _ = svc.send_journal(parent_email, "Parent", &html, &subject, &garderie_name).await;
                     total_sent += 1;
                 }
             }
@@ -489,7 +519,13 @@ impl JournalService {
         .fetch_all(pool)
         .await?;
 
-        if parents.is_empty() {
+        // Fetch pending parents
+        let pending_parents: Vec<(Uuid, String)> =
+            ChildService::get_pending_parent_emails_for_children(pool, tenant, &[child_id])
+                .await
+                .unwrap_or_default();
+
+        if parents.is_empty() && pending_parents.is_empty() {
             anyhow::bail!("Aucun parent assigné à cet enfant");
         }
 
@@ -530,23 +566,29 @@ impl JournalService {
         // Build HTML email
         let html = build_journal_email_html(&child_first_name, &child_last_name, week_start, week_end, &entries, &garderie_name, &themes_for_week, &menus_for_week);
 
-        // Send to all parents
-        if let Some(svc) = email_svc {
-            for (parent_email, parent_name) in &parents {
-                let subject = format!(
-                    "Journal de bord de {} {} - Semaine du {}",
-                    child_first_name, child_last_name,
-                    week_start.format("%d/%m/%Y")
-                );
+        let subject = format!(
+            "Journal de bord de {} {} - Semaine du {}",
+            child_first_name, child_last_name,
+            week_start.format("%d/%m/%Y")
+        );
 
+        // Send to all registered and pending parents
+        if let Some(svc) = email_svc {
+            // Send to registered parents
+            for (parent_email, parent_name) in &parents {
                 // Ignore send errors — graceful degradation
                 let _ = svc.send_journal(parent_email, parent_name, &html, &subject, &garderie_name).await;
             }
+            // Send to pending parents
+            for (_child_id, parent_email) in &pending_parents {
+                let _ = svc.send_journal(parent_email, "Parent", &html, &subject, &garderie_name).await;
+            }
         }
 
+        let total = parents.len() + pending_parents.len();
         Ok(format!(
             "Journal envoyé à {} parent(s)",
-            parents.len()
+            total
         ))
     }
 }
@@ -774,6 +816,7 @@ fn build_journal_email_html(
 
 /// Builds email HTML for multiple children's journals (grouped by parent).
 /// Each child is displayed in its own section.
+/// Structure: Header > Theme (if present) > Menu (if present) > Each child's data
 fn build_journal_email_html_multi(
     children_entries: &[(String, String, crate::models::journal::DailyJournal)],
     today: NaiveDate,
@@ -791,6 +834,61 @@ fn build_journal_email_html_multi(
         period = period,
     );
 
+    // ─── THEME SECTION (displayed once at top) ───
+    if let Some(theme) = get_theme_for_date(today, themes) {
+        html.push_str(&format!(
+            r#"<div style="background:#f3e8ff;border:2px solid #d8b4fe;border-radius:8px;padding:16px;margin-bottom:24px;font-size:14px">
+            <span style="color:#7c3aed;font-weight:700;font-size:15px">📚 Thème de la semaine :</span> <span style="color:#5b21b6;font-weight:600">{}</span>
+            </div>"#,
+            theme
+        ));
+    }
+
+    // ─── MENU SECTION (displayed once at top) ───
+    if let Some(menu) = menu {
+        let has_menu = menu.collation_matin.is_some() || menu.diner.is_some() || menu.collation_apres_midi.is_some();
+        if has_menu {
+            html.push_str(r#"<div style="background:#fffbeb;border:2px solid #fcd34d;border-radius:8px;padding:16px;margin-bottom:24px">"#);
+            html.push_str(r#"<div style="color:#d97706;font-weight:700;font-size:15px;margin-bottom:12px">🍽️ Menu du jour</div>"#);
+
+            if let Some(ref m) = menu.collation_matin {
+                if !m.trim().is_empty() {
+                    html.push_str(&format!(
+                        r#"<div style="background:#fef3c7;border-left:4px solid #fbbf24;padding:10px 12px;margin-bottom:8px;border-radius:4px">
+                        <span style="color:#d97706;font-weight:600">🌅 Collation matin :</span> <span style="color:#92400e">{}</span>
+                        </div>"#,
+                        m
+                    ));
+                }
+            }
+
+            if let Some(ref m) = menu.diner {
+                if !m.trim().is_empty() {
+                    html.push_str(&format!(
+                        r#"<div style="background:#fed7aa;border-left:4px solid #fb923c;padding:10px 12px;margin-bottom:8px;border-radius:4px">
+                        <span style="color:#c2410c;font-weight:600">🍽️ Dîner :</span> <span style="color:#7c2d12">{}</span>
+                        </div>"#,
+                        m
+                    ));
+                }
+            }
+
+            if let Some(ref m) = menu.collation_apres_midi {
+                if !m.trim().is_empty() {
+                    html.push_str(&format!(
+                        r#"<div style="background:#e9d5ff;border-left:4px solid #d8b4fe;padding:10px 12px;margin-bottom:8px;border-radius:4px">
+                        <span style="color:#9333ea;font-weight:600">🌙 Collation après-midi :</span> <span style="color:#5b21b6">{}</span>
+                        </div>"#,
+                        m
+                    ));
+                }
+            }
+
+            html.push_str("</div>");
+        }
+    }
+
+    // ─── CHILDREN SECTIONS ───
     for (child_first, child_last, entry) in children_entries {
         // Child header
         html.push_str(&format!(
@@ -821,63 +919,10 @@ fn build_journal_email_html_multi(
                 date = date_fr,
             ));
 
-            // Add menu du jour if present
-            if let Some(menu) = menu {
-                let has_menu = menu.collation_matin.is_some() || menu.diner.is_some() || menu.collation_apres_midi.is_some();
-                if has_menu {
-                    html.push_str(r#"<div style="margin-bottom:12px;font-size:12px">"#);
-
-                    if let Some(ref m) = menu.collation_matin {
-                        if !m.trim().is_empty() {
-                            html.push_str(&format!(
-                                r#"<div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:8px;margin-bottom:6px">
-                                <span style="color:#d97706;font-weight:600">🌅 Collation matin :</span> <span style="color:#92400e">{}</span>
-                                </div>"#,
-                                m
-                            ));
-                        }
-                    }
-
-                    if let Some(ref m) = menu.diner {
-                        if !m.trim().is_empty() {
-                            html.push_str(&format!(
-                                r#"<div style="background:#fed7aa;border:1px solid #fdba74;border-radius:6px;padding:8px;margin-bottom:6px">
-                                <span style="color:#c2410c;font-weight:600">🍽️ Dîner :</span> <span style="color:#7c2d12">{}</span>
-                                </div>"#,
-                                m
-                            ));
-                        }
-                    }
-
-                    if let Some(ref m) = menu.collation_apres_midi {
-                        if !m.trim().is_empty() {
-                            html.push_str(&format!(
-                                r#"<div style="background:#e9d5ff;border:1px solid #d8b4fe;border-radius:6px;padding:8px;margin-bottom:6px">
-                                <span style="color:#9333ea;font-weight:600">🌙 Collation après-midi :</span> <span style="color:#5b21b6">{}</span>
-                                </div>"#,
-                                m
-                            ));
-                        }
-                    }
-
-                    html.push_str("</div>");
-                }
-            }
-
-            // Add theme if present for this day
-            if let Some(theme) = get_theme_for_date(entry.date, themes) {
-                html.push_str(&format!(
-                    r#"<div style="background:#f3e8ff;border:1px solid #e9d5ff;border-radius:6px;padding:10px;margin-bottom:10px;font-size:13px">
-                    <span style="color:#7c3aed;font-weight:600">📚 Thème :</span> <span style="color:#6d28d9">{}</span>
-                    </div>"#,
-                    theme
-                ));
-            }
-
+            // Main data table
             html.push_str(&format!(
-                r#"<table style="width:100%;font-size:13px;color:#374151;border-collapse:collapse">
+                r#"<table style="width:100%;font-size:13px;color:#374151;border-collapse:collapse;margin-bottom:12px">
                     <tr><td style="padding:4px 8px 4px 0;width:120px;color:#6b7280"><strong>Température</strong></td><td style="padding:4px 0">{temp}</td></tr>
-                    <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Menu</strong></td><td style="padding:4px 0">{menu}</td></tr>
                     <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Appétit</strong></td><td style="padding:4px 0">{appetit}</td></tr>
                     <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Humeur</strong></td><td style="padding:4px 0">{humeur}</td></tr>
                     <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Sommeil</strong></td><td style="padding:4px 0">{sommeil}</td></tr>
@@ -885,7 +930,6 @@ fn build_journal_email_html_multi(
                     <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Médicaments</strong></td><td style="padding:4px 0">{med}</td></tr>
                 </table>"#,
                 temp    = entry.temperature.as_deref().map(fmt_temperature).unwrap_or("—"),
-                menu    = opt_str(entry.menu.as_deref()),
                 appetit = entry.appetit.as_deref().map(fmt_appetit).unwrap_or("—"),
                 humeur  = entry.humeur.as_deref().map(fmt_humeur).unwrap_or("—"),
                 sommeil = sommeil,
@@ -893,12 +937,25 @@ fn build_journal_email_html_multi(
                 med     = opt_str(entry.medicaments.as_deref()),
             ));
 
+            // Note alimentaire (food note from child's journal.menu)
+            if let Some(ref food_note) = entry.menu {
+                if !food_note.trim().is_empty() {
+                    html.push_str(&format!(
+                        r#"<div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:10px 12px;margin-bottom:12px;font-size:13px;border-radius:0 4px 4px 0">
+                        <strong style="color:#15803d">📝 Note alimentaire :</strong><br><span style="color:#374151">{}</span>
+                    </div>"#,
+                        food_note
+                    ));
+                }
+            }
+
             if let Some(msg) = &entry.message_educatrice {
                 if !msg.trim().is_empty() {
                     html.push_str(&format!(
-                        r#"<div style="background:#eff6ff;border-left:3px solid #2563eb;padding:8px 12px;margin-top:10px;font-size:12px;border-radius:0 4px 4px 0">
-                        <strong style="color:#1d4ed8">💬 Message de l'éducatrice :</strong><br><span style="color:#374151">{msg}</span>
-                    </div>"#
+                        r#"<div style="background:#eff6ff;border-left:3px solid #2563eb;padding:10px 12px;margin-bottom:12px;font-size:13px;border-radius:0 4px 4px 0">
+                        <strong style="color:#1d4ed8">💬 Message de l'éducatrice :</strong><br><span style="color:#374151">{}</span>
+                    </div>"#,
+                        msg
                     ));
                 }
             }
@@ -906,9 +963,10 @@ fn build_journal_email_html_multi(
             if let Some(obs) = &entry.observations {
                 if !obs.trim().is_empty() {
                     html.push_str(&format!(
-                        r#"<div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:8px 12px;margin-top:8px;font-size:12px;border-radius:0 4px 4px 0">
-                        <strong style="color:#15803d">📝 Observations :</strong><br><span style="color:#374151">{obs}</span>
-                    </div>"#
+                        r#"<div style="background:#fef2f2;border-left:3px solid #dc2626;padding:10px 12px;font-size:13px;border-radius:0 4px 4px 0">
+                        <strong style="color:#991b1b">🔍 Observations :</strong><br><span style="color:#374151">{}</span>
+                    </div>"#,
+                        obs
                     ));
                 }
             }

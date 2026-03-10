@@ -30,14 +30,32 @@ scrape_configs:
         target_label: 'service'
         replacement: 'nginx'
     pipeline_stages:
+      # Try JSON parsing first for new JSON format
+      - json:
+          expressions:
+            timestamp: timestamp
+            client_ip: client_ip
+            method: request_method
+            path: request_path
+            uri: request_uri
+            status: status
+            bytes_sent: bytes_sent
+            response_time: response_time
+            referer: http_referer
+            user_agent: http_user_agent
+            http_host: http_host
+          on_error: skip
+      # Fallback to regex for legacy plain text format
       - regex:
           expression: '^(?P<remote_ip>[\d.]+) - (?P<user>[^ ]*) \[(?P<timestamp>[^\]]+)\] "(?P<method>\w+) (?P<path>[^ ]*) (?P<protocol>[^"]+)" (?P<status>\d+) (?P<bytes_sent>\d+) "(?P<referer>[^"]*)" "(?P<user_agent>[^"]*)"'
+          on_error: drop
       - timestamp:
           source: timestamp
           format: '02/Jan/2006:15:04:05 -0700'
+          on_error: drop
+      # Only index LOW-cardinality labels to avoid stream explosion.
+      # High-cardinality fields (client_ip, path, host, response_time)
+      # are extracted from JSON at query time with | json.
       - labels:
           method:
           status:
-          path:
-          remote_ip:
-          bytes_sent:

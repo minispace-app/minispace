@@ -1,0 +1,281 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "templating": {
+    "list": [
+      {
+        "name": "status",
+        "label": "Status Code",
+        "type": "custom",
+        "query": "all : .*,2xx : 2[0-9]{2},3xx : 3[0-9]{2},4xx : 4[0-9]{2},5xx : 5[0-9]{2},200 : 200,201 : 201,204 : 204,301 : 301,302 : 302,304 : 304,400 : 400,401 : 401,403 : 403,404 : 404,429 : 429,500 : 500,502 : 502,503 : 503,504 : 504",
+        "current": { "text": "all", "value": ".*" },
+        "options": [
+          { "text": "all", "value": ".*", "selected": true },
+          { "text": "2xx", "value": "2[0-9]{2}" },
+          { "text": "3xx", "value": "3[0-9]{2}" },
+          { "text": "4xx", "value": "4[0-9]{2}" },
+          { "text": "5xx", "value": "5[0-9]{2}" }
+        ],
+        "includeAll": false, "multi": false, "hide": 0
+      },
+      {
+        "name": "method",
+        "label": "HTTP Method",
+        "type": "custom",
+        "query": "all : .*,GET : GET,POST : POST,PUT : PUT,PATCH : PATCH,DELETE : DELETE,HEAD : HEAD,OPTIONS : OPTIONS",
+        "current": { "text": "all", "value": ".*" },
+        "options": [
+          { "text": "all", "value": ".*", "selected": true },
+          { "text": "GET", "value": "GET" },
+          { "text": "POST", "value": "POST" },
+          { "text": "PUT", "value": "PUT" },
+          { "text": "PATCH", "value": "PATCH" },
+          { "text": "DELETE", "value": "DELETE" }
+        ],
+        "includeAll": false, "multi": false, "hide": 0
+      },
+      {
+        "name": "path_filter",
+        "label": "Path Filter",
+        "type": "textbox",
+        "query": "",
+        "current": { "text": "", "value": "" },
+        "hide": 0
+      },
+      {
+        "name": "ip_filter",
+        "label": "IP Filter",
+        "type": "textbox",
+        "query": "",
+        "current": { "text": "", "value": "" },
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100, "title": "Overview", "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "fixedColor": "blue", "mode": "fixed" }, "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 }, "id": 1,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "count(sum by (client_ip) (count_over_time({service=\"nginx\"} | json | __error__=\\\"\\\" | client_ip =~ `.*${ip_filter}.*` [1h])))",
+        "instant": true, "refId": "A" }],
+      "title": "Unique IPs (1h)", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "fixedColor": "green", "mode": "fixed" }, "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 }, "id": 2,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "sum(count_over_time({service=\"nginx\", status=~`${status:raw}`, method=~`${method:raw}`} | json | __error__=\"\" | path =~ `.*${path_filter}.*` | client_ip =~ `.*${ip_filter}.*` [$__range]))",
+        "instant": true, "refId": "A" }],
+      "title": "Total Requests", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "fixedColor": "green", "mode": "fixed" }, "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 }, "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "sum(count_over_time({service=\"nginx\", status=~`2[0-9]{2}`, method=~`${method:raw}`} [$__range]))",
+        "instant": true, "refId": "A" }],
+      "title": "2xx Success", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "fixedColor": "orange", "mode": "fixed" }, "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "orange", "value": 10 }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 }, "id": 4,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "sum(count_over_time({service=\"nginx\", status=~`4[0-9]{2}`} [$__range]))",
+        "instant": true, "refId": "A" }],
+      "title": "4xx Errors", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "fixedColor": "red", "mode": "fixed" }, "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": 5 }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 }, "id": 5,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "sum(count_over_time({service=\"nginx\", status=~`5[0-9]{2}`} [$__range]))",
+        "instant": true, "refId": "A" }],
+      "title": "5xx Errors", "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "fixedColor": "purple", "mode": "fixed" }, "unit": "percentunit", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "orange", "value": 0.05 }, { "color": "red", "value": 0.15 }] } }, "overrides": [] },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 }, "id": 6,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "sum(count_over_time({service=\"nginx\", status=~`[45][0-9]{2}`} [$__range])) / sum(count_over_time({service=\"nginx\"} [$__range]))",
+        "instant": true, "refId": "A" }],
+      "title": "Error Rate", "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 101, "title": "Traffic Analysis", "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "bars", "fillOpacity": 100, "lineWidth": 1, "stacking": { "group": "A", "mode": "normal" } }, "unit": "short" },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "^2" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "^3" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "^4" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "^5" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 }, "id": 10,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "sum(rate({service=\"nginx\", status=~`${status:raw}`, method=~`${method:raw}`} [2m])) by (status)",
+        "legendFormat": "{{status}}", "refId": "A" }],
+      "title": "Requests by HTTP Status", "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "hideFrom": { "tooltip": false, "viz": false, "legend": false } }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 }, "id": 11,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "pieType": "donut", "tooltip": { "mode": "single", "sort": "none" } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "sum(count_over_time({service=\"nginx\"} | status =~ `${status:raw}` | method =~ `${method:raw}` [$__range])) by (status)",
+        "instant": true, "legendFormat": "{{status}}", "refId": "A" }],
+      "title": "HTTP Status Distribution", "type": "piechart"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 }, "id": 12,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "sum(rate({service=\"nginx\", status=~`${status:raw}`, method=~`${method:raw}`} [2m])) by (method)",
+        "legendFormat": "{{method}}", "refId": "A" }],
+      "title": "Requests by HTTP Method", "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "fixedColor": "purple", "mode": "fixed" }, "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 }, "unit": "Bps" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 }, "id": 13,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "sum(sum_over_time({service=\"nginx\", status=~`${status:raw}`, method=~`${method:raw}`} | json | __error__=\"\" | unwrap bytes_sent [2m]))",
+        "legendFormat": "Bytes/s", "refId": "A" }],
+      "title": "Bandwidth", "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "id": 102, "title": "Top Lists", "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "custom": { "align": "auto", "cellOptions": { "type": "color-background" }, "inspect": false }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "orange", "value": 500 }, { "color": "red", "value": 1000 }] } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 23 }, "id": 20,
+      "options": { "footer": { "show": false }, "showHeader": true, "sortBy": [{ "displayName": "Value", "desc": true }] },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "topk(10, sum(count_over_time({service=\"nginx\", status=~`${status:raw}`, method=~`${method:raw}`} | json | __error__=\"\" | client_ip =~ `.*${ip_filter}.*` [$__range])) by (client_ip))",
+        "instant": true, "legendFormat": "{{client_ip}}", "refId": "A" }],
+      "title": "Top 10 IPs", "type": "table"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "custom": { "align": "auto", "cellOptions": { "type": "color-background" }, "inspect": false }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "orange", "value": 500 }, { "color": "red", "value": 1000 }] } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 9, "x": 6, "y": 23 }, "id": 21,
+      "options": { "footer": { "show": false }, "showHeader": true, "sortBy": [{ "displayName": "Value", "desc": true }] },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "topk(10, sum(count_over_time({service=\"nginx\", status=~`${status:raw}`, method=~`${method:raw}`} | json | __error__=\"\" | path =~ `.*${path_filter}.*` [$__range])) by (path))",
+        "instant": true, "legendFormat": "{{path}}", "refId": "A" }],
+      "title": "Top 10 Paths", "type": "table"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 23 }, "id": 22,
+      "options": { "footer": { "show": false }, "showHeader": true, "sortBy": [{ "displayName": "Value", "desc": true }] },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "topk(10, sum(count_over_time({service=\"nginx\", status=~`${status:raw}`} | json | __error__=\"\" [$__range])) by (http_host))",
+        "instant": true, "legendFormat": "{{http_host}}", "refId": "A" }],
+      "title": "Top 10 Hosts", "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "id": 103, "title": "Error Analysis", "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "custom": { "align": "auto", "cellOptions": { "type": "color-background" }, "inspect": false }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 10 }, { "color": "red", "value": 50 }] } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 }, "id": 30,
+      "options": { "footer": { "show": false }, "showHeader": true, "sortBy": [{ "displayName": "Value", "desc": true }] },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "topk(10, sum(count_over_time({service=\"nginx\", status=~`[45][0-9]{2}`, method=~`${method:raw}`} | json | __error__=\"\" | path =~ `.*${path_filter}.*` [$__range])) by (path))",
+        "instant": true, "legendFormat": "{{path}}", "refId": "A" }],
+      "title": "Top 10 Error Paths", "type": "table"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "hideFrom": { "tooltip": false, "viz": false, "legend": false } }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 }, "id": 31,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "pieType": "pie", "tooltip": { "mode": "single", "sort": "none" } },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "sum(count_over_time({service=\"nginx\"} | status =~ `[45][0-9]{2}` [$__range])) by (status)",
+        "instant": true, "legendFormat": "{{status}}", "refId": "A" }],
+      "title": "Error Status Distribution", "type": "piechart"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 40 }, "id": 32,
+      "options": { "footer": { "show": false }, "showHeader": true, "sortBy": [{ "displayName": "Value", "desc": true }] },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "topk(10, sum(count_over_time({service=\"nginx\", status=~`[45][0-9]{2}`} | json | __error__=\"\" [$__range])) by (client_ip))",
+        "instant": true, "legendFormat": "{{client_ip}}", "refId": "A" }],
+      "title": "Top IPs with Errors", "type": "table"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "custom": { "align": "auto", "cellOptions": { "type": "auto" }, "inspect": false }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 40 }, "id": 33,
+      "options": { "footer": { "show": false }, "showHeader": true, "sortBy": [{ "displayName": "Value", "desc": true }] },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "topk(10, sum(count_over_time({service=\"nginx\", status=~`${status:raw}`} | json | __error__=\"\" [$__range])) by (user_agent))",
+        "instant": true, "legendFormat": "{{user_agent}}", "refId": "A" }],
+      "title": "Top User Agents", "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 48 },
+      "id": 104, "title": "Real-time Logs", "type": "row"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 49 }, "id": 40,
+      "options": { "dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false },
+      "targets": [{ "datasource": { "type": "loki", "uid": "loki" },
+        "expr": "{service=\"nginx\", status=~`${status:raw}`, method=~`${method:raw}`} | json | __error__=\"\" | path =~ `.*${path_filter}.*` | client_ip =~ `.*${ip_filter}.*`",
+        "refId": "A" }],
+      "title": "Access Logs", "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["nginx", "loki", "monitoring"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Nginx GeoIP Dashboard",
+  "uid": "nginx-geoip",
+  "version": 6
+}

@@ -92,6 +92,11 @@
     "welcome": "Bienvenue, {name}!",
     "recentMessages": "Messages récents",
     "recentMedia": "Photos récentes",
+    "weekPresence": "Présence de la semaine",
+    "absences": "Absences",
+    "allPresent": "✓ {total}/{total}",
+    "presentCount": "{present}/{total} présents",
+    "allPresentMobile": "✓ {total}/{total} présents",
     "childrenCount": "{count, plural, =0 {Aucun enfant} one {# enfant} other {# enfants}}",
     "groupsCount": "{count, plural, =0 {Aucun groupe} one {# groupe} other {# groupes}}"
   },
@@ -226,8 +231,19 @@
     "associatedParents": "Parents associés",
     "associate": "Associer",
     "noParents": "Aucun parent associé",
+    "pendingParents": "Parents en attente d'inscription",
+    "addByEmail": "Ajouter par email",
+    "noPendingParents": "Aucun parent en attente",
+    "pending": "En attente",
+    "invitation": "Invitation",
+    "linkInvitation": "Lier une invitation",
+    "emailPlaceholder": "adresse@email.com",
+    "add": "Ajouter",
+    "link": "Lier",
+    "relationship": "Relation",
     "remove": "Retirer",
     "chooseParent": "Choisir un parent...",
+    "chooseInvitation": "Choisir une invitation...",
     "noGroup": "Aucun groupe",
     "deleteError": "Erreur lors de la suppression",
     "confirmRemoveParent": "Retirer ce parent?",
@@ -383,10 +399,15 @@
     "prevWeek": "Semaine précédente",
     "nextWeek": "Semaine suivante",
     "placeholder": "Menu du jour...",
-    "menuOfDay": "Menu du jour"
+    "menuOfDay": "Menu du jour",
+    "sectionMatin": "🌅 Collation matin",
+    "sectionDiner": "🍽️ Dîner",
+    "sectionSoir": "🌙 Collation après-midi"
   },
   "planning": {
-    "title": "Planification"
+    "title": "Planification",
+    "tabMenu": "🍽️ Menu",
+    "tabActivities": "🎉 Activités"
   },
   "auditLog": {
     "title": "Journal d'audit",

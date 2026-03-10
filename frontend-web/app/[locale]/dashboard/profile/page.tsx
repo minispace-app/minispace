@@ -252,7 +252,7 @@ export default function ProfilePage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 bg-ink text-white rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <Save className="w-4 h-4" />
               {loading ? "..." : t("update")}
@@ -307,7 +307,7 @@ export default function ProfilePage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
+              className="w-full px-4 py-2 bg-ink text-white rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <Save className="w-4 h-4" />
               {loading ? "..." : t("update")}
@@ -341,7 +341,7 @@ export default function ProfilePage() {
                   type="button"
                   onClick={handleSaveTime}
                   disabled={savingTime}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition text-sm"
+                  className="flex items-center gap-2 px-4 py-2 bg-ink text-white rounded-pill text-body hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
                   {savingTime ? "..." : t("update")}
@@ -382,7 +382,7 @@ export default function ProfilePage() {
                 <button
                   type="submit"
                   disabled={!logoFile || logoLoading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition flex items-center gap-2 text-sm"
+                  className="px-4 py-2 bg-ink text-white rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50 flex items-center gap-2 text-body"
                 >
                   <Upload className="w-4 h-4" />
                   {logoLoading ? "..." : t("logoUploadButton")}
