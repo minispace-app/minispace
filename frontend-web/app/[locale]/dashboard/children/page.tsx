@@ -376,7 +376,7 @@ function ChildDetails({
         </div>
       )}
 
-      {/* Parents section */}
+      {/* Parents section (active + pending) */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100">
           <div className="flex items-center justify-between">
@@ -384,26 +384,36 @@ function ChildDetails({
               <UserPlus className="w-4 h-4 text-slate-500" />
               {t("associatedParents")}
             </h3>
-            {canWrite && !showAddParent && (
-              <button
-                onClick={() => setShowAddParent(true)}
-                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium transition"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                {t("associate")}
-              </button>
+            {canWrite && !showAddParent && !showAddPendingParent && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowAddParent(true)}
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium transition"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  {t("associate")}
+                </button>
+                <button
+                  onClick={() => setShowAddPendingParent(true)}
+                  className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium transition"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  {t("addByEmail")}
+                </button>
+              </div>
             )}
           </div>
         </div>
 
         <div className="px-5 py-4">
-          {parents.length === 0 ? (
+          {parents.length === 0 && pendingParents.length === 0 ? (
             <p className="text-sm text-slate-400">{t("noParents")}</p>
           ) : (
             <ul className="space-y-2 mb-4">
+              {/* Active parents */}
               {parents.map((p) => (
                 <li
-                  key={p.user_id}
+                  key={`active-${p.user_id}`}
                   className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2"
                 >
                   <div>
@@ -428,9 +438,43 @@ function ChildDetails({
                   )}
                 </li>
               ))}
+
+              {/* Pending parents */}
+              {pendingParents.map((p) => (
+                <li
+                  key={`pending-${p.email}`}
+                  className="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs bg-amber-200 text-amber-800 rounded px-2 py-1 font-medium">
+                        {t("pending")}
+                      </span>
+                      <span className="text-sm font-medium text-slate-800">
+                        {p.email}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-slate-500">
+                        {p.relationship}
+                      </span>
+                    </div>
+                  </div>
+                  {canWrite && (
+                    <button
+                      onClick={() => handleRemovePendingParent(p.email)}
+                      className="text-slate-400 hover:text-red-500 transition ml-3 flex-shrink-0"
+                      title={t("remove")}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </li>
+              ))}
             </ul>
           )}
 
+          {/* Add registered parent form */}
           {canWrite && showAddParent && (
             <form onSubmit={handleAddParent} className="bg-blue-50 border border-blue-100 rounded-lg p-3 space-y-2 mt-2">
               <select
@@ -477,68 +521,8 @@ function ChildDetails({
               </div>
             </form>
           )}
-        </div>
-      </div>
 
-      {/* Pending Parents section */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-slate-500" />
-              {t("pendingParents")}
-            </h3>
-            {canWrite && !showAddPendingParent && (
-              <button
-                onClick={() => setShowAddPendingParent(true)}
-                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium transition"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                {t("addByEmail")}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="px-5 py-4">
-          {pendingParents.length === 0 ? (
-            <p className="text-sm text-slate-400">{t("noPendingParents")}</p>
-          ) : (
-            <ul className="space-y-2 mb-4">
-              {pendingParents.map((p) => (
-                <li
-                  key={p.email}
-                  className="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs bg-amber-200 text-amber-800 rounded px-2 py-1 font-medium">
-                        {t("pending")}
-                      </span>
-                      <span className="text-sm font-medium text-slate-800">
-                        {p.email}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-slate-500">
-                        {t("relationship")}: {p.relationship}
-                      </span>
-                    </div>
-                  </div>
-                  {canWrite && (
-                    <button
-                      onClick={() => handleRemovePendingParent(p.email)}
-                      className="text-slate-400 hover:text-red-500 transition ml-3 flex-shrink-0"
-                      title={t("remove")}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-
+          {/* Add pending parent form */}
           {canWrite && showAddPendingParent && (
             <form onSubmit={handleAddPendingParent} className="bg-blue-50 border border-blue-100 rounded-lg p-3 space-y-2 mt-2">
               <input
