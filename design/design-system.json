@@ -1,0 +1,415 @@
+{
+  "meta": {
+    "name": "Creator Studio Design System",
+    "version": "1.0.0",
+    "description": "Comprehensive design system for the Creator Studio analytics dashboard. All tokens map directly to custom Tailwind v3 classes defined in tailwind.config.js. Use this file as the single source of truth when building new features, pages, or components.",
+    "stack": ["React", "Vite", "Tailwind CSS v3", "Recharts", "Lucide React"]
+  },
+
+  "guidelines": {
+    "core_principles": [
+      "All cards use white backgrounds with 24px border radius and shadow-card. Never use borders on cards.",
+      "Use elevation (shadows) to create depth instead of borders or background color changes.",
+      "Keep the app background as the linear gradient — never override it with a solid color.",
+      "Typography must follow the defined scale strictly. Do not use arbitrary font sizes except for sub-caption labels (9px–11px) when necessary.",
+      "Color usage must be purposeful: use accent colors to encode meaning (status, category, progress), not decoration.",
+      "All interactive elements must use transition-all duration-[180ms] ease-out. Never use other durations.",
+      "Pill shape (rounded-pill) is the default for all buttons, tags, badges, inputs, and nav elements.",
+      "Prefer Tailwind utility classes. Only use inline styles for dynamic values computed from data (e.g. chart colors, progress widths).",
+      "Icon size is always 14px–18px, stroke width 1.5px. Use Lucide React exclusively.",
+      "Maintain 12-column grid at the page level with 24px (gap-6) gutters. Section rows use col-span-8 + col-span-4 split.",
+      "Never use drop shadows stronger than shadow-hover. The design is intentionally light and airy.",
+      "Glassmorphism (bg-white/60 backdrop-blur-sm) is reserved for navbar elements floating over the gradient background only."
+    ],
+    "do_not": [
+      "Do not add borders to cards (design uses shadow for elevation, not borders).",
+      "Do not use color-scheme: dark or add dark mode styles — this is a light-only UI.",
+      "Do not use font families other than Inter / SF Pro Display / Helvetica Neue.",
+      "Do not use Tailwind's default rounded-lg (which is 8px) — use the custom scale: rounded-xs through rounded-pill.",
+      "Do not use transition durations other than 180ms.",
+      "Do not place content wider than max-w-[1440px].",
+      "Do not use saturated or high-contrast colors outside the defined palette.",
+      "Do not add animations beyond hover lifts (hover:-translate-y-0.5) and animate-pulse for live indicators.",
+      "Do not use box shadows with rgba values stronger than rgba(0,0,0,0.08)."
+    ]
+  },
+
+  "tokens": {
+    "colors": {
+      "description": "All color tokens are defined in tailwind.config.js and available as Tailwind utility classes.",
+      "background": {
+        "app_gradient": {
+          "value": "linear-gradient(135deg, #BFDDE3 0%, #C8E6D7 100%)",
+          "usage": "Applied as inline style on the root app div. Never replicate with Tailwind gradient classes.",
+          "class": "N/A — inline style only"
+        },
+        "card": {
+          "hex": "#FFFFFF",
+          "tailwind": "bg-surface-card",
+          "usage": "All card and panel backgrounds"
+        },
+        "surface_soft": {
+          "hex": "#F5F7F8",
+          "tailwind": "bg-surface-soft",
+          "usage": "Hover states on list rows, input backgrounds, secondary icon backgrounds"
+        }
+      },
+      "primary": {
+        "default": { "hex": "#6B7CFF", "tailwind_bg": "bg-primary", "tailwind_text": "text-primary" },
+        "light": { "hex": "#8A97FF", "tailwind_bg": "bg-primary-light", "tailwind_text": "text-primary-light" },
+        "soft": { "hex": "#E7EBFF", "tailwind_bg": "bg-primary-soft", "tailwind_text": "text-primary-soft", "usage": "Button backgrounds, icon container backgrounds, tag backgrounds for primary-themed items" }
+      },
+      "accents": {
+        "green": { "hex": "#7ED6A6", "tailwind_bg": "bg-accent-green", "tailwind_text": "text-accent-green", "semantic": "growth, subscribers, positive trends" },
+        "mint": { "hex": "#B7EAD3", "tailwind_bg": "bg-accent-mint", "tailwind_text": "text-accent-mint", "usage": "Light background version of green, icon containers" },
+        "blue": { "hex": "#8EC9F7", "tailwind_bg": "bg-accent-blue", "tailwind_text": "text-accent-blue", "semantic": "information, audience data" },
+        "purple": { "hex": "#A69BFF", "tailwind_bg": "bg-accent-purple", "tailwind_text": "text-accent-purple", "semantic": "premium features, milestones" },
+        "orange": { "hex": "#F5B266", "tailwind_bg": "bg-accent-orange", "tailwind_text": "text-accent-orange", "semantic": "warnings, lifestyle content" },
+        "yellow": { "hex": "#FFD76A", "tailwind_bg": "bg-accent-yellow", "tailwind_text": "text-accent-yellow", "semantic": "revenue, highlights, achievements" }
+      },
+      "ink": {
+        "primary": { "hex": "#1E1F23", "tailwind": "text-ink", "usage": "Primary headings, strong labels, active states, button backgrounds" },
+        "secondary": { "hex": "#6B7280", "tailwind": "text-ink-secondary", "usage": "Body text, descriptions, secondary labels" },
+        "muted": { "hex": "#9CA3AF", "tailwind": "text-ink-muted", "usage": "Placeholders, timestamps, tertiary metadata" },
+        "inverse": { "hex": "#FFFFFF", "tailwind": "text-white", "usage": "Text on dark (ink) or primary-colored backgrounds" }
+      },
+      "border": {
+        "soft": { "hex": "#E6E8EC", "tailwind": "border-border-soft", "usage": "Dividers and hairlines when needed. Avoid on cards." }
+      },
+      "status": {
+        "success": { "hex": "#63D69E", "tailwind_text": "text-status-success", "tailwind_bg": "bg-status-success", "usage": "Positive engagement, upward trends, live indicators" },
+        "warning": { "hex": "#F5B266", "tailwind_text": "text-status-warning", "tailwind_bg": "bg-status-warning", "usage": "Caution states" },
+        "info": { "hex": "#8EC9F7", "tailwind_text": "text-status-info", "tailwind_bg": "bg-status-info", "usage": "Informational states" },
+        "danger": { "hex": "#FF6B6B", "tailwind_text": "text-status-danger", "tailwind_bg": "bg-status-danger", "usage": "Negative trends, errors, notification badges" }
+      },
+      "opacity_utilities": {
+        "description": "Used for glassmorphism and translucent surfaces only",
+        "examples": ["bg-white/60 — navbar pill background", "bg-white/70 — search bar and icon button backgrounds", "bg-black/20 — hover overlays on thumbnails", "bg-black/50 — video duration badge overlay"]
+      }
+    },
+
+    "typography": {
+      "font_family": {
+        "stack": "Inter, SF Pro Display, Helvetica Neue, sans-serif",
+        "tailwind": "font-sans",
+        "note": "Applied globally via body in index.css. Do not override per-component."
+      },
+      "scale": {
+        "display": { "size": "32px", "line_height": "1.2", "tailwind": "text-display", "weight": "font-bold", "usage": "Large metric values in KPI cards" },
+        "h1": { "size": "24px", "line_height": "1.2", "tailwind": "text-h1", "weight": "font-bold", "usage": "Page titles, main headings" },
+        "h2": { "size": "20px", "line_height": "1.2", "tailwind": "text-h2", "weight": "font-semibold", "usage": "Section headings" },
+        "h3": { "size": "18px", "line_height": "1.4", "tailwind": "text-h3", "weight": "font-semibold", "usage": "Card titles" },
+        "body_large": { "size": "16px", "line_height": "1.6", "tailwind": "text-body-lg", "weight": "font-medium or font-semibold", "usage": "Logo text, prominent labels" },
+        "body": { "size": "14px", "line_height": "1.4", "tailwind": "text-body", "weight": "font-medium or font-regular", "usage": "General UI text, table cells, nav tabs, input text" },
+        "caption": { "size": "12px", "line_height": "1.4", "tailwind": "text-caption", "weight": "font-medium or font-semibold", "usage": "Labels, subtitles, badges, timestamps, legend items" },
+        "sub_caption": { "size": "9px–11px", "tailwind": "text-[10px] / text-[11px] / text-[9px]", "usage": "Video duration overlays, tag chips, fine-print metadata only. Use sparingly." }
+      },
+      "weights": {
+        "regular": { "value": 400, "tailwind": "font-normal" },
+        "medium": { "value": 500, "tailwind": "font-medium" },
+        "semibold": { "value": 600, "tailwind": "font-semibold" },
+        "bold": { "value": 700, "tailwind": "font-bold" }
+      }
+    },
+
+    "spacing": {
+      "base_unit": 8,
+      "description": "Follow Tailwind's 4px base scale. Prefer multiples of 8px for most spacing. Use the values below as a reference for established patterns.",
+      "common_patterns": {
+        "card_padding": "p-5 (20px)",
+        "card_gap": "gap-6 (24px)",
+        "section_gap": "gap-6 (24px) — between rows of cards",
+        "page_horizontal_padding": "px-8 (32px)",
+        "page_bottom_padding": "pb-10 (40px)",
+        "list_row_padding": "px-2 py-2.5",
+        "activity_row_padding": "p-2.5",
+        "badge_padding": "px-2 py-1 (caption badges) / px-3 py-1.5 (action badges)",
+        "nav_tab_padding": "px-4 py-1.5",
+        "search_padding": "px-4 py-2",
+        "icon_container_small": "w-8 h-8 (32px)",
+        "icon_container_medium": "w-9 h-9 (36px)",
+        "icon_container_large": "w-10 h-10 (40px)",
+        "avatar": "w-9 h-9 (36px)",
+        "notification_dot": "w-2 h-2 (8px)",
+        "legend_dot": "w-2.5 h-2.5 (10px)",
+        "progress_bar_height": "h-1.5 (6px)",
+        "legend_line": "w-3 h-1 (12px × 4px)"
+      }
+    },
+
+    "border_radius": {
+      "description": "Custom scale defined in tailwind.config.js. Always use these — do not use Tailwind's built-in rounded scale.",
+      "scale": {
+        "xs": { "value": "6px", "tailwind": "rounded-xs", "usage": "Video duration badges, tiny chips" },
+        "sm": { "value": "10px", "tailwind": "rounded-sm", "usage": "Small icon containers, inner elements" },
+        "md": { "value": "16px", "tailwind": "rounded-md", "usage": "Medium containers" },
+        "lg": { "value": "20px", "tailwind": "rounded-lg", "usage": "Icon containers within cards (w-10 h-10), thumbnail images" },
+        "xl": { "value": "24px", "tailwind": "rounded-xl", "usage": "All cards, all panels — this is the primary card radius" },
+        "pill": { "value": "999px", "tailwind": "rounded-pill", "usage": "Buttons, badges, nav tabs, inputs, avatars, progress bars, legend lines, notification dots" }
+      }
+    },
+
+    "shadows": {
+      "card": { "value": "0px 8px 24px rgba(0,0,0,0.05)", "tailwind": "shadow-card", "usage": "Default shadow on all cards and panels" },
+      "hover": { "value": "0px 12px 32px rgba(0,0,0,0.08)", "tailwind": "shadow-hover", "usage": "Elevated state on hover, tooltip backgrounds" },
+      "soft": { "value": "0px 4px 12px rgba(0,0,0,0.04)", "tailwind": "shadow-soft", "usage": "Navbar elements, icon buttons, search bar, active nav tabs" }
+    },
+
+    "transitions": {
+      "standard": { "value": "transition-all duration-[180ms] ease-out", "usage": "All interactive elements — cards, buttons, tabs, rows" },
+      "opacity_only": { "value": "transition-opacity duration-[180ms]", "usage": "Show/hide overlays on hover (e.g. play button over thumbnails)" },
+      "note": "Always use 180ms. Do not use Tailwind's preset durations (duration-150, duration-200, etc.)."
+    },
+
+    "animations": {
+      "pulse": { "tailwind": "animate-pulse", "usage": "Live status indicator dot only" },
+      "lift": { "tailwind": "hover:-translate-y-0.5", "usage": "Cards on hover, always paired with hover:shadow-hover" }
+    }
+  },
+
+  "components": {
+    "card": {
+      "description": "The foundational layout block. All dashboard panels are cards.",
+      "base_classes": "bg-surface-card rounded-xl p-5 shadow-card",
+      "hover_variant": "bg-surface-card rounded-xl p-5 shadow-card hover:shadow-hover transition-all duration-[180ms] ease-out hover:-translate-y-0.5",
+      "rules": [
+        "Never add a border to a card.",
+        "Always use rounded-xl (24px) — not rounded-lg.",
+        "Use p-5 (20px) for internal padding consistently.",
+        "Cards that contain lists or charts should declare h-full when inside a grid row to equalize height."
+      ],
+      "card_header_pattern": {
+        "description": "Standard card header with title, subtitle, and optional action",
+        "structure": "<div class='flex items-center justify-between mb-5'><div><h2 class='text-h3 font-semibold text-ink'>{Title}</h2><p class='text-caption text-ink-muted mt-0.5'>{Subtitle}</p></div>{OptionalAction}</div>"
+      }
+    },
+
+    "navbar": {
+      "description": "Top navigation bar. Floats over the gradient background using glassmorphism.",
+      "container": "max-w-[1440px] mx-auto px-8 h-16 flex items-center justify-between gap-6",
+      "logo": {
+        "icon_box": "w-8 h-8 rounded-lg bg-ink flex items-center justify-center",
+        "icon": "Zap from lucide-react, size=16, text-accent-yellow fill='#FFD76A'",
+        "label": "text-body-lg font-bold text-ink tracking-tight"
+      },
+      "nav_tabs": {
+        "wrapper": "flex items-center gap-1 bg-white/60 backdrop-blur-sm rounded-pill px-2 py-1.5 shadow-soft",
+        "active_tab": "px-4 py-1.5 rounded-pill text-body font-medium bg-ink text-white shadow-soft transition-all duration-[180ms] ease-out",
+        "inactive_tab": "px-4 py-1.5 rounded-pill text-body font-medium text-ink-secondary hover:text-ink hover:bg-surface-soft transition-all duration-[180ms] ease-out"
+      },
+      "search": {
+        "wrapper": "flex items-center gap-2 bg-white/70 backdrop-blur-sm rounded-pill px-4 py-2 shadow-soft",
+        "input": "bg-transparent text-body text-ink placeholder:text-ink-muted outline-none w-36",
+        "icon": "Search from lucide-react, size=14, text-ink-muted"
+      },
+      "icon_button": {
+        "classes": "relative w-9 h-9 rounded-pill bg-white/70 backdrop-blur-sm shadow-soft flex items-center justify-center text-ink-secondary hover:text-ink transition-all duration-[180ms] border-0 cursor-pointer",
+        "notification_dot": "absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-status-danger"
+      },
+      "avatar": "w-9 h-9 rounded-pill bg-gradient-to-br from-primary to-accent-purple flex items-center justify-center text-white text-caption font-semibold shadow-soft cursor-pointer"
+    },
+
+    "metric_card": {
+      "description": "KPI summary card. Used in a 4-column grid at the top of the dashboard.",
+      "grid": "grid grid-cols-4 gap-6",
+      "card_classes": "bg-surface-card rounded-xl p-5 shadow-card hover:shadow-hover transition-all duration-[180ms] ease-out hover:-translate-y-0.5",
+      "icon_container": "w-10 h-10 rounded-lg {iconBg} flex items-center justify-center",
+      "trend_badge": {
+        "positive": "flex items-center gap-0.5 text-caption font-semibold rounded-pill px-2 py-1 bg-status-success/10 text-status-success",
+        "negative": "flex items-center gap-0.5 text-caption font-semibold rounded-pill px-2 py-1 bg-status-danger/10 text-status-danger",
+        "icons": "ArrowUpRight (positive) / ArrowDownRight (negative) from lucide-react, size=11"
+      },
+      "metric_value": "text-display font-bold text-ink leading-none mb-1",
+      "metric_label": "text-caption text-ink-muted font-medium",
+      "progress_bar": {
+        "track": "mt-4 h-1.5 bg-surface-soft rounded-pill overflow-hidden",
+        "fill": "h-full rounded-pill — use inline style for dynamic background color and opacity: 0.7"
+      },
+      "icon_bg_pairings": {
+        "primary": { "bg": "bg-primary-soft", "icon_color": "text-primary" },
+        "green": { "bg": "bg-accent-mint", "icon_color": "text-accent-green" },
+        "yellow": { "bg": "bg-yellow-50", "icon_color": "text-accent-yellow" },
+        "orange": { "bg": "bg-orange-50", "icon_color": "text-accent-orange" },
+        "purple": { "bg": "bg-[#EAE8FF]", "icon_color": "text-accent-purple" },
+        "blue": { "bg": "bg-[#E3F3FD]", "icon_color": "text-accent-blue" },
+        "danger": { "bg": "bg-red-50", "icon_color": "text-status-danger" }
+      }
+    },
+
+    "button": {
+      "primary": {
+        "classes": "bg-ink text-white rounded-pill px-5 py-2.5 text-body font-medium border-0 cursor-pointer transition-all duration-[180ms] ease-out hover:opacity-90",
+        "usage": "Primary actions — save, publish, confirm"
+      },
+      "secondary": {
+        "classes": "bg-surface-soft text-ink rounded-pill px-4 py-2 text-body font-medium border-0 cursor-pointer transition-all duration-[180ms] ease-out hover:bg-border-soft",
+        "usage": "Secondary actions — cancel, back"
+      },
+      "accent": {
+        "classes": "text-caption font-medium text-primary bg-primary-soft rounded-pill px-3 py-1.5 border-0 cursor-pointer hover:bg-primary hover:text-white transition-all duration-[180ms]",
+        "usage": "Inline card actions — 'View all', 'See more'"
+      },
+      "icon_button": {
+        "classes": "w-9 h-9 rounded-pill bg-white/70 backdrop-blur-sm shadow-soft flex items-center justify-center text-ink-secondary hover:text-ink transition-all duration-[180ms] border-0 cursor-pointer",
+        "usage": "Navbar icon actions (bell, settings, etc.)"
+      }
+    },
+
+    "badge_and_tag": {
+      "description": "Pill-shaped labels for categories, statuses, and counts.",
+      "status_positive": "text-caption font-semibold rounded-pill px-2 py-1 bg-status-success/10 text-status-success",
+      "status_negative": "text-caption font-semibold rounded-pill px-2 py-1 bg-status-danger/10 text-status-danger",
+      "category_tag": "text-[10px] font-medium rounded-pill px-2 py-0.5 {bg} {text}",
+      "category_color_pairings": {
+        "tutorial": { "bg": "bg-primary-soft", "text": "text-primary" },
+        "behind_the_scenes": { "bg": "bg-accent-mint", "text": "text-accent-green" },
+        "gear": { "bg": "bg-[#E3F3FD]", "text": "text-accent-blue" },
+        "vlog": { "bg": "bg-[#EAE8FF]", "text": "text-accent-purple" },
+        "lifestyle": { "bg": "bg-orange-50", "text": "text-accent-orange" }
+      },
+      "neutral_tag": "text-caption text-ink-muted bg-surface-soft rounded-pill px-2.5 py-1 font-medium"
+    },
+
+    "progress_bar": {
+      "track": "h-1.5 bg-surface-soft rounded-pill overflow-hidden",
+      "fill": "h-full rounded-pill — width via inline style, background via inline style",
+      "legend_variant": "w-20 h-1.5 bg-surface-soft rounded-pill overflow-hidden — used in AudienceChart legend"
+    },
+
+    "list_row": {
+      "description": "Hoverable row pattern used in tables and feeds.",
+      "classes": "flex items-center gap-3 px-2 py-2.5 rounded-lg hover:bg-surface-soft transition-all duration-[180ms] cursor-pointer",
+      "activity_variant": "flex items-start gap-3 p-2.5 rounded-lg hover:bg-surface-soft transition-all duration-[180ms] cursor-pointer",
+      "table_row": "grid grid-cols-[2fr_1fr_1fr_1fr] gap-4 items-center px-2 py-2.5 rounded-lg hover:bg-surface-soft transition-all duration-[180ms] cursor-pointer group"
+    },
+
+    "icon_container": {
+      "description": "Colored background circle/square for icons in cards and activity feeds.",
+      "small": "w-8 h-8 rounded-lg {bg} flex items-center justify-center shrink-0",
+      "medium": "w-10 h-10 rounded-lg {bg} flex items-center justify-center",
+      "icon_size": "14px for small containers, 18px for medium containers",
+      "note": "Use rounded-lg (20px), not rounded-xl, for icon containers inside cards."
+    },
+
+    "chart_tooltip": {
+      "classes": "bg-white rounded-xl shadow-hover px-4 py-3 text-body",
+      "title": "font-semibold text-ink mb-1",
+      "value": "font-medium — use appropriate accent or primary color",
+      "subtitle": "text-ink-muted text-caption"
+    },
+
+    "donut_chart": {
+      "inner_radius": 58,
+      "outer_radius": 80,
+      "stroke_width": 2,
+      "stroke_color": "#fff",
+      "center_label": {
+        "classes": "absolute inset-0 flex flex-col items-center justify-center pointer-events-none",
+        "value": "text-h2 font-bold text-ink",
+        "label": "text-caption text-ink-muted"
+      }
+    },
+
+    "area_chart": {
+      "line_width": 3,
+      "dot": { "fill": "primary color", "r": 4, "stroke": "#fff", "strokeWidth": 2 },
+      "active_dot": { "r": 6, "stroke": "#fff", "strokeWidth": 2 },
+      "grid": { "strokeDasharray": "3 3", "stroke": "#F0F2F5", "vertical": false },
+      "axis": { "fontSize": 12, "fill": "#9CA3AF", "fontFamily": "Inter", "axisLine": false, "tickLine": false },
+      "gradient": {
+        "primary_fill": { "start": "primary color at 15% opacity", "end": "primary color at 0% opacity" },
+        "secondary_fill": { "start": "#E6E8EC at 40% opacity", "end": "#E6E8EC at 0% opacity" }
+      },
+      "cursor": { "stroke": "primary color", "strokeWidth": 1, "strokeDasharray": "4 4" }
+    },
+
+    "live_indicator": {
+      "description": "Animated dot indicating real-time data. Used in ActivityFeed.",
+      "dot_classes": "inline-block w-1.5 h-1.5 rounded-full bg-status-success ml-1.5 align-middle animate-pulse",
+      "wrapper": "text-caption text-ink-muted bg-surface-soft rounded-pill px-2.5 py-1 font-medium"
+    },
+
+    "video_thumbnail": {
+      "description": "Emoji-based placeholder thumbnail for video rows.",
+      "container": "w-14 h-9 rounded-lg flex items-center justify-center text-lg shrink-0 relative overflow-hidden group",
+      "background": "inline style: { background: accentColor + '33' } — 20% opacity tinted background",
+      "hover_overlay": "absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-[180ms] bg-black/20 rounded-lg",
+      "play_icon": "Play from lucide-react, size=12, text-white, fill='white'",
+      "duration_badge": "absolute bottom-0.5 right-0.5 text-[9px] font-medium text-white bg-black/50 rounded px-0.5 leading-none py-0.5"
+    }
+  },
+
+  "layout": {
+    "page": {
+      "container": "max-w-[1440px] mx-auto px-8 pb-10",
+      "background": "min-h-screen font-sans — with inline gradient style on root div",
+      "navbar_height": "h-16"
+    },
+    "grid": {
+      "main_columns": 12,
+      "gutter": "gap-6 (24px)",
+      "standard_split": {
+        "description": "Default two-column layout for dashboard rows",
+        "primary": "col-span-8 (chart or main content)",
+        "secondary": "col-span-4 (supporting panel)"
+      },
+      "metric_row": "grid grid-cols-4 gap-6",
+      "full_width": "col-span-12"
+    },
+    "section_spacing": {
+      "between_rows": "mt-6 (24px)",
+      "page_header_to_content": "mb-6 (24px)"
+    },
+    "page_header": {
+      "title": "text-h1 font-bold text-ink",
+      "subtitle": "text-body text-ink-secondary mt-1"
+    }
+  },
+
+  "iconography": {
+    "library": "lucide-react",
+    "default_size": 18,
+    "small_size": 14,
+    "extra_small_size": 11,
+    "stroke_width": 1.5,
+    "note": "Pass size as a prop number (not string). Do not override stroke-width via className."
+  },
+
+  "glassmorphism": {
+    "description": "Used exclusively for navbar elements that float over the gradient background.",
+    "light": "bg-white/60 backdrop-blur-sm",
+    "lighter": "bg-white/70 backdrop-blur-sm",
+    "rules": [
+      "Never use glassmorphism inside a card — card backgrounds are always solid white.",
+      "Always pair with shadow-soft when using glassmorphism.",
+      "backdrop-blur-sm is the only blur level used — do not increase it."
+    ]
+  },
+
+  "data_visualization": {
+    "color_sequence": ["#6B7CFF", "#7ED6A6", "#8EC9F7", "#A69BFF", "#F5B266", "#FFD76A", "#F0F2F5"],
+    "note": "Use accent colors in order for chart segments, bars, and series. The last color (#F0F2F5) is for 'Other' or neutral segments.",
+    "tooltip": "Always use custom tooltip components styled as chart_tooltip component above.",
+    "axes": "Always hide axis lines and tick lines. Use #9CA3AF for tick text. Use Inter font in charts.",
+    "grid_lines": "Only horizontal grid lines (vertical: false). Use strokeDasharray='3 3' and stroke='#F0F2F5'."
+  },
+
+  "file_structure": {
+    "components_dir": "src/components/",
+    "existing_components": [
+      "Navbar.jsx",
+      "MetricCards.jsx",
+      "ViewsChart.jsx",
+      "AudienceChart.jsx",
+      "TopContent.jsx",
+      "ActivityFeed.jsx"
+    ],
+    "conventions": [
+      "One component per file, named with PascalCase matching the filename.",
+      "Data arrays live in the same file as the component (no separate data files for now).",
+      "No prop-types or TypeScript — keep it plain JSX.",
+      "Import icons directly from lucide-react (named imports only).",
+      "Import chart primitives directly from recharts (named imports only)."
+    ]
+  }
+}

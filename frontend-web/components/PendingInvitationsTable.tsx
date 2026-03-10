@@ -73,7 +73,7 @@ export default function PendingInvitationsTable() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric',
     });
   };
@@ -90,15 +90,15 @@ export default function PendingInvitationsTable() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center py-8">
-        <div className="text-gray-500">{tc('loading')}</div>
+      <div className="bg-surface-card rounded-xl shadow-card p-8 text-center text-body text-ink-muted">
+        {tc('loading')}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+      <div className="bg-status-danger/10 rounded-xl p-4 text-body text-status-danger">
         {error}
       </div>
     );
@@ -106,84 +106,87 @@ export default function PendingInvitationsTable() {
 
   if (invitations.length === 0) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-600 text-center">
+      <div className="bg-surface-card rounded-xl shadow-soft p-6 text-body text-ink-muted text-center">
         {t('noPendingInvitations')}
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {resendSuccess && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-green-700 text-sm">
+        <div className="bg-status-success/10 rounded-xl p-3 text-body text-status-success font-medium">
           {resendSuccess}
         </div>
       )}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-gray-100 border-b border-gray-300">
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-              {t('emailCol')}
-            </th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-              {t('role')}
-            </th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-              {t('invitedBy')}
-            </th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-              {t('createdAt')}
-            </th>
-            <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
-              {t('expiresAt')}
-            </th>
-            <th className="px-4 py-3" />
-          </tr>
-        </thead>
-        <tbody>
-          {invitations.map((invitation) => (
-            <tr
-              key={invitation.id}
-              className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
-            >
-              <td className="px-4 py-3 text-sm text-gray-900">{invitation.email}</td>
-              <td className="px-4 py-3 text-sm text-gray-700">
-                <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">
-                  {getRoleLabel(invitation.role)}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-700">
-                {invitation.invited_by_name || '—'}
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-600">
-                {formatDate(invitation.created_at)}
-              </td>
-              <td className="px-4 py-3 text-sm text-gray-600">
-                {formatDate(invitation.expires_at)}
-              </td>
-              <td className="px-4 py-3 text-right flex items-center gap-1 justify-end">
-                <button
-                  onClick={() => handleResend(invitation.id)}
-                  disabled={resendingId === invitation.id}
-                  className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition disabled:opacity-40"
-                  title={t('inviteSend')}
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => handleDelete(invitation.id)}
-                  disabled={deletingId === invitation.id}
-                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-40"
-                  title={t('deleteInvitation')}
-                >
-                  <UserX className="w-3.5 h-3.5" />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-        </table>
+
+      <div className="bg-surface-card rounded-xl shadow-card overflow-hidden">
+        {/* Header */}
+        <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-5 py-3 bg-surface-soft border-b border-border-soft">
+          <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide">{t('emailCol')}</span>
+          <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide">{t('role')}</span>
+          <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide hidden md:block">{t('invitedBy')}</span>
+          <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide hidden md:block">{t('expiresAt')}</span>
+          <span />
+        </div>
+
+        {/* Rows */}
+        {invitations.map((invitation, i) => (
+          <div
+            key={invitation.id}
+            className={`grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center px-5 py-3.5 hover:bg-surface-soft transition-all duration-[180ms] ${
+              i < invitations.length - 1 ? 'border-b border-border-soft' : ''
+            }`}
+          >
+            {/* Email */}
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-pill bg-status-warning/20 flex items-center justify-center flex-shrink-0">
+                <Mail size={14} strokeWidth={1.5} className="text-status-warning" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-body font-medium text-ink truncate">{invitation.email}</p>
+                {invitation.invited_by_name && (
+                  <p className="text-caption text-ink-muted md:hidden">{invitation.invited_by_name}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Role badge */}
+            <span className="text-caption font-semibold rounded-pill px-2.5 py-1 bg-primary-soft text-primary whitespace-nowrap">
+              {getRoleLabel(invitation.role)}
+            </span>
+
+            {/* Invited by */}
+            <span className="text-body text-ink-secondary hidden md:block whitespace-nowrap">
+              {invitation.invited_by_name || '—'}
+            </span>
+
+            {/* Expires */}
+            <span className="text-caption text-ink-muted hidden md:block whitespace-nowrap">
+              {formatDate(invitation.expires_at)}
+            </span>
+
+            {/* Actions */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handleResend(invitation.id)}
+                disabled={resendingId === invitation.id}
+                className="w-8 h-8 flex items-center justify-center text-ink-muted hover:text-primary hover:bg-primary-soft rounded-pill transition-all duration-[180ms] disabled:opacity-40"
+                title={t('inviteSend')}
+              >
+                <Mail size={14} strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={() => handleDelete(invitation.id)}
+                disabled={deletingId === invitation.id}
+                className="w-8 h-8 flex items-center justify-center text-ink-muted hover:text-status-danger hover:bg-status-danger/10 rounded-pill transition-all duration-[180ms] disabled:opacity-40"
+                title={t('deleteInvitation')}
+              >
+                <UserX size={14} strokeWidth={1.5} />
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

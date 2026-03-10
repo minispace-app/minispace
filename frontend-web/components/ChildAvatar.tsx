@@ -1,14 +1,14 @@
 "use client";
 
 const COLORS = [
-  "bg-blue-500",
-  "bg-purple-500",
-  "bg-emerald-500",
-  "bg-orange-500",
-  "bg-pink-500",
-  "bg-teal-500",
-  "bg-indigo-500",
-  "bg-rose-500",
+  "bg-primary",
+  "bg-accent-green",
+  "bg-accent-blue",
+  "bg-accent-purple",
+  "bg-accent-orange",
+  "bg-accent-yellow",
+  "bg-status-danger",
+  "bg-status-success",
 ];
 
 export function childAvatarColor(id: string): string {
@@ -26,14 +26,14 @@ interface Props {
 
 const SIZE = {
   sm: "w-7 h-7 text-[10px]",
-  md: "w-9 h-9 text-xs",
-  lg: "w-11 h-11 text-sm",
+  md: "w-9 h-9 text-caption",
+  lg: "w-11 h-11 text-body",
 };
 
 export function ChildAvatar({ id, firstName, lastName, size = "md" }: Props) {
   return (
     <div
-      className={`${SIZE[size]} ${childAvatarColor(id)} rounded-full flex items-center justify-center text-white font-bold flex-shrink-0`}
+      className={`${SIZE[size]} ${childAvatarColor(id)} rounded-pill flex items-center justify-center text-white font-bold flex-shrink-0`}
     >
       {firstName[0]}{lastName[0]}
     </div>

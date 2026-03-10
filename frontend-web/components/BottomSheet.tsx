@@ -34,21 +34,21 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
       />
 
       {/* Sheet */}
-      <div className="bg-white rounded-t-2xl shadow-xl md:hidden max-h-[90vh] overflow-y-auto">
+      <div className="bg-surface-card rounded-t-xl shadow-hover md:hidden max-h-[90vh] overflow-y-auto">
         {/* Handle bar */}
         <div className="flex justify-center pt-3 pb-1">
-          <div className="w-12 h-1 rounded-full bg-slate-300" />
+          <div className="w-12 h-1 rounded-pill bg-border-soft" />
         </div>
 
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-            <h2 className="text-base font-semibold text-slate-800">{title}</h2>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border-soft">
+            <h2 className="text-h3 font-semibold text-ink">{title}</h2>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-slate-100 rounded-lg transition"
+              className="w-9 h-9 flex items-center justify-center hover:bg-surface-soft rounded-pill transition-all duration-[180ms]"
             >
-              <X className="w-4 h-4 text-slate-500" />
+              <X size={18} strokeWidth={1.5} className="text-ink-secondary" />
             </button>
           </div>
         )}

@@ -3,7 +3,7 @@ providers:
   - name: minispace
     folder: minispace.app
     type: file
-    disableDeletion: false
+    disableDeletion: true
     editable: true
     options:
       path: /etc/grafana/provisioning/dashboards

@@ -44,7 +44,7 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
 
   const SidebarContent = ({ onNavigate }: { onNavigate?: () => void }) => (
     <>
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
         {navItems.map(({ key, icon: Icon, href }) => {
           const fullHref = `/${locale}${href}`;
           const active = pathname === fullHref;
@@ -53,16 +53,16 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
               key={key}
               href={fullHref}
               onClick={onNavigate}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-body transition-all duration-[180ms] ease-out ${
                 active
-                  ? "bg-blue-50 text-blue-700 font-medium"
-                  : "text-slate-600 hover:bg-slate-50"
+                  ? "bg-ink text-white font-medium"
+                  : "text-ink-secondary hover:bg-surface-soft hover:text-ink"
               }`}
             >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              <span className="flex-1">{t(key as Parameters<typeof t>[0])}</span>
+              <Icon size={16} strokeWidth={1.5} className="flex-shrink-0" />
+              <span className="flex-1 truncate">{t(key as Parameters<typeof t>[0])}</span>
               {key === "messages" && totalUnread > 0 && (
-                <span className="flex-shrink-0 min-w-[1.25rem] h-5 px-1 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                <span className="flex-shrink-0 min-w-[1.25rem] h-5 px-1 bg-status-danger text-white text-[10px] rounded-pill flex items-center justify-center font-semibold">
                   {totalUnread > 99 ? "99+" : totalUnread}
                 </span>
               )}
@@ -71,37 +71,37 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
         })}
       </nav>
 
-<div className="px-3 py-4 border-t border-slate-100 space-y-2">
-        <div className="flex justify-center">
+      <div className="px-3 py-4 space-y-0.5 border-t border-border-soft/50">
+        <div className="flex justify-center py-1.5">
           <LanguageSwitcher />
         </div>
         <button
           onClick={() => logout(locale)}
-          className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-slate-600 hover:bg-red-50 hover:text-red-600 transition"
+          className="flex items-center gap-2.5 px-3 py-2 w-full rounded-lg text-body text-ink-secondary hover:bg-status-danger/10 hover:text-status-danger transition-all duration-[180ms] ease-out"
         >
-          <LogOut className="w-4 h-4" />
-          {tc("logout")}
+          <LogOut size={16} strokeWidth={1.5} className="flex-shrink-0" />
+          <span>{tc("logout")}</span>
         </button>
       </div>
     </>
   );
 
   return (
-    <div className="flex h-screen bg-slate-50" style={{ height: "100dvh" }}>
+    <div className="flex h-screen" style={{ height: "100dvh" }}>
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex w-60 bg-white border-r border-slate-200 flex-col flex-shrink-0">
-        <div className="px-5 py-5 border-b border-slate-100 flex flex-col items-center">
+      <aside className="hidden md:flex w-60 bg-white/80 backdrop-blur-sm shadow-card flex-col flex-shrink-0 my-3 ml-3 rounded-xl overflow-hidden">
+        <div className="px-5 py-5 flex flex-col items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={tenantLogoUrl || "/logo.png"} alt="minispace.app" className="w-28 mb-2" />
           {!tenantLogoUrl && (
             <div className="mb-3 text-center">
-              <span className="text-sm font-semibold" style={{ color: '#001F3F' }}>minispace</span>
-              <span className="text-sm font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
+              <span className="text-body-lg font-bold" style={{ color: '#001F3F' }}>minispace</span>
+              <span className="text-body-lg font-bold" style={{ color: '#ff3c7a' }}>.app</span>
             </div>
           )}
-          <h1 className="font-bold text-slate-800 text-center">{garderieName}</h1>
+          <h1 className="text-h3 font-semibold text-ink text-center">{garderieName}</h1>
           {user && (
-            <p className="text-sm text-slate-500 mt-0.5">
+            <p className="text-caption text-ink-secondary mt-0.5">
               {user.first_name} {user.last_name}
             </p>
           )}
@@ -119,34 +119,34 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
 
       {/* ── Mobile drawer ── */}
       <aside
-        className={`fixed inset-y-0 left-0 w-72 bg-white z-50 flex flex-col shadow-xl transform transition-transform duration-300 ease-in-out md:hidden ${
+        className={`fixed inset-y-0 left-0 w-72 bg-white/80 backdrop-blur-sm z-50 flex flex-col shadow-hover transform transition-transform duration-300 ease-in-out md:hidden ${
           drawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div className="px-5 py-4 flex items-center justify-between gap-3">
           <div className="flex flex-col items-center flex-1 min-w-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={tenantLogoUrl || "/logo.png"} alt="GarderieConnect" className="w-24 mb-1" />
+            <img src={tenantLogoUrl || "/logo.png"} alt="minispace.app" className="w-24 mb-1" />
             {!tenantLogoUrl && (
               <div className="mb-2 text-center">
-                <span className="text-xs font-semibold" style={{ color: '#001F3F' }}>minispace</span>
-                <span className="text-xs font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
+                <span className="text-caption font-semibold" style={{ color: '#001F3F' }}>minispace</span>
+                <span className="text-caption font-semibold" style={{ color: '#ff3c7a' }}>.app</span>
               </div>
             )}
-            <h1 className="font-bold text-slate-800 text-center text-sm truncate w-full">
+            <h1 className="font-semibold text-ink text-center text-body truncate w-full">
               {garderieName}
             </h1>
             {user && (
-              <p className="text-xs text-slate-500">
+              <p className="text-caption text-ink-secondary">
                 {user.first_name} {user.last_name}
               </p>
             )}
           </div>
           <button
             onClick={() => setDrawerOpen(false)}
-            className="p-2 text-slate-500 hover:bg-slate-100 rounded-lg flex-shrink-0"
+            className="w-9 h-9 flex items-center justify-center text-ink-secondary hover:bg-surface-soft rounded-pill transition-all duration-[180ms] flex-shrink-0"
           >
-            <X className="w-5 h-5" />
+            <X size={18} strokeWidth={1.5} />
           </button>
         </div>
         <SidebarContent onNavigate={() => setDrawerOpen(false)} />
@@ -154,15 +154,15 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
 
       {/* ── Main area ── */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Mobile top header */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 flex-shrink-0">
+        {/* Mobile top header — glassmorphism */}
+        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white/60 backdrop-blur-sm shadow-soft flex-shrink-0">
           <button
             onClick={() => setDrawerOpen(true)}
-            className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg"
+            className="w-9 h-9 flex items-center justify-center text-ink-secondary bg-white/70 backdrop-blur-sm shadow-soft rounded-pill transition-all duration-[180ms]"
           >
-            <Menu className="w-6 h-6" />
+            <Menu size={18} strokeWidth={1.5} />
           </button>
-          <span className="font-semibold text-slate-800 truncate">{garderieName}</span>
+          <span className="text-body font-semibold text-ink truncate">{garderieName}</span>
         </header>
 
         <AnnouncementBanner />
