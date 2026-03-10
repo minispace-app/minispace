@@ -156,6 +156,20 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     .execute(pool)
     .await?;
 
+    // --- Pending parents (by email, for non-registered parents) ---
+    sqlx::raw_sql(&format!(
+        r#"CREATE TABLE IF NOT EXISTS "{schema}".child_pending_parents (
+            child_id     UUID NOT NULL REFERENCES "{schema}".children(id) ON DELETE CASCADE,
+            email        VARCHAR(255) NOT NULL,
+            relationship VARCHAR(64) NOT NULL DEFAULT 'parent',
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (child_id, email)
+        );
+        CREATE INDEX IF NOT EXISTS idx_child_pending_parents_email ON "{schema}".child_pending_parents(email)"#
+    ))
+    .execute(pool)
+    .await?;
+
     // --- Enum: message_type ---
     sqlx::raw_sql(&format!(
         "DO $$ BEGIN

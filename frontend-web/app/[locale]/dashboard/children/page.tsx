@@ -57,6 +57,13 @@ interface ParentUser {
   relationship: string;
 }
 
+interface PendingParent {
+  child_id: string;
+  email: string;
+  relationship: string;
+  created_at: string;
+}
+
 interface UserOption {
   id: string;
   first_name: string;
@@ -138,10 +145,19 @@ function ChildDetails({
   const [selectedUserId, setSelectedUserId] = useState("");
   const [relationship, setRelationship] = useState("parent");
   const [savingParent, setSavingParent] = useState(false);
+  const [showAddPendingParent, setShowAddPendingParent] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState("");
+  const [pendingRelationship, setPendingRelationship] = useState("parent");
+  const [savingPendingParent, setSavingPendingParent] = useState(false);
 
   const { data: parentsData, mutate: mutateParents } = useSWR(
     `child-parents-${child.id}`,
     () => childrenApi.listParents(child.id)
+  );
+
+  const { data: pendingParentsData, mutate: mutatePendingParents } = useSWR(
+    `child-pending-parents-${child.id}`,
+    () => childrenApi.listPendingParents(child.id)
   );
 
   const { data: usersData } = useSWR(
@@ -150,10 +166,12 @@ function ChildDetails({
   );
 
   const parents: ParentUser[] = (parentsData as { data: ParentUser[] } | undefined)?.data ?? [];
+  const pendingParents: PendingParent[] = (pendingParentsData as { data: PendingParent[] } | undefined)?.data ?? [];
   const allUsers: UserOption[] = (usersData as { data: UserOption[] } | undefined)?.data ?? [];
   const parentOptions = allUsers.filter((u) => u.role === "parent");
   const assignedIds = new Set(parents.map((p) => p.user_id));
   const availableOptions = parentOptions.filter((u) => !assignedIds.has(u.id));
+  const pendingEmails = new Set(pendingParents.map((p) => p.email));
 
   const handleAddParent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,6 +192,28 @@ function ChildDetails({
     if (!confirm(t("confirmRemoveParent"))) return;
     await childrenApi.removeParent(child.id, userId);
     mutateParents();
+    onUpdated();
+  };
+
+  const handleAddPendingParent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingEmail) return;
+    setSavingPendingParent(true);
+    try {
+      await childrenApi.assignPendingParent(child.id, pendingEmail, pendingRelationship);
+      setPendingEmail("");
+      setPendingRelationship("parent");
+      setShowAddPendingParent(false);
+      mutatePendingParents();
+    } finally {
+      setSavingPendingParent(false);
+    }
+  };
+
+  const handleRemovePendingParent = async (email: string) => {
+    if (!confirm(t("confirmRemoveParent"))) return;
+    await childrenApi.removePendingParent(child.id, email);
+    mutatePendingParents();
     onUpdated();
   };
 
@@ -429,6 +469,109 @@ function ChildDetails({
                   onClick={() => {
                     setShowAddParent(false);
                     setSelectedUserId("");
+                  }}
+                  className="px-3 py-1.5 border border-slate-200 text-slate-600 text-xs font-medium rounded-lg hover:bg-white"
+                >
+                  {tc("cancel")}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+
+      {/* Pending Parents section */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-slate-500" />
+              {t("pendingParents")}
+            </h3>
+            {canWrite && !showAddPendingParent && (
+              <button
+                onClick={() => setShowAddPendingParent(true)}
+                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium transition"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                {t("addByEmail")}
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="px-5 py-4">
+          {pendingParents.length === 0 ? (
+            <p className="text-sm text-slate-400">{t("noPendingParents")}</p>
+          ) : (
+            <ul className="space-y-2 mb-4">
+              {pendingParents.map((p) => (
+                <li
+                  key={p.email}
+                  className="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs bg-amber-200 text-amber-800 rounded px-2 py-1 font-medium">
+                        {t("pending")}
+                      </span>
+                      <span className="text-sm font-medium text-slate-800">
+                        {p.email}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs text-slate-500">
+                        {t("relationship")}: {p.relationship}
+                      </span>
+                    </div>
+                  </div>
+                  {canWrite && (
+                    <button
+                      onClick={() => handleRemovePendingParent(p.email)}
+                      className="text-slate-400 hover:text-red-500 transition ml-3 flex-shrink-0"
+                      title={t("remove")}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {canWrite && showAddPendingParent && (
+            <form onSubmit={handleAddPendingParent} className="bg-blue-50 border border-blue-100 rounded-lg p-3 space-y-2 mt-2">
+              <input
+                type="email"
+                value={pendingEmail}
+                onChange={(e) => setPendingEmail(e.target.value)}
+                placeholder={t("emailPlaceholder")}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                required
+              />
+              <select
+                value={pendingRelationship}
+                onChange={(e) => setPendingRelationship(e.target.value)}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="parent">{t("relationshipParent")}</option>
+                <option value="tuteur">{t("relationshipGuardian")}</option>
+                <option value="gardien">{t("relationshipCaretaker")}</option>
+                <option value="autre">{t("relationshipOther")}</option>
+              </select>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={savingPendingParent || !pendingEmail}
+                  className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingPendingParent ? tc("loading") : t("add")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddPendingParent(false);
+                    setPendingEmail("");
                   }}
                   className="px-3 py-1.5 border border-slate-200 text-slate-600 text-xs font-medium rounded-lg hover:bg-white"
                 >
@@ -1479,13 +1622,7 @@ export default function ChildrenPage() {
   const canWrite = user?.role === "admin_garderie" || user?.role === "super_admin";
   const [selectedChildId, setSelectedChildId] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
-  const [activeTabByChild, setActiveTabByChild] = useState<Record<string, "calendar" | "journals" | "profile">>({});
-  const activeTab = selectedChildId ? (activeTabByChild[selectedChildId] ?? "calendar") : "calendar";
-  const setActiveTab = (tab: "calendar" | "journals" | "profile") => {
-    if (selectedChildId) {
-      setActiveTabByChild(prev => ({ ...prev, [selectedChildId]: tab }));
-    }
-  };
+  const [activeTab, setActiveTab] = useState<"calendar" | "journals" | "profile">("calendar");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statusModalDate, setStatusModalDate] = useState<string | null>(null);
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null);
@@ -1632,7 +1769,7 @@ export default function ChildrenPage() {
                 active={activeTab === "journals"}
                 onClick={() => setActiveTab("journals")}
               >
-                📖 Journaux
+                📖 Journal de bord
               </TabButton>
               <TabButton
                 active={activeTab === "profile"}
@@ -1748,7 +1885,7 @@ export default function ChildrenPage() {
                 active={activeTab === "journals"}
                 onClick={() => setActiveTab("journals")}
               >
-                📖 Journaux
+                📖 Journal de bord
               </TabButton>
               <TabButton
                 active={activeTab === "profile"}
