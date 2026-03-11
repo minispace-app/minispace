@@ -98,14 +98,23 @@ function ChildStatusIndicators({
   currentMonthStr: string;
   attendanceStatus?: string;
 }) {
-  const { data: journalData } = useSWR(
+  const { data: journalData, isLoading } = useSWR(
     `journal-summary-${childId}-${currentMonthStr}`,
-    () => journalApi.getMonthSummary(childId, currentMonthStr).then((r: { data: { journals?: JournalDay[] } }) => r.data.journals || [])
+    () => journalApi.getMonthSummary(childId, currentMonthStr).then((r: { data: { journals?: JournalDay[] } }) => r.data.journals || []),
+    { revalidateOnFocus: false, dedupingInterval: 60000 }
   );
 
   const hasJournalToday = journalData && Array.isArray(journalData) 
     ? journalData.some((j: JournalDay) => j.date === today)
     : false;
+
+  // Debug logs (à retirer après test)
+  if (journalData && Array.isArray(journalData)) {
+    console.log(`Child ${childId}: journal data =`, journalData, `today = ${today}`, `hasJournalToday = ${hasJournalToday}`);
+  }
+  if (attendanceStatus) {
+    console.log(`Child ${childId}: attendance status = ${attendanceStatus}`);
+  }
 
   return (
     <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
@@ -2028,6 +2037,15 @@ export default function ChildrenPage() {
             const isActive = selectedChildId === child.id;
             const childAttendance = attendanceByChild.get(child.id);
             const todayStatus = childAttendance ? childAttendance[today] : undefined;
+            
+            // Debug log
+            console.log(`Child ${child.first_name} ${child.last_name}:`, {
+              childId: child.id,
+              today,
+              todayStatus,
+              childAttendance,
+              allAttendance: Array.from(attendanceByChild.entries()).map(([id, data]) => ({ id, data }))
+            });
             
             return (
               <button
