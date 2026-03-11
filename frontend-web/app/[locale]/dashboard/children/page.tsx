@@ -6,7 +6,7 @@ import useSWR from "swr";
 import { childrenApi, groupsApi, usersApi, attendanceApi, journalApi, activitiesApi, menusApi, settingsApi } from "../../../../lib/api";
 import { useAuth } from "../../../../hooks/useAuth";
 import { getTodayInMontreal, formatDateInMontreal } from "../../../../lib/dateUtils";
-import { Plus, ChevronDown, ChevronUp, UserPlus, X, Pencil, ChevronLeft, ChevronRight, Loader2, Check, BookOpen, Clock, CheckCircle2, XCircle, AlertCircle, ThermometerSun } from "lucide-react";
+import { Plus, ChevronDown, ChevronUp, UserPlus, X, Pencil, ChevronLeft, ChevronRight, Loader2, Check, BookOpen, Clock, CheckCircle, XCircle, AlertCircle, ThermometerSun, FileText, UserX, UserCheck, Notebook, CircleCheck, CircleX } from "lucide-react";
 import { ChildAvatar, childAvatarColor } from "../../../../components/ChildAvatar";
 import { WeatherPicker } from "../../../../components/journal/WeatherPicker";
 import { EmojiPicker } from "../../../../components/journal/EmojiPicker";
@@ -108,60 +108,42 @@ function ChildStatusIndicators({
     : false;
 
   return (
-    <div className="flex items-center gap-1 ml-auto flex-shrink-0">
-      {/* Journal indicator */}
+    <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+      {/* Journal indicator - Icône livre/journal */}
       {hasJournalToday && (
         <div 
-          className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0" 
+          className="w-6 h-6 rounded-md bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm" 
           title="Journal rempli"
         >
-          <BookOpen className="w-3 h-3 text-blue-600" strokeWidth={2.5} />
+          <BookOpen className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
         </div>
       )}
       
-      {/* Attendance indicator */}
+      {/* Attendance indicator - Présent (vert) ou Absent (rouge) */}
       {attendanceStatus === 'present' && (
         <div 
-          className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0"
+          className="w-6 h-6 rounded-md bg-green-500 flex items-center justify-center flex-shrink-0 shadow-sm"
           title="Présent"
         >
-          <CheckCircle2 className="w-3 h-3 text-green-600" strokeWidth={2.5} />
+          <Check className="w-4 h-4 text-white" strokeWidth={3} />
         </div>
       )}
       
-      {attendanceStatus === 'absent' && (
+      {(attendanceStatus === 'absent' || attendanceStatus === 'malade') && (
         <div 
-          className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0"
-          title="Absent"
+          className="w-6 h-6 rounded-md bg-red-500 flex items-center justify-center flex-shrink-0 shadow-sm"
+          title={attendanceStatus === 'malade' ? 'Absent (malade)' : 'Absent'}
         >
-          <XCircle className="w-3 h-3 text-red-600" strokeWidth={2.5} />
-        </div>
-      )}
-      
-      {attendanceStatus === 'malade' && (
-        <div 
-          className="w-5 h-5 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0"
-          title="Malade"
-        >
-          <ThermometerSun className="w-3 h-3 text-orange-600" strokeWidth={2.5} />
+          <X className="w-4 h-4 text-white" strokeWidth={3} />
         </div>
       )}
       
       {attendanceStatus === 'present_hors_contrat' && (
         <div 
-          className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0"
+          className="w-6 h-6 rounded-md bg-green-500 flex items-center justify-center flex-shrink-0 shadow-sm"
           title="Présent hors contrat"
         >
-          <CheckCircle2 className="w-3 h-3 text-purple-600" strokeWidth={2.5} />
-        </div>
-      )}
-      
-      {attendanceStatus === 'attendu' && (
-        <div 
-          className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"
-          title="Attendu"
-        >
-          <Clock className="w-3 h-3 text-gray-500" strokeWidth={2.5} />
+          <Check className="w-4 h-4 text-white" strokeWidth={3} />
         </div>
       )}
     </div>
