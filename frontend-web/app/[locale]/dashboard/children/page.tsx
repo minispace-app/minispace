@@ -108,14 +108,6 @@ function ChildStatusIndicators({
     ? journalData.some((j: JournalDay) => j.date === today)
     : false;
 
-  // Debug logs (à retirer après test)
-  if (journalData && Array.isArray(journalData)) {
-    console.log(`Child ${childId}: journal data =`, journalData, `today = ${today}`, `hasJournalToday = ${hasJournalToday}`);
-  }
-  if (attendanceStatus) {
-    console.log(`Child ${childId}: attendance status = ${attendanceStatus}`);
-  }
-
   return (
     <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
       {/* Journal indicator - Icône livre/journal */}
@@ -129,10 +121,10 @@ function ChildStatusIndicators({
       )}
       
       {/* Attendance indicator - Présent (vert) ou Absent (rouge) */}
-      {attendanceStatus === 'present' && (
+      {(attendanceStatus === 'present' || attendanceStatus === 'present_hors_contrat' || attendanceStatus === 'attendu') && (
         <div 
           className="w-6 h-6 rounded-md bg-green-500 flex items-center justify-center flex-shrink-0 shadow-sm"
-          title="Présent"
+          title={attendanceStatus === 'attendu' ? 'Attendu' : attendanceStatus === 'present_hors_contrat' ? 'Présent hors contrat' : 'Présent'}
         >
           <Check className="w-4 h-4 text-white" strokeWidth={3} />
         </div>
@@ -144,15 +136,6 @@ function ChildStatusIndicators({
           title={attendanceStatus === 'malade' ? 'Absent (malade)' : 'Absent'}
         >
           <X className="w-4 h-4 text-white" strokeWidth={3} />
-        </div>
-      )}
-      
-      {attendanceStatus === 'present_hors_contrat' && (
-        <div 
-          className="w-6 h-6 rounded-md bg-green-500 flex items-center justify-center flex-shrink-0 shadow-sm"
-          title="Présent hors contrat"
-        >
-          <Check className="w-4 h-4 text-white" strokeWidth={3} />
         </div>
       )}
     </div>
@@ -1952,27 +1935,10 @@ export default function ChildrenPage() {
   const { data: attendanceAllData, error: attendanceError } = useSWR(
     `attendance-all-${currentMonthStr}`,
     async () => {
-      try {
-        console.log('🔍 Fetching attendance for month:', currentMonthStr);
-        const response = await attendanceApi.getMonthAllChildren(currentMonthStr);
-        console.log('✅ Attendance API response:', response);
-        return response.data.attendance || [];
-      } catch (err) {
-        console.error('❌ Attendance API error:', err);
-        throw err;
-      }
+      const response = await attendanceApi.getMonthAllChildren(currentMonthStr);
+      return response.data.attendance || [];
     }
   );
-
-  // Debug: Check what attendance data we're getting
-  console.log('📊 Attendance fetch result:', {
-    currentMonthStr,
-    today,
-    attendanceAllData,
-    attendanceError,
-    isArray: Array.isArray(attendanceAllData),
-    length: attendanceAllData?.length
-  });
 
   // Map attendance by child_id and date for quick lookup
   const attendanceByChild = new Map<string, Record<string, string>>();
@@ -2057,15 +2023,6 @@ export default function ChildrenPage() {
             const isActive = selectedChildId === child.id;
             const childAttendance = attendanceByChild.get(child.id);
             const todayStatus = childAttendance ? childAttendance[today] : undefined;
-            
-            // Debug log
-            console.log(`Child ${child.first_name} ${child.last_name}:`, {
-              childId: child.id,
-              today,
-              todayStatus,
-              childAttendance,
-              allAttendance: Array.from(attendanceByChild.entries()).map(([id, data]) => ({ id, data }))
-            });
             
             return (
               <button

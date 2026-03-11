@@ -379,10 +379,47 @@ pub async fn get_month_all_children(
 
     let schema = schema_name(&tenant);
 
+    // Generate all dates in the month and cross join with active children
+    // For each child+date combination:
+    // - If attendance exists, use that status
+    // - Otherwise, if day-of-week is in child's schedule_days, return "attendu"
+    // - Otherwise, return nothing (NULL, which we filter out)
     let records = sqlx::query_as::<_, (Uuid, String, String)>(
         &format!(
-            "SELECT child_id, date::TEXT, status::TEXT FROM {}.attendance WHERE date >= $1 AND date < $2 ORDER BY child_id, date",
-            schema
+            r#"
+            WITH date_series AS (
+              SELECT generate_series($1::date, $2::date - interval '1 day', interval '1 day')::date AS date
+            ),
+            children_dates AS (
+              SELECT c.id AS child_id, ds.date, c.schedule_days
+              FROM {schema}.children c
+              CROSS JOIN date_series ds
+              WHERE c.is_active = true
+            )
+            SELECT 
+              cd.child_id,
+              cd.date::TEXT,
+              COALESCE(
+                a.status::TEXT,
+                CASE 
+                  WHEN cd.schedule_days @> ARRAY[EXTRACT(ISODOW FROM cd.date)::INTEGER]
+                  THEN 'attendu'
+                  ELSE NULL
+                END
+              ) AS status
+            FROM children_dates cd
+            LEFT JOIN {schema}.attendance a ON cd.child_id = a.child_id AND cd.date = a.date
+            WHERE COALESCE(
+              a.status::TEXT,
+              CASE 
+                WHEN cd.schedule_days @> ARRAY[EXTRACT(ISODOW FROM cd.date)::INTEGER]
+                THEN 'attendu'
+                ELSE NULL
+              END
+            ) IS NOT NULL
+            ORDER BY cd.child_id, cd.date
+            "#,
+            schema = schema
         ),
     )
     .bind(start_date)
