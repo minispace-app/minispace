@@ -491,6 +491,23 @@ export default function JournalDashboardPage() {
           <>
             <DayTabBar tabs={tabs} activeIndex={activeDayIndex} onSelect={setActiveDayIndex} />
             <div className="flex-1 overflow-y-auto pb-20">
+              {/* Weather picker (garderie-wide, applies to all children) */}
+              <div className="px-4 py-3 border-b border-slate-100 bg-sky-50/30">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-sky-700 flex items-center gap-1.5">
+                    <span className="text-base">🌤️</span>
+                    Météo du jour
+                  </label>
+                  <span className="text-xs text-slate-400">
+                    (Partagée pour tous les enfants)
+                  </span>
+                </div>
+                <WeatherPicker
+                  value={getWeatherForDate(formatDate(weekDates[activeDayIndex]))}
+                  onChange={(v) => updateWeather(formatDate(weekDates[activeDayIndex]), v)}
+                />
+              </div>
+
               <DayFieldList
                 day={getDayData(formatDate(weekDates[activeDayIndex]))}
                 menuDuJour={getMenuForDate(formatDate(weekDates[activeDayIndex]))}

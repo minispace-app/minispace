@@ -1359,6 +1359,9 @@ function JournalsSection({
 }) {
   const t = useTranslations("journal");
 
+  const [localMenuWeather, setLocalMenuWeather] = useState<Record<string, string | null>>({});
+  const weatherSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const weekStartStr = formatDate(weekStart);
   const weekDates = WEEK_DAYS.map((_, i) => addDays(weekStart, i));
   const today = formatDateInMontreal(getTodayInMontreal());
@@ -1381,6 +1384,7 @@ function JournalsSection({
   );
   interface MenuEntry {
     date: string;
+    weather?: string;
     menu?: string;
     collation_matin?: string;
     diner?: string;
@@ -1392,10 +1396,21 @@ function JournalsSection({
     const menuEntry = serverMenus.find((m) => m.date === dateStr);
     if (!menuEntry) return null;
     return {
+      weather: menuEntry.weather,
       collation_matin: menuEntry.collation_matin,
       diner: menuEntry.diner,
       collation_apres_midi: menuEntry.collation_apres_midi,
     };
+  };
+
+  const getWeatherForDate = (dateStr: string): string | null => {
+    if (localMenuWeather[dateStr] !== undefined) return localMenuWeather[dateStr];
+    const menu = getMenuForDate(dateStr);
+    return menu?.weather ?? null;
+  };
+
+  const updateWeather = (dateStr: string, weather: string | null) => {
+    setLocalMenuWeather((prev) => ({ ...prev, [dateStr]: weather }));
   };
 
   // Load activities (weekly themes)
@@ -1466,9 +1481,35 @@ function JournalsSection({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localData]);
 
+  // Auto-save weather debounce (updates menu table, not journals)
+  useEffect(() => {
+    if (Object.keys(localMenuWeather).length === 0) return;
+    if (weatherSaveTimerRef.current) clearTimeout(weatherSaveTimerRef.current);
+    weatherSaveTimerRef.current = setTimeout(async () => {
+      setSaveStatus("saving");
+      try {
+        await Promise.all(
+          Object.entries(localMenuWeather).map(([dateStr, weather]) => {
+            return menusApi.upsert({ date: dateStr, weather });
+          })
+        );
+        setLocalMenuWeather({});
+        // Refetch menus to get updated data
+        if (swrKey) mutate();
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 2000);
+      } catch {
+        setSaveStatus("idle");
+      }
+    }, 1500);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localMenuWeather]);
+
   const prevWeek = () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (weatherSaveTimerRef.current) clearTimeout(weatherSaveTimerRef.current);
     setLocalData({});
+    setLocalMenuWeather({});
     setSaveStatus("idle");
     const newStart = addDays(weekStart, -7);
     setWeekStart(newStart);
@@ -1477,7 +1518,9 @@ function JournalsSection({
 
   const nextWeek = () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (weatherSaveTimerRef.current) clearTimeout(weatherSaveTimerRef.current);
     setLocalData({});
+    setLocalMenuWeather({});
     setSaveStatus("idle");
     const newStart = addDays(weekStart, 7);
     setWeekStart(newStart);
@@ -1611,6 +1654,26 @@ function JournalsSection({
               );
             })}
 
+            {/* Weather row (garderie-wide, stored in daily_menus) */}
+            <div className="bg-surface-soft p-3 text-caption font-medium text-ink-secondary flex items-center gap-1.5">
+              🌤️ Météo
+            </div>
+            {weekDates.map((date, di) => {
+              const dateStr = formatDate(date);
+              const weather = getWeatherForDate(dateStr);
+              const day = getDayData(dateStr);
+              const isAbsent = !!day.absent;
+              const isToday = dateStr === today;
+              return (
+                <div key={`weather-${di}`} className={`p-2 ${isAbsent ? "bg-status-danger/5" : isToday ? "bg-accent-yellow/10" : "bg-surface-card"}`}>
+                  <WeatherPicker
+                    value={weather}
+                    onChange={(v) => updateWeather(dateStr, v)}
+                  />
+                </div>
+              );
+            })}
+
             {/* Absent toggle row */}
             <div className="bg-surface-soft p-3 text-caption font-medium text-ink-secondary flex items-center gap-1.5">
               Absent
@@ -1660,6 +1723,23 @@ function JournalsSection({
       <div className="md:hidden space-y-2">
         <DayTabBar tabs={tabs} activeIndex={activeDayIndex} onSelect={setActiveDayIndex} />
         <div className="space-y-4">
+          {/* Weather picker (garderie-wide, applies to all children) */}
+          <div className="px-4 py-3 border border-border-soft rounded-xl bg-sky-50/30">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-caption font-semibold uppercase tracking-wide text-sky-700 flex items-center gap-1.5">
+                <span className="text-base">🌤️</span>
+                Météo du jour
+              </label>
+              <span className="text-caption text-ink-muted">
+                (Partagée pour tous)
+              </span>
+            </div>
+            <WeatherPicker
+              value={getWeatherForDate(formatDate(weekDates[activeDayIndex]))}
+              onChange={(v) => updateWeather(formatDate(weekDates[activeDayIndex]), v)}
+            />
+          </div>
+
           <DayFieldList
             day={getDayData(formatDate(weekDates[activeDayIndex]))}
             menuDuJour={getMenuForDate(formatDate(weekDates[activeDayIndex]))}
