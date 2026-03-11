@@ -6,7 +6,7 @@ import useSWR from "swr";
 import { childrenApi, groupsApi, usersApi, attendanceApi, journalApi, activitiesApi, menusApi, settingsApi } from "../../../../lib/api";
 import { useAuth } from "../../../../hooks/useAuth";
 import { getTodayInMontreal, formatDateInMontreal } from "../../../../lib/dateUtils";
-import { Plus, ChevronDown, ChevronUp, UserPlus, X, Pencil, ChevronLeft, ChevronRight, Loader2, Check, BookOpen, Clock } from "lucide-react";
+import { Plus, ChevronDown, ChevronUp, UserPlus, X, Pencil, ChevronLeft, ChevronRight, Loader2, Check, BookOpen, Clock, CheckCircle2, XCircle, AlertCircle, ThermometerSun } from "lucide-react";
 import { ChildAvatar, childAvatarColor } from "../../../../components/ChildAvatar";
 import { WeatherPicker } from "../../../../components/journal/WeatherPicker";
 import { EmojiPicker } from "../../../../components/journal/EmojiPicker";
@@ -107,48 +107,61 @@ function ChildStatusIndicators({
     ? journalData.some((j: JournalDay) => j.date === today)
     : false;
 
-  // Attendance status colors
-  const attendanceConfig: Record<string, { color: string; icon: string }> = {
-    present: { color: "text-green-600", icon: "✓" },
-    absent: { color: "text-red-600", icon: "✗" },
-    malade: { color: "text-orange-600", icon: "🤒" },
-    attendu: { color: "text-gray-500", icon: "⏰" },
-    present_hors_contrat: { color: "text-purple-600", icon: "✓" },
-  };
-
-  const config = attendanceStatus ? attendanceConfig[attendanceStatus] : null;
-
   return (
-    <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+    <div className="flex items-center gap-1 ml-auto flex-shrink-0">
       {/* Journal indicator */}
       {hasJournalToday && (
         <div 
-          className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center" 
+          className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0" 
           title="Journal rempli"
         >
-          <BookOpen className="w-3 h-3 text-blue-600" />
+          <BookOpen className="w-3 h-3 text-blue-600" strokeWidth={2.5} />
         </div>
       )}
       
       {/* Attendance indicator */}
-      {config && (
+      {attendanceStatus === 'present' && (
         <div 
-          className={`w-5 h-5 rounded-full flex items-center justify-center font-semibold text-xs ${
-            attendanceStatus === 'present' ? 'bg-green-100' :
-            attendanceStatus === 'absent' ? 'bg-red-100' :
-            attendanceStatus === 'malade' ? 'bg-orange-100' :
-            attendanceStatus === 'present_hors_contrat' ? 'bg-purple-100' :
-            'bg-gray-100'
-          } ${config.color}`}
-          title={
-            attendanceStatus === 'present' ? 'Présent' :
-            attendanceStatus === 'absent' ? 'Absent' :
-            attendanceStatus === 'malade' ? 'Malade' :
-            attendanceStatus === 'present_hors_contrat' ? 'Hors contrat' :
-            'Attendu'
-          }
+          className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0"
+          title="Présent"
         >
-          {config.icon}
+          <CheckCircle2 className="w-3 h-3 text-green-600" strokeWidth={2.5} />
+        </div>
+      )}
+      
+      {attendanceStatus === 'absent' && (
+        <div 
+          className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0"
+          title="Absent"
+        >
+          <XCircle className="w-3 h-3 text-red-600" strokeWidth={2.5} />
+        </div>
+      )}
+      
+      {attendanceStatus === 'malade' && (
+        <div 
+          className="w-5 h-5 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0"
+          title="Malade"
+        >
+          <ThermometerSun className="w-3 h-3 text-orange-600" strokeWidth={2.5} />
+        </div>
+      )}
+      
+      {attendanceStatus === 'present_hors_contrat' && (
+        <div 
+          className="w-5 h-5 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0"
+          title="Présent hors contrat"
+        >
+          <CheckCircle2 className="w-3 h-3 text-purple-600" strokeWidth={2.5} />
+        </div>
+      )}
+      
+      {attendanceStatus === 'attendu' && (
+        <div 
+          className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0"
+          title="Attendu"
+        >
+          <Clock className="w-3 h-3 text-gray-500" strokeWidth={2.5} />
         </div>
       )}
     </div>
