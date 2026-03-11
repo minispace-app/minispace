@@ -1954,6 +1954,15 @@ export default function ChildrenPage() {
     () => attendanceApi.getMonthAllChildren(currentMonthStr).then((r) => r.data.attendance || [])
   );
 
+  // Debug: Check what attendance data we're getting
+  console.log('📊 Attendance fetch result:', {
+    currentMonthStr,
+    today,
+    attendanceAllData,
+    isArray: Array.isArray(attendanceAllData),
+    length: attendanceAllData?.length
+  });
+
   // Map attendance by child_id and date for quick lookup
   const attendanceByChild = new Map<string, Record<string, string>>();
   if (attendanceAllData && Array.isArray(attendanceAllData)) {
