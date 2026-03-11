@@ -15,7 +15,7 @@ export interface DailyJournal {
   id?: string;
   child_id?: string;
   date: string;
-  temperature?: string | null;
+  temperature?: string | null; // DEPRECATED: Weather now comes from daily_menus.weather (day-level)
   menu?: string | null;
   appetit?: string | null;
   humeur?: string | null;
@@ -46,7 +46,6 @@ export const HUMEUR_OPTIONS: EmojiOption[] = [
 ];
 
 export const FIELD_ROWS = [
-  "temperature",
   "menu",
   "appetit",
   "humeur",
@@ -60,7 +59,7 @@ export const FIELD_ROWS = [
 export function emptyDay(date: string): DayData {
   return {
     date,
-    temperature: null,
+    temperature: null, // Legacy field, kept for backwards compatibility
     menu: null,
     appetit: null,
     humeur: null,
@@ -75,7 +74,6 @@ export function emptyDay(date: string): DayData {
 
 export function hasDayData(day: Partial<DailyJournal>): boolean {
   return !!(
-    day.temperature ||
     day.menu ||
     day.appetit ||
     day.humeur ||

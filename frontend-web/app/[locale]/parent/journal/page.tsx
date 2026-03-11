@@ -42,7 +42,6 @@ function emptyEntry(date: string): DailyJournal {
 
 function renderReadOnlyField(field: FieldKey, day: DailyJournal) {
   switch (field) {
-    case "temperature":        return <WeatherPicker value={day.temperature ?? null} readOnly />;
     case "appetit":            return <EmojiPicker options={APPETIT_OPTIONS} value={day.appetit ?? null} readOnly />;
     case "humeur":             return <EmojiPicker options={HUMEUR_OPTIONS} value={day.humeur ?? null} readOnly />;
     case "sommeil":            return <SleepBar value={day.sommeil_minutes ?? null} readOnly />;
@@ -83,6 +82,7 @@ export default function ParentJournalPage() {
   );
   interface MenuEntry {
     date: string;
+    weather?: string;
     menu?: string;
     collation_matin?: string;
     diner?: string;
@@ -94,6 +94,7 @@ export default function ParentJournalPage() {
     const menuEntry = serverMenus.find((m) => m.date === dateStr);
     if (!menuEntry) return null;
     return {
+      weather: menuEntry.weather,
       collation_matin: menuEntry.collation_matin,
       diner: menuEntry.diner,
       collation_apres_midi: menuEntry.collation_apres_midi,

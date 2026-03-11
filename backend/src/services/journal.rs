@@ -12,6 +12,7 @@ use crate::{
 
 #[derive(Clone, Debug, sqlx::FromRow)]
 struct MenuDuJour {
+    weather: Option<String>, // garderie-wide weather
     collation_matin: Option<String>,
     diner: Option<String>,
     collation_apres_midi: Option<String>,
@@ -32,7 +33,7 @@ async fn fetch_menu_du_jour(
 ) -> anyhow::Result<Option<MenuDuJour>> {
     let schema = schema_name(tenant);
     let menu: Option<MenuDuJour> = sqlx::query_as(&format!(
-        r#"SELECT collation_matin, diner, collation_apres_midi
+        r#"SELECT weather::TEXT AS weather, collation_matin, diner, collation_apres_midi
            FROM "{schema}".daily_menus
            WHERE date = $1"#
     ))
@@ -710,6 +711,18 @@ fn build_journal_email_html(
 
         // Add menu du jour if present
         if let Some(menu) = menus.get(&entry.date) {
+            // Display weather from menu (garderie-level)
+            if let Some(ref w) = menu.weather {
+                if !w.trim().is_empty() {
+                    html.push_str(&format!(
+                        r#"<div style="background:#dbeafe;border:1px solid #3b82f6;border-radius:6px;padding:10px;margin-bottom:12px;font-size:14px">
+                        <span style="color:#1d4ed8;font-weight:600">🌤️ Météo :</span> <span style="color:#1e3a8a">{}</span>
+                        </div>"#,
+                        fmt_temperature(w)
+                    ));
+                }
+            }
+
             let has_menu = menu.collation_matin.is_some() || menu.diner.is_some() || menu.collation_apres_midi.is_some();
             if has_menu {
                 html.push_str(r#"<div style="margin-bottom:12px;font-size:13px">"#);
@@ -763,22 +776,29 @@ fn build_journal_email_html(
 
         html.push_str(&format!(
             r#"<table style="width:100%;font-size:14px;color:#374151;border-collapse:collapse">
-                <tr><td style="padding:5px 8px 5px 0;width:140px;color:#6b7280"><strong>Température</strong></td><td style="padding:5px 0">{temp}</td></tr>
-                <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Menu</strong></td><td style="padding:5px 0">{menu}</td></tr>
-                <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Appétit</strong></td><td style="padding:5px 0">{appetit}</td></tr>
+                <tr><td style="padding:5px 8px 5px 0;width:140px;color:#6b7280"><strong>Appétit</strong></td><td style="padding:5px 0">{appetit}</td></tr>
                 <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Humeur</strong></td><td style="padding:5px 0">{humeur}</td></tr>
                 <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Sommeil</strong></td><td style="padding:5px 0">{sommeil}</td></tr>
                 <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Santé</strong></td><td style="padding:5px 0">{sante}</td></tr>
                 <tr><td style="padding:5px 8px 5px 0;color:#6b7280"><strong>Médicaments</strong></td><td style="padding:5px 0">{med}</td></tr>
             </table>"#,
-            temp    = entry.temperature.as_deref().map(fmt_temperature).unwrap_or("—"),
-            menu    = opt_str(entry.menu.as_deref()),
             appetit = entry.appetit.as_deref().map(fmt_appetit).unwrap_or("—"),
             humeur  = entry.humeur.as_deref().map(fmt_humeur).unwrap_or("—"),
             sommeil = sommeil,
             sante   = opt_str(entry.sante.as_deref()),
             med     = opt_str(entry.medicaments.as_deref()),
         ));
+
+        if let Some(ref food_note) = entry.menu {
+            if !food_note.trim().is_empty() {
+                html.push_str(&format!(
+                    r#"<div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:10px 12px;margin-top:12px;font-size:13px;border-radius:0 4px 4px 0">
+                    <strong style="color:#15803d">📝 Note alimentaire :</strong><br><span style="color:#374151">{}</span>
+                </div>"#,
+                    food_note
+                ));
+            }
+        }
 
         if let Some(msg) = &entry.message_educatrice {
             if !msg.trim().is_empty() {
@@ -846,6 +866,18 @@ fn build_journal_email_html_multi(
 
     // ─── MENU SECTION (displayed once at top) ───
     if let Some(menu) = menu {
+        // Show weather from menu (garderie-level)
+        if let Some(ref w) = menu.weather {
+            if !w.trim().is_empty() {
+                html.push_str(&format!(
+                    r#"<div style="background:#dbeafe;border:2px solid #3b82f6;border-radius:8px;padding:16px;margin-bottom:16px;font-size:14px">
+                    <span style="color:#1d4ed8;font-weight:700;font-size:15px">🌤️ Météo :</span> <span style="color:#1e3a8a;font-weight:600">{}</span>
+                    </div>"#,
+                    fmt_temperature(w)
+                ));
+            }
+        }
+
         let has_menu = menu.collation_matin.is_some() || menu.diner.is_some() || menu.collation_apres_midi.is_some();
         if has_menu {
             html.push_str(r#"<div style="background:#fffbeb;border:2px solid #fcd34d;border-radius:8px;padding:16px;margin-bottom:24px">"#);
@@ -922,14 +954,12 @@ fn build_journal_email_html_multi(
             // Main data table
             html.push_str(&format!(
                 r#"<table style="width:100%;font-size:13px;color:#374151;border-collapse:collapse;margin-bottom:12px">
-                    <tr><td style="padding:4px 8px 4px 0;width:120px;color:#6b7280"><strong>Température</strong></td><td style="padding:4px 0">{temp}</td></tr>
-                    <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Appétit</strong></td><td style="padding:4px 0">{appetit}</td></tr>
+                    <tr><td style="padding:4px 8px 4px 0;width:120px;color:#6b7280"><strong>Appétit</strong></td><td style="padding:4px 0">{appetit}</td></tr>
                     <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Humeur</strong></td><td style="padding:4px 0">{humeur}</td></tr>
                     <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Sommeil</strong></td><td style="padding:4px 0">{sommeil}</td></tr>
                     <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Santé</strong></td><td style="padding:4px 0">{sante}</td></tr>
                     <tr><td style="padding:4px 8px 4px 0;color:#6b7280"><strong>Médicaments</strong></td><td style="padding:4px 0">{med}</td></tr>
                 </table>"#,
-                temp    = entry.temperature.as_deref().map(fmt_temperature).unwrap_or("—"),
                 appetit = entry.appetit.as_deref().map(fmt_appetit).unwrap_or("—"),
                 humeur  = entry.humeur.as_deref().map(fmt_humeur).unwrap_or("—"),
                 sommeil = sommeil,

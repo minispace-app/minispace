@@ -336,7 +336,7 @@ export const activitiesApi = {
 export const menusApi = {
   getWeek: (weekStart: string) =>
     apiClient.get("/menus", { params: { week_start: weekStart } }),
-  upsert: (data: { date: string; menu?: string; collation_matin?: string; diner?: string; collation_apres_midi?: string }) =>
+  upsert: (data: { date: string; weather?: string | null; menu?: string; collation_matin?: string; diner?: string; collation_apres_midi?: string }) =>
     apiClient.put("/menus", data),
 };
 

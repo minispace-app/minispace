@@ -584,6 +584,7 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
         r#"CREATE TABLE IF NOT EXISTS "{schema}".daily_menus (
             id                   UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
             date                 DATE NOT NULL UNIQUE,
+            weather              "{schema}".weather_condition,
             menu                 TEXT,
             collation_matin      TEXT,
             diner                TEXT,

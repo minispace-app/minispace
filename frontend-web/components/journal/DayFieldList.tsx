@@ -13,7 +13,7 @@ interface Props {
   onFieldChange?: (field: keyof DailyJournal, value: unknown) => void;
   appetitOptions: EmojiOption[];
   humeurOptions: EmojiOption[];
-  menuDuJour?: { collation_matin?: string; diner?: string; collation_apres_midi?: string } | null;
+  menuDuJour?: { weather?: string; collation_matin?: string; diner?: string; collation_apres_midi?: string } | null;
   weeklyTheme?: { title: string; date: string; end_date?: string } | null;
   placeholders?: {
     menu?: string;
@@ -35,7 +35,6 @@ const MEALS_FIELDS: FieldConfig[] = [
 ];
 
 const WELLBEING_FIELDS: FieldConfig[] = [
-  { key: "temperature",     label: "Température",              Icon: Sun },
   { key: "appetit",         label: "Appétit",                  Icon: Smile },
   { key: "humeur",          label: "Humeur",                   Icon: Heart },
   { key: "sommeil_minutes", label: "Sommeil",                  Icon: Moon },
@@ -63,14 +62,6 @@ export function DayFieldList({
 
   function renderControl(cfg: FieldConfig) {
     switch (cfg.key) {
-      case "temperature":
-        return (
-          <WeatherPicker
-            value={day.temperature ?? null}
-            onChange={set("temperature") as (v: string | null) => void}
-            readOnly={readOnly || isAbsent}
-          />
-        );
       case "appetit":
         return (
           <EmojiPicker
@@ -164,6 +155,23 @@ export function DayFieldList({
                 Thème de la semaine
               </span>
               <p className="text-body text-ink font-medium">{weeklyTheme.title}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Weather (garderie-level, from daily_menus) */}
+      {menuDuJour?.weather && (
+        <div className="px-4 py-3 border-b border-border-soft">
+          <div className="flex items-start gap-2 p-3 bg-sky-50 rounded-xl">
+            <span className="text-xl flex-shrink-0 mt-0.5">🌤️</span>
+            <div className="flex-1">
+              <span className="text-caption font-semibold uppercase tracking-wide text-sky-700 block mb-1">
+                Météo
+              </span>
+              <div className="text-body text-ink font-medium">
+                <WeatherPicker value={menuDuJour.weather} readOnly />
+              </div>
             </div>
           </div>
         </div>

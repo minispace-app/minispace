@@ -44,9 +44,11 @@ export default function JournalDashboardPage() {
   const [selectedChildId, setSelectedChildId] = useState<string>("");
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
   const [localData, setLocalData] = useState<Record<string, DayData>>({});
+  const [localMenuWeather, setLocalMenuWeather] = useState<Record<string, string | null>>({});
   const [activeDayIndex, setActiveDayIndex] = useState(() => getDefaultActiveDayIndex(getMonday(new Date())));
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const weatherSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const weekDates = WEEK_DAYS.map((_, i) => addDays(weekStart, i));
   const weekStartStr = formatDate(weekStart);
@@ -73,6 +75,7 @@ export default function JournalDashboardPage() {
   );
   interface MenuEntry {
     date: string;
+    weather?: string;
     menu?: string;
     collation_matin?: string;
     diner?: string;
@@ -84,10 +87,21 @@ export default function JournalDashboardPage() {
     const menuEntry = serverMenus.find((m) => m.date === dateStr);
     if (!menuEntry) return null;
     return {
+      weather: menuEntry.weather,
       collation_matin: menuEntry.collation_matin,
       diner: menuEntry.diner,
       collation_apres_midi: menuEntry.collation_apres_midi,
     };
+  };
+
+  const getWeatherForDate = (dateStr: string): string | null => {
+    if (localMenuWeather[dateStr] !== undefined) return localMenuWeather[dateStr];
+    const menu = getMenuForDate(dateStr);
+    return menu?.weather ?? null;
+  };
+
+  const updateWeather = (dateStr: string, weather: string | null) => {
+    setLocalMenuWeather((prev) => ({ ...prev, [dateStr]: weather }));
   };
 
   const getDayData = useCallback(
@@ -131,16 +145,44 @@ export default function JournalDashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localData]);
 
+  // Auto-save weather debounce (updates menu table, not journals)
+  useEffect(() => {
+    if (Object.keys(localMenuWeather).length === 0) return;
+    if (weatherSaveTimerRef.current) clearTimeout(weatherSaveTimerRef.current);
+    weatherSaveTimerRef.current = setTimeout(async () => {
+      setSaveStatus("saving");
+      try {
+        await Promise.all(
+          Object.entries(localMenuWeather).map(([dateStr, weather]) => {
+            return menusApi.upsert({ date: dateStr, weather });
+          })
+        );
+        setLocalMenuWeather({});
+        // Refetch menus to get updated data
+        if (swrKey) mutate();
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 2000);
+      } catch {
+        setSaveStatus("idle");
+      }
+    }, 1500);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localMenuWeather]);
+
   const selectChild = (id: string) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (weatherSaveTimerRef.current) clearTimeout(weatherSaveTimerRef.current);
     setLocalData({});
+    setLocalMenuWeather({});
     setSaveStatus("idle");
     setSelectedChildId(id);
   };
 
   const prevWeek = () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (weatherSaveTimerRef.current) clearTimeout(weatherSaveTimerRef.current);
     setLocalData({});
+    setLocalMenuWeather({});
     setSaveStatus("idle");
     const newStart = addDays(weekStart, -7);
     setWeekStart(newStart);
@@ -149,7 +191,9 @@ export default function JournalDashboardPage() {
 
   const nextWeek = () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (weatherSaveTimerRef.current) clearTimeout(weatherSaveTimerRef.current);
     setLocalData({});
+    setLocalMenuWeather({});
     setSaveStatus("idle");
     const newStart = addDays(weekStart, 7);
     setWeekStart(newStart);
@@ -186,7 +230,6 @@ export default function JournalDashboardPage() {
   function renderField(field: FieldKey, day: DayData, dateStr: string) {
     const set = (val: DayData[keyof DayData]) => updateField(dateStr, field as keyof DayData, val);
     switch (field) {
-      case "temperature": return <WeatherPicker value={day.temperature ?? null} onChange={(v) => set(v)} />;
       case "appetit":     return <EmojiPicker options={APPETIT_OPTIONS} value={day.appetit ?? null} onChange={(v) => set(v)} />;
       case "humeur":      return <EmojiPicker options={HUMEUR_OPTIONS} value={day.humeur ?? null} onChange={(v) => set(v)} />;
       case "sommeil":     return <SleepBar value={day.sommeil_minutes ?? null} onChange={(v) => updateField(dateStr, "sommeil_minutes", v)} />;
@@ -287,6 +330,26 @@ export default function JournalDashboardPage() {
                       </div>
                     );
                   })())}
+                </div>
+              );
+            })}
+
+            {/* Weather row (garderie-wide, stored in daily_menus) */}
+            <div className="p-3 text-xs font-medium text-slate-500 border-b border-slate-100 flex items-center pt-4 gap-1.5">
+              🌤️ Météo
+            </div>
+            {weekDates.map((date, di) => {
+              const dateStr = formatDate(date);
+              const weather = getWeatherForDate(dateStr);
+              const day = getDayData(dateStr);
+              const isAbsent = !!day.absent;
+              const isToday = dateStr === today;
+              return (
+                <div key={`weather-${di}`} className={`p-2 border-b border-slate-100 border-l border-l-slate-50 ${isAbsent ? "bg-red-50/40" : isToday ? "bg-blue-50/40" : ""}`}>
+                  <WeatherPicker
+                    value={weather}
+                    onChange={(v) => updateWeather(dateStr, v)}
+                  />
                 </div>
               );
             })}

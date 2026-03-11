@@ -8,6 +8,7 @@ use uuid::Uuid;
 pub struct DailyMenu {
     pub id: Uuid,
     pub date: NaiveDate,
+    pub weather: Option<String>, // garderie-wide weather (ensoleille, nuageux, pluie, neige, orageux)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub menu: Option<String>, // Deprecated, kept for backwards compatibility
     pub collation_matin: Option<String>,
@@ -22,6 +23,7 @@ pub struct DailyMenu {
 #[derive(Debug, Deserialize)]
 pub struct UpsertMenuRequest {
     pub date: NaiveDate,
+    pub weather: Option<String>, // garderie-wide weather
     #[serde(skip_serializing_if = "Option::is_none")]
     pub menu: Option<String>, // Deprecated
     pub collation_matin: Option<String>,
