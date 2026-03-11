@@ -11,7 +11,7 @@ use crate::{
     db::tenant::schema_name,
     middleware::tenant::TenantSlug,
     models::{
-        attendance::{AttendanceMonthAllQuery, AttendanceMonthQuery, BulkSetAttendanceRequest, SetAttendanceRequest},
+        attendance::{AttendanceMonthAllQuery, AttendanceMonthQuery, AttendanceMonthResponse, BulkSetAttendanceRequest, SetAttendanceRequest},
         auth::AuthenticatedUser,
         user::UserRole,
     },
@@ -396,5 +396,15 @@ pub async fn get_month_all_children(
         )
     })?;
 
-    Ok(Json(json!({ "attendance": records })))
+    // Convert tuples to proper response structs
+    let attendance: Vec<AttendanceMonthResponse> = records
+        .into_iter()
+        .map(|(child_id, date, status)| AttendanceMonthResponse {
+            child_id,
+            date,
+            status,
+        })
+        .collect();
+
+    Ok(Json(json!({ "attendance": attendance })))
 }

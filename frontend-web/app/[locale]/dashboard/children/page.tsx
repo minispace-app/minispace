@@ -1949,9 +1949,19 @@ export default function ChildrenPage() {
   const today = format(todayDate, "yyyy-MM-dd");
   const currentMonthStr = format(new Date(), "yyyy-MM");
   
-  const { data: attendanceAllData } = useSWR(
+  const { data: attendanceAllData, error: attendanceError } = useSWR(
     `attendance-all-${currentMonthStr}`,
-    () => attendanceApi.getMonthAllChildren(currentMonthStr).then((r) => r.data.attendance || [])
+    async () => {
+      try {
+        console.log('🔍 Fetching attendance for month:', currentMonthStr);
+        const response = await attendanceApi.getMonthAllChildren(currentMonthStr);
+        console.log('✅ Attendance API response:', response);
+        return response.data.attendance || [];
+      } catch (err) {
+        console.error('❌ Attendance API error:', err);
+        throw err;
+      }
+    }
   );
 
   // Debug: Check what attendance data we're getting
@@ -1959,6 +1969,7 @@ export default function ChildrenPage() {
     currentMonthStr,
     today,
     attendanceAllData,
+    attendanceError,
     isArray: Array.isArray(attendanceAllData),
     length: attendanceAllData?.length
   });
