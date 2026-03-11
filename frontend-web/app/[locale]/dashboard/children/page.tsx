@@ -1954,7 +1954,8 @@ export default function ChildrenPage() {
   const groupMap = Object.fromEntries(groups.map((g) => [g.id, g.name]));
 
   // Fetch attendance for all children for current month
-  const today = getTodayInMontreal();
+  const todayDate = getTodayInMontreal();
+  const today = format(todayDate, "yyyy-MM-dd");
   const currentMonthStr = format(new Date(), "yyyy-MM");
   
   const { data: attendanceAllData } = useSWR(
