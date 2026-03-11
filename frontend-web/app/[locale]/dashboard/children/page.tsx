@@ -86,6 +86,75 @@ interface JournalDay {
 
 type AttendanceStatus = "attendu" | "present" | "absent" | "malade" | "vacances" | "present_hors_contrat";
 
+// ── Child Status Indicators Component ──
+function ChildStatusIndicators({ 
+  childId, 
+  today, 
+  currentMonthStr, 
+  attendanceStatus 
+}: { 
+  childId: string; 
+  today: string; 
+  currentMonthStr: string;
+  attendanceStatus?: string;
+}) {
+  const { data: journalData } = useSWR(
+    `journal-summary-${childId}-${currentMonthStr}`,
+    () => journalApi.getMonthSummary(childId, currentMonthStr).then((r: { data: { journals?: JournalDay[] } }) => r.data.journals || [])
+  );
+
+  const hasJournalToday = journalData && Array.isArray(journalData) 
+    ? journalData.some((j: JournalDay) => j.date === today)
+    : false;
+
+  // Attendance status colors
+  const attendanceConfig: Record<string, { color: string; icon: string }> = {
+    present: { color: "text-green-600", icon: "✓" },
+    absent: { color: "text-red-600", icon: "✗" },
+    malade: { color: "text-orange-600", icon: "🤒" },
+    attendu: { color: "text-gray-500", icon: "⏰" },
+    present_hors_contrat: { color: "text-purple-600", icon: "✓" },
+  };
+
+  const config = attendanceStatus ? attendanceConfig[attendanceStatus] : null;
+
+  return (
+    <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+      {/* Journal indicator */}
+      {hasJournalToday && (
+        <div 
+          className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center" 
+          title="Journal rempli"
+        >
+          <BookOpen className="w-3 h-3 text-blue-600" />
+        </div>
+      )}
+      
+      {/* Attendance indicator */}
+      {config && (
+        <div 
+          className={`w-5 h-5 rounded-full flex items-center justify-center font-semibold text-xs ${
+            attendanceStatus === 'present' ? 'bg-green-100' :
+            attendanceStatus === 'absent' ? 'bg-red-100' :
+            attendanceStatus === 'malade' ? 'bg-orange-100' :
+            attendanceStatus === 'present_hors_contrat' ? 'bg-purple-100' :
+            'bg-gray-100'
+          } ${config.color}`}
+          title={
+            attendanceStatus === 'present' ? 'Présent' :
+            attendanceStatus === 'absent' ? 'Absent' :
+            attendanceStatus === 'malade' ? 'Malade' :
+            attendanceStatus === 'present_hors_contrat' ? 'Hors contrat' :
+            'Attendu'
+          }
+        >
+          {config.icon}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const ATTENDANCE_COLORS: Record<AttendanceStatus, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
   attendu: { bg: "bg-gray-100", text: "text-gray-600", icon: "⏰", label: "Attendu" },
   present: { bg: "bg-green-100", text: "text-green-600", icon: "✓", label: "Présent" },
@@ -1871,6 +1940,26 @@ export default function ChildrenPage() {
   const groups: Group[] = (groupsData as { data: Group[] } | undefined)?.data ?? [];
   const groupMap = Object.fromEntries(groups.map((g) => [g.id, g.name]));
 
+  // Fetch attendance for all children for current month
+  const today = getTodayInMontreal();
+  const currentMonthStr = format(new Date(), "yyyy-MM");
+  
+  const { data: attendanceAllData } = useSWR(
+    `attendance-all-${currentMonthStr}`,
+    () => attendanceApi.getMonthAllChildren(currentMonthStr).then((r) => r.data.attendance || [])
+  );
+
+  // Map attendance by child_id and date for quick lookup
+  const attendanceByChild = new Map<string, Record<string, string>>();
+  if (attendanceAllData && Array.isArray(attendanceAllData)) {
+    attendanceAllData.forEach((record: { child_id: string; date: string; status: string }) => {
+      if (!attendanceByChild.has(record.child_id)) {
+        attendanceByChild.set(record.child_id, {});
+      }
+      attendanceByChild.get(record.child_id)![record.date] = record.status;
+    });
+  }
+
   // Filter children by selected group
   const filteredChildren = filterGroupId
     ? children.filter((c) => c.group_id === filterGroupId)
@@ -1941,6 +2030,9 @@ export default function ChildrenPage() {
           )}
           {filteredChildren.map((child) => {
             const isActive = selectedChildId === child.id;
+            const childAttendance = attendanceByChild.get(child.id);
+            const todayStatus = childAttendance ? childAttendance[today] : undefined;
+            
             return (
               <button
                 key={child.id}
@@ -1955,6 +2047,12 @@ export default function ChildrenPage() {
                 <span className={`text-body truncate ${isActive ? "font-semibold" : ""}`}>
                   {child.first_name} {child.last_name}
                 </span>
+                <ChildStatusIndicators 
+                  childId={child.id}
+                  today={today}
+                  currentMonthStr={currentMonthStr}
+                  attendanceStatus={todayStatus}
+                />
               </button>
             );
           })}
@@ -2079,6 +2177,9 @@ export default function ChildrenPage() {
           <div className="flex gap-2 overflow-x-auto px-4 py-2.5 border-b border-border-soft/50 flex-shrink-0 scrollbar-none">
             {filteredChildren.map((child) => {
               const isActive = selectedChildId === child.id;
+              const childAttendance = attendanceByChild.get(child.id);
+              const todayStatus = childAttendance ? childAttendance[today] : undefined;
+              
               return (
                 <button
                   key={child.id}
@@ -2095,6 +2196,12 @@ export default function ChildrenPage() {
                     {child.first_name[0]}
                   </span>
                   {child.first_name}
+                  <ChildStatusIndicators 
+                    childId={child.id}
+                    today={today}
+                    currentMonthStr={currentMonthStr}
+                    attendanceStatus={todayStatus}
+                  />
                 </button>
               );
             })}
