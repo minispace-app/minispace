@@ -126,7 +126,7 @@ export default function MenusPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex-shrink-0 md:flex-row md:items-center">
+      <div className="flex flex-col gap-3 px-4 md:px-6 py-3 md:py-4 flex-shrink-0 md:flex-row md:items-center">
         <div className="flex items-center gap-2">
           <UtensilsCrossed className="w-5 h-5 text-amber-600" />
           <h1 className="text-base md:text-base font-semibold text-slate-800">{t("title")}</h1>

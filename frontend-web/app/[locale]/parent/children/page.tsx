@@ -947,7 +947,7 @@ export default function ParentChildrenPage() {
 
       {/* ── Desktop main content ── */}
       <div className="hidden md:flex flex-col flex-1 min-w-0 overflow-hidden">
-        <div className="px-6 py-4 border-b border-border-soft flex-shrink-0">
+        <div className="px-6 py-4 flex-shrink-0">
           <h1 className="text-body font-semibold text-ink">{t("myChildren")}</h1>
         </div>
 
@@ -994,13 +994,13 @@ export default function ParentChildrenPage() {
 
       {/* ── Mobile ── */}
       <div className="md:hidden flex flex-col h-full w-full overflow-hidden">
-        <div className="px-4 py-3 border-b border-border-soft flex-shrink-0">
+        <div className="px-4 py-3 flex-shrink-0">
           <h1 className="text-body font-semibold text-ink">{t("myChildren")}</h1>
         </div>
 
         {/* Child chips */}
         {children.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto px-4 py-2.5 border-b border-border-soft flex-shrink-0 scrollbar-none">
+          <div className="flex gap-2 overflow-x-auto px-4 py-2.5 flex-shrink-0 scrollbar-none">
             {children.map((child) => {
               const isActive = selectedChildId === child.id;
               return (

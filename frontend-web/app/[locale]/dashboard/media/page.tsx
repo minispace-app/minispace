@@ -447,41 +447,49 @@ export default function MediaPage() {
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-900 text-white py-3 px-6 flex items-center gap-3 shadow-xl">
-          <span className="text-sm font-medium mr-2">{t("nSelected", { n: selected.size })}</span>
-          <button
-            onClick={() => setBulkDeleteConfirm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-lg text-xs font-medium transition"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            {tc("delete")}
-          </button>
-          {(["private", "public", "group", "child"] as Visibility[]).map((v) => (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-t border-border-soft shadow-xl">
+          {/* Row 1: count + cancel */}
+          <div className="flex items-center justify-between px-4 py-2 border-b border-border-soft/50">
+            <span className="text-sm font-semibold text-ink">
+              {t("nSelected", { n: selected.size })}
+            </span>
             <button
-              key={v}
-              onClick={() => {
-                if (v === "group" || v === "child") {
-                  setBulkVisibility(v);
-                  setBulkGroupId("");
-                  setBulkChildIds([]);
-                  setBulkAssignOpen(true);
-                } else {
-                  setBulkVisibility(v);
-                  mediaApi.bulk({ action: "assign", media_ids: Array.from(selected), visibility: v }).then(() => { setSelected(new Set()); mutate(); });
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs font-medium transition"
+              onClick={() => setSelected(new Set())}
+              className="text-caption text-ink-secondary hover:text-ink transition px-2 py-1"
             >
-              <VisibilityIcon visibility={v} />
-              {visibilityLabel(v, tc, t)}
+              {tc("cancel")}
             </button>
-          ))}
-          <button
-            onClick={() => setSelected(new Set())}
-            className="ml-auto px-3 py-1.5 text-xs text-slate-400 hover:text-white transition"
-          >
-            {tc("cancel")}
-          </button>
+          </div>
+          {/* Row 2: action buttons — horizontally scrollable */}
+          <div className="flex items-center gap-2 px-4 py-2.5 overflow-x-auto scrollbar-none">
+            <button
+              onClick={() => setBulkDeleteConfirm(true)}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-status-danger/10 text-status-danger border border-status-danger/30 hover:bg-status-danger/20 rounded-lg text-xs font-semibold transition"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {tc("delete")}
+            </button>
+            {(["private", "public", "group", "child"] as Visibility[]).map((v) => (
+              <button
+                key={v}
+                onClick={() => {
+                  if (v === "group" || v === "child") {
+                    setBulkVisibility(v);
+                    setBulkGroupId("");
+                    setBulkChildIds([]);
+                    setBulkAssignOpen(true);
+                  } else {
+                    setBulkVisibility(v);
+                    mediaApi.bulk({ action: "assign", media_ids: Array.from(selected), visibility: v }).then(() => { setSelected(new Set()); mutate(); });
+                  }
+                }}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-surface-soft text-ink-secondary border border-border-soft hover:bg-border-soft rounded-lg text-xs font-semibold transition"
+              >
+                <VisibilityIcon visibility={v} />
+                {visibilityLabel(v, tc, t)}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

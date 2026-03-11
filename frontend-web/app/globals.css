@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 body {
-  background: linear-gradient(135deg, #BFDDE3 0%, #C8E6D7 100%);
+  background: linear-gradient(135deg, #B0CCEE 0%, #BCC0EE 100%);
   min-height: 100vh;
   font-family: Inter, "SF Pro Display", "Helvetica Neue", sans-serif;
   font-size: 14px;
