@@ -222,6 +222,8 @@
     "lastName": "Nom",
     "birthDate": "Date de naissance",
     "group": "Groupe",
+    "allGroups": "Tous les groupes",
+    "filterByGroup": "Filtrer par groupe",
     "noChildren": "Aucun enfant enregistré",
     "selectChild": "Choisir un enfant",
     "assignParent": "Associer un parent",

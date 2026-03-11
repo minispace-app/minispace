@@ -1734,6 +1734,7 @@ export default function ChildrenPage() {
   const canWrite = user?.role === "admin_garderie" || user?.role === "super_admin";
   const [selectedChildId, setSelectedChildId] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
+  const [filterGroupId, setFilterGroupId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"calendar" | "journals" | "profile">("calendar");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statusModalDate, setStatusModalDate] = useState<string | null>(null);
@@ -1791,7 +1792,24 @@ export default function ChildrenPage() {
   const groups: Group[] = (groupsData as { data: Group[] } | undefined)?.data ?? [];
   const groupMap = Object.fromEntries(groups.map((g) => [g.id, g.name]));
 
-  const selectedChild = children.find((c) => c.id === selectedChildId);
+  // Filter children by selected group
+  const filteredChildren = filterGroupId
+    ? children.filter((c) => c.group_id === filterGroupId)
+    : children;
+
+  // Auto-select first filtered child if current selection is not in filtered list
+  useEffect(() => {
+    if (filteredChildren.length > 0) {
+      const isCurrentChildInFiltered = filteredChildren.some((c) => c.id === selectedChildId);
+      if (!isCurrentChildInFiltered) {
+        setSelectedChildId(filteredChildren[0].id);
+      }
+    } else if (selectedChildId) {
+      setSelectedChildId("");
+    }
+  }, [filterGroupId, filteredChildren.length, filteredChildren, selectedChildId]);
+
+  const selectedChild = filteredChildren.find((c) => c.id === selectedChildId);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1821,11 +1839,28 @@ export default function ChildrenPage() {
         <div className="px-4 py-4 border-b border-border-soft/50">
           <h1 className="text-body font-semibold text-ink">{t("title")}</h1>
         </div>
+        
+        {/* Group filter */}
+        {groups.length > 0 && (
+          <div className="px-3 py-2 border-b border-border-soft/50">
+            <select
+              value={filterGroupId}
+              onChange={(e) => setFilterGroupId(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">{t("allGroups")}</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        
         <div className="flex-1 overflow-y-auto py-2 px-2">
-          {children.length === 0 && (
+          {filteredChildren.length === 0 && (
             <p className="px-4 py-3 text-body text-ink-muted">{t("noChildren")}</p>
           )}
-          {children.map((child) => {
+          {filteredChildren.map((child) => {
             const isActive = selectedChildId === child.id;
             return (
               <button
@@ -1944,10 +1979,26 @@ export default function ChildrenPage() {
           )}
         </div>
 
+        {/* Group filter (mobile) */}
+        {groups.length > 0 && (
+          <div className="px-4 py-2 border-b border-border-soft/50 flex-shrink-0">
+            <select
+              value={filterGroupId}
+              onChange={(e) => setFilterGroupId(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">{t("allGroups")}</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Child chips */}
-        {children.length > 0 && (
+        {filteredChildren.length > 0 && (
           <div className="flex gap-2 overflow-x-auto px-4 py-2.5 border-b border-border-soft/50 flex-shrink-0 scrollbar-none">
-            {children.map((child) => {
+            {filteredChildren.map((child) => {
               const isActive = selectedChildId === child.id;
               return (
                 <button
