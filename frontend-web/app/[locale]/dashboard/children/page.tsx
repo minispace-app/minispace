@@ -1513,7 +1513,6 @@ function JournalsSection({
   function renderField(field: FieldKey, day: DayData, dateStr: string) {
     const set = (val: DayData[keyof DayData]) => updateField(dateStr, field as keyof DayData, val);
     switch (field) {
-      case "temperature": return <WeatherPicker value={day.temperature ?? null} onChange={(v) => set(v)} />;
       case "appetit":     return <EmojiPicker options={APPETIT_OPTIONS} value={day.appetit ?? null} onChange={(v) => set(v)} />;
       case "humeur":      return <EmojiPicker options={HUMEUR_OPTIONS} value={day.humeur ?? null} onChange={(v) => set(v)} />;
       case "sommeil":     return <SleepBar value={day.sommeil_minutes ?? null} onChange={(v) => updateField(dateStr, "sommeil_minutes", v)} />;
