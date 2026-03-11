@@ -4,14 +4,12 @@
 
 DO $$
 DECLARE
-  schema_rec RECORD;
+  garderie_slug TEXT;
 BEGIN
-  FOR schema_rec IN
-    SELECT schema_name FROM public.tenants
-  LOOP
+  FOR garderie_slug IN SELECT slug FROM public.garderies LOOP
     EXECUTE format(
       'ALTER TABLE "garderie_%s".daily_menus ADD COLUMN IF NOT EXISTS weather "garderie_%s".weather_condition',
-      schema_rec.schema_name, schema_rec.schema_name
+      garderie_slug, garderie_slug
     );
   END LOOP;
 END $$;
