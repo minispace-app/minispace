@@ -95,9 +95,13 @@ const ATTENDANCE_COLORS: Record<AttendanceStatus, { bg: string; text: string; ic
   present_hors_contrat: { bg: "bg-purple-100", text: "text-purple-600", icon: "✓", label: "Hors contrat" },
 };
 
+// Statuses shown in the bulk/single action bar (vacances removed)
 const STAFF_STATUSES = [
   { key: "present", label: "Présent", icon: "✓", cls: "bg-green-100 text-green-700 hover:bg-green-200 border-green-300" },
   { key: "absent",  label: "Absent",  icon: "✗", cls: "bg-red-100 text-red-700 hover:bg-red-200 border-red-300" },
+  { key: "malade",  label: "Malade",  icon: "🤒", cls: "bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-300" },
+  { key: "present_hors_contrat", label: "Hors contrat", icon: "✓", cls: "bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300" },
+  { key: "attendu", label: "Attendu", icon: "⏰", cls: "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300" },
 ];
 
 function ChildDetails({
@@ -729,22 +733,11 @@ function DayDetailModalAdmin({
   onClose: () => void;
 }) {
   const t = useTranslations("calendar");
-  const [statusLoading, setStatusLoading] = useState(false);
 
-  const { data: attendance = {}, mutate: mutateAttendance } = useSWR(
+  const { data: attendance = {} } = useSWR(
     `attendance-${child.id}-${monthStr}`,
     () => attendanceApi.getMonth(child.id, monthStr).then((r) => r.data.attendance || {})
   );
-
-  const handleSetStatus = async (status: string) => {
-    setStatusLoading(true);
-    try {
-      await attendanceApi.setStatus(child.id, date, status);
-      mutateAttendance();
-    } finally {
-      setStatusLoading(false);
-    }
-  };
 
   const dateObj = parseISO(date);
   const weekStart = format(startOfWeek(dateObj, { weekStartsOn: 1 }), "yyyy-MM-dd");
@@ -794,24 +787,14 @@ function DayDetailModalAdmin({
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {/* ── ATTENDANCE ── */}
           <section>
-            <h4 className="text-xs font-bold text-ink-secondary uppercase tracking-wide mb-3">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">
               {t("dayDetail.attendance")}
             </h4>
-            <div className="flex gap-2">
-              {[
-                { key: "present", label: "Présent", icon: "✓", cls: "bg-green-100 text-green-700 border-green-300 hover:bg-green-200", active: "ring-2 ring-green-400" },
-                { key: "absent",  label: "Absent",  icon: "✗", cls: "bg-red-100 text-red-700 border-red-300 hover:bg-red-200",   active: "ring-2 ring-red-400" },
-              ].map((s) => (
-                <button
-                  key={s.key}
-                  onClick={() => handleSetStatus(s.key)}
-                  disabled={statusLoading}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold border transition disabled:opacity-50 ${s.cls} ${currentStatus === s.key ? s.active : ""}`}
-                >
-                  {statusLoading && currentStatus !== s.key ? s.icon : `${s.icon} ${s.label}`}
-                  {statusLoading && currentStatus === s.key && <Loader2 className="w-3 h-3 animate-spin inline ml-1" />}
-                </button>
-              ))}
+            <div className="flex items-center gap-2">
+              <span className="text-sm">{ATTENDANCE_COLORS[currentStatus]?.icon}</span>
+              <span className="text-sm font-medium text-slate-700">
+                {ATTENDANCE_COLORS[currentStatus]?.label}
+              </span>
             </div>
           </section>
 
@@ -1243,11 +1226,11 @@ function CalendarSection({
 
       {/* Bulk action bar (shared desktop + mobile) */}
       {selectMode && selectedDates.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white/90 backdrop-blur-sm rounded-xl shadow-2xl border border-border-soft px-4 py-3 flex items-center gap-3 w-fit">
-          <span className="text-sm font-semibold text-ink whitespace-nowrap">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white rounded-xl shadow-2xl border border-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap max-w-lg w-full mx-4">
+          <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
             {selectedDates.size} jour{selectedDates.size > 1 ? "s" : ""}
           </span>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap flex-1">
             {STAFF_STATUSES.map((s) => (
               <button
                 key={s.key}
@@ -1259,7 +1242,7 @@ function CalendarSection({
               </button>
             ))}
           </div>
-          <button onClick={clearSelection} className="p-1 text-ink-muted hover:text-ink transition">
+          <button onClick={clearSelection} className="p-1 text-slate-400 hover:text-slate-600">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -1545,14 +1528,14 @@ function JournalsSection({
   // Week nav bar
   const weekNav = (
     <div className="flex items-center gap-2">
-      <button onClick={prevWeek} className="p-1.5 rounded-lg bg-white/70 backdrop-blur-sm border border-border-soft shadow-soft hover:bg-white/90 transition-all duration-[180ms]" title={t("prevWeek")}>
-        <ChevronLeft className="w-4 h-4 text-ink-secondary" />
+      <button onClick={prevWeek} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition" title={t("prevWeek")}>
+        <ChevronLeft className="w-4 h-4 text-slate-600" />
       </button>
-      <span className="text-sm text-ink font-medium whitespace-nowrap">
+      <span className="text-sm text-slate-600 font-medium whitespace-nowrap">
         {weekStart.toLocaleDateString("fr-CA", { day: "numeric", month: "short", year: "numeric" })}
       </span>
-      <button onClick={nextWeek} className="p-1.5 rounded-lg bg-white/70 backdrop-blur-sm border border-border-soft shadow-soft hover:bg-white/90 transition-all duration-[180ms]" title={t("nextWeek")}>
-        <ChevronRight className="w-4 h-4 text-ink-secondary" />
+      <button onClick={nextWeek} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition" title={t("nextWeek")}>
+        <ChevronRight className="w-4 h-4 text-slate-600" />
       </button>
     </div>
   );
@@ -1560,112 +1543,101 @@ function JournalsSection({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 pb-4">
+      <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-100">
         {weekNav}
-        <div className="flex items-center gap-1.5 text-xs text-ink-secondary ml-2">
+        <div className="flex items-center gap-1.5 text-xs text-slate-400 ml-2">
           <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>Envoi automatique à <strong className="text-ink">{autoSendTime}</strong> en semaine</span>
+          <span>Envoi automatique à <strong className="text-slate-600">{autoSendTime}</strong> en semaine</span>
         </div>
         <div className="ml-auto">
           {saveIndicator}
         </div>
       </div>
 
-      {/* Desktop: Column cards grid */}
-      <div className="hidden md:block overflow-x-auto pb-2">
-        <div className="grid min-w-[800px] gap-x-3 gap-y-0" style={{ gridTemplateColumns: "148px repeat(5, 1fr)" }}>
-          {/* Header row */}
-          <div className="pb-1" />
-          {weekDates.map((date, i) => {
-            const dateStr = formatDate(date);
-            const isToday = dateStr === today;
-            const day = getDayData(dateStr);
-            const isAbsent = !!day.absent;
-            const hasUnsaved = !!(localData[dateStr] && hasDayData(localData[dateStr]));
-            const menuDuJour = getMenuForDate(dateStr);
-            const colBg = isAbsent
-              ? "bg-status-danger/10 backdrop-blur-sm border-status-danger/20"
-              : isToday
-              ? "bg-accent-yellow/30 backdrop-blur-sm border-accent-yellow/40"
-              : "bg-white/60 backdrop-blur-sm border-border-soft/40";
-            return (
-              <div key={i} className={`rounded-t-xl border-t border-x p-3 text-center shadow-soft ${colBg}`}>
-                <div className={`text-caption font-semibold uppercase tracking-wide ${isAbsent ? "text-status-danger" : isToday ? "text-ink" : "text-ink-muted"}`}>
-                  {t(`days.${WEEK_DAYS[i]}`)}
+      {/* Desktop: Grid */}
+      <div className="hidden md:block overflow-x-auto">
+        <div className="rounded-xl overflow-hidden shadow-soft">
+          <div className="grid min-w-[800px] bg-border-soft/60 gap-px" style={{ gridTemplateColumns: "160px repeat(5, 1fr)" }}>
+            {/* Header row */}
+            <div className="bg-surface-soft p-3 text-caption font-semibold text-ink-muted uppercase tracking-wide" />
+            {weekDates.map((date, i) => {
+              const dateStr = formatDate(date);
+              const isToday = dateStr === today;
+              const day = getDayData(dateStr);
+              const isAbsent = !!day.absent;
+              const hasUnsaved = !!(localData[dateStr] && hasDayData(localData[dateStr]));
+              const menuDuJour = getMenuForDate(dateStr);
+              return (
+                <div key={i} className={`p-3 text-center ${isAbsent ? "bg-status-danger/8" : isToday ? "bg-accent-yellow/30" : "bg-surface-soft"}`}>
+                  <div className={`text-caption font-semibold uppercase tracking-wide ${isAbsent ? "text-status-danger" : isToday ? "text-ink" : "text-ink-muted"}`}>
+                    {t(`days.${WEEK_DAYS[i]}`)}
+                  </div>
+                  <div className={`text-body font-medium mt-0.5 ${isAbsent ? "text-status-danger" : "text-ink"}`}>
+                    {date.getDate()}{" "}
+                    <span className={`font-normal ${isToday ? "text-primary/70" : "text-ink-muted"}`}>
+                      {date.toLocaleDateString("fr-CA", { month: "short" })}
+                    </span>
+                  </div>
+                  {isAbsent ? (
+                    <div className="w-1.5 h-1.5 rounded-pill bg-status-danger mx-auto mt-1" />
+                  ) : hasUnsaved ? (
+                    <div className="w-1.5 h-1.5 rounded-pill bg-accent-orange mx-auto mt-1" />
+                  ) : isToday ? (
+                    <div className="w-1.5 h-1.5 rounded-pill bg-primary mx-auto mt-1" />
+                  ) : null}
+                  {menuDuJour && ((() => {
+                    const hasMenu = menuDuJour.collation_matin || menuDuJour.diner || menuDuJour.collation_apres_midi;
+                    if (!hasMenu) return null;
+                    return (
+                      <div className="mt-1.5 space-y-0.5">
+                        {menuDuJour.collation_matin && (
+                          <div className="text-caption text-accent-blue bg-accent-blue/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_matin}>
+                            🌅 {menuDuJour.collation_matin}
+                          </div>
+                        )}
+                        {menuDuJour.diner && (
+                          <div className="text-caption text-accent-orange bg-accent-orange/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.diner}>
+                            🍽️ {menuDuJour.diner}
+                          </div>
+                        )}
+                        {menuDuJour.collation_apres_midi && (
+                          <div className="text-caption text-accent-purple bg-accent-purple/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_apres_midi}>
+                            🌙 {menuDuJour.collation_apres_midi}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })())}
                 </div>
-                <div className={`text-body font-medium mt-0.5 ${isAbsent ? "text-status-danger" : "text-ink"}`}>
-                  {date.getDate()}{" "}
-                  <span className={`font-normal ${isToday ? "text-primary/70" : "text-ink-muted"}`}>
-                    {date.toLocaleDateString("fr-CA", { month: "short" })}
-                  </span>
+              );
+            })}
+
+            {/* Absent toggle row */}
+            <div className="bg-surface-soft p-3 text-caption font-medium text-ink-secondary flex items-center gap-1.5">
+              Absent
+            </div>
+            {weekDates.map((date, di) => {
+              const dateStr = formatDate(date);
+              const day = getDayData(dateStr);
+              const isAbsent = !!day.absent;
+              const isToday = dateStr === today;
+              return (
+                <div key={`absent-${di}`} className={`p-2 flex items-center justify-center ${isAbsent ? "bg-status-danger/8" : isToday ? "bg-accent-yellow/15" : "bg-surface-card"}`}>
+                  <button
+                    type="button"
+                    onClick={() => updateField(dateStr, "absent" as keyof DayData, !isAbsent)}
+                    className={`relative inline-flex h-5 w-9 items-center rounded-pill transition-all duration-[180ms] focus:outline-none ${isAbsent ? "bg-status-danger" : "bg-border-soft"}`}
+                  >
+                    <span className={`inline-block h-3 w-3 transform rounded-pill bg-white shadow transition-transform duration-[180ms] ${isAbsent ? "translate-x-5" : "translate-x-1"}`} />
+                  </button>
                 </div>
-                {isAbsent ? (
-                  <div className="w-1.5 h-1.5 rounded-pill bg-status-danger mx-auto mt-1" />
-                ) : hasUnsaved ? (
-                  <div className="w-1.5 h-1.5 rounded-pill bg-accent-orange mx-auto mt-1" />
-                ) : isToday ? (
-                  <div className="w-1.5 h-1.5 rounded-pill bg-primary mx-auto mt-1" />
-                ) : null}
-                {menuDuJour && ((() => {
-                  const hasMenu = menuDuJour.collation_matin || menuDuJour.diner || menuDuJour.collation_apres_midi;
-                  if (!hasMenu) return null;
-                  return (
-                    <div className="mt-1.5 space-y-0.5">
-                      {menuDuJour.collation_matin && (
-                        <div className="text-caption text-sky-700 bg-sky-100 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_matin}>
-                          ☕ {menuDuJour.collation_matin}
-                        </div>
-                      )}
-                      {menuDuJour.diner && (
-                        <div className="text-caption text-orange-700 bg-orange-100 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.diner}>
-                          🍽 {menuDuJour.diner}
-                        </div>
-                      )}
-                      {menuDuJour.collation_apres_midi && (
-                        <div className="text-caption text-violet-700 bg-violet-100 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_apres_midi}>
-                          🍎 {menuDuJour.collation_apres_midi}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })())}
-              </div>
-            );
-          })}
+              );
+            })}
 
-          {/* Absent toggle row */}
-          <div className="flex items-center px-2 py-2 text-caption font-medium text-ink-secondary">
-            Absent
-          </div>
-          {weekDates.map((date, di) => {
-            const dateStr = formatDate(date);
-            const day = getDayData(dateStr);
-            const isAbsent = !!day.absent;
-            const isToday = dateStr === today;
-            const colBg = isAbsent
-              ? "bg-status-danger/8 border-status-danger/20"
-              : isToday
-              ? "bg-accent-yellow/20 border-accent-yellow/40"
-              : "bg-white/60 border-border-soft/40";
-            return (
-              <div key={`absent-${di}`} className={`border-x border-t border-white/30 p-2 flex items-center justify-center ${colBg}`}>
-                <button
-                  type="button"
-                  onClick={() => updateField(dateStr, "absent" as keyof DayData, !isAbsent)}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-pill transition-all duration-[180ms] focus:outline-none ${isAbsent ? "bg-status-danger" : "bg-border-soft"}`}
-                >
-                  <span className={`inline-block h-3 w-3 transform rounded-pill bg-white shadow transition-transform duration-[180ms] ${isAbsent ? "translate-x-5" : "translate-x-1"}`} />
-                </button>
-              </div>
-            );
-          })}
-
-          {/* Field rows */}
-          {FIELD_ROWS.map((field, fieldIdx) => {
-            const isLast = fieldIdx === FIELD_ROWS.length - 1;
-            return (
+            {/* Field rows */}
+            {FIELD_ROWS.map((field) => (
               <div key={`field-${field}`} className="contents">
-                <div className={`flex items-start px-2 pt-3 text-caption font-medium text-ink-secondary ${isLast ? "pb-3" : ""}`}>
+                <div className="bg-surface-soft p-3 text-caption font-medium text-ink-secondary flex items-start pt-4">
                   {t(`fields.${field === "sommeil" ? "sommeil" : field}`)}
                 </div>
                 {weekDates.map((date, di) => {
@@ -1673,23 +1645,15 @@ function JournalsSection({
                   const day = getDayData(dateStr);
                   const isAbsent = !!day.absent;
                   const isToday = dateStr === today;
-                  const colBg = isAbsent
-                    ? "bg-status-danger/5 border-status-danger/20"
-                    : isToday
-                    ? "bg-accent-yellow/15 border-accent-yellow/40"
-                    : "bg-white/60 border-border-soft/40";
                   return (
-                    <div
-                      key={`${field}-${di}`}
-                      className={`border-x border-t border-white/30 p-2 ${isLast ? "rounded-b-xl border-b pb-3" : ""} ${isAbsent ? "opacity-30 pointer-events-none select-none" : ""} ${colBg}`}
-                    >
+                    <div key={`${field}-${di}`} className={`p-2 ${isAbsent ? "bg-status-danger/5 opacity-30 pointer-events-none select-none" : isToday ? "bg-accent-yellow/10" : "bg-surface-card"}`}>
                       {renderField(field, day, dateStr)}
                     </div>
                   );
                 })}
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
       </div>
 
@@ -1770,6 +1734,7 @@ export default function ChildrenPage() {
   const canWrite = user?.role === "admin_garderie" || user?.role === "super_admin";
   const [selectedChildId, setSelectedChildId] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
+  const [filterGroupId, setFilterGroupId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"calendar" | "journals" | "profile">("calendar");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statusModalDate, setStatusModalDate] = useState<string | null>(null);
@@ -1827,7 +1792,24 @@ export default function ChildrenPage() {
   const groups: Group[] = (groupsData as { data: Group[] } | undefined)?.data ?? [];
   const groupMap = Object.fromEntries(groups.map((g) => [g.id, g.name]));
 
-  const selectedChild = children.find((c) => c.id === selectedChildId);
+  // Filter children by selected group
+  const filteredChildren = filterGroupId
+    ? children.filter((c) => c.group_id === filterGroupId)
+    : children;
+
+  // Auto-select first filtered child if current selection is not in filtered list
+  useEffect(() => {
+    if (filteredChildren.length > 0) {
+      const isCurrentChildInFiltered = filteredChildren.some((c) => c.id === selectedChildId);
+      if (!isCurrentChildInFiltered) {
+        setSelectedChildId(filteredChildren[0].id);
+      }
+    } else if (selectedChildId) {
+      setSelectedChildId("");
+    }
+  }, [filterGroupId, filteredChildren.length, filteredChildren, selectedChildId]);
+
+  const selectedChild = filteredChildren.find((c) => c.id === selectedChildId);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1857,11 +1839,28 @@ export default function ChildrenPage() {
         <div className="px-4 py-4 border-b border-border-soft/50">
           <h1 className="text-body font-semibold text-ink">{t("title")}</h1>
         </div>
+        
+        {/* Group filter */}
+        {groups.length > 0 && (
+          <div className="px-3 py-2 border-b border-border-soft/50">
+            <select
+              value={filterGroupId}
+              onChange={(e) => setFilterGroupId(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">{t("allGroups")}</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        
         <div className="flex-1 overflow-y-auto py-2 px-2">
-          {children.length === 0 && (
+          {filteredChildren.length === 0 && (
             <p className="px-4 py-3 text-body text-ink-muted">{t("noChildren")}</p>
           )}
-          {children.map((child) => {
+          {filteredChildren.map((child) => {
             const isActive = selectedChildId === child.id;
             return (
               <button
@@ -1885,7 +1884,7 @@ export default function ChildrenPage() {
 
       {/* ── Desktop main content ── */}
       <div className="hidden md:flex flex-col flex-1 min-w-0 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft/50 flex-shrink-0">
           <h1 className="text-body font-semibold text-ink">{t("title")}</h1>
           {canWrite && (
             <button
@@ -1967,7 +1966,7 @@ export default function ChildrenPage() {
       {/* ── Mobile ── */}
       <div className="md:hidden flex flex-col h-full w-full overflow-hidden">
         {/* Mobile header */}
-        <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-soft/50 flex-shrink-0">
           <h1 className="text-body font-semibold text-ink">{t("title")}</h1>
           {canWrite && (
             <button
@@ -1980,10 +1979,26 @@ export default function ChildrenPage() {
           )}
         </div>
 
+        {/* Group filter (mobile) */}
+        {groups.length > 0 && (
+          <div className="px-4 py-2 border-b border-border-soft/50 flex-shrink-0">
+            <select
+              value={filterGroupId}
+              onChange={(e) => setFilterGroupId(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">{t("allGroups")}</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Child chips */}
-        {children.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto px-4 py-2.5 flex-shrink-0 scrollbar-none">
-            {children.map((child) => {
+        {filteredChildren.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto px-4 py-2.5 border-b border-border-soft/50 flex-shrink-0 scrollbar-none">
+            {filteredChildren.map((child) => {
               const isActive = selectedChildId === child.id;
               return (
                 <button
