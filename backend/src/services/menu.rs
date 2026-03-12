@@ -42,7 +42,7 @@ impl MenuService {
         let schema = schema_name(tenant);
         let entry = sqlx::query_as::<_, DailyMenu>(&format!(
             r#"INSERT INTO "{schema}".daily_menus (date, weather, menu, collation_matin, diner, collation_apres_midi, created_by)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)
+               VALUES ($1, $2::TEXT::"{schema}".weather_condition, $3, $4, $5, $6, $7)
                ON CONFLICT (date) DO UPDATE SET
                    weather = COALESCE(EXCLUDED.weather, daily_menus.weather),
                    menu = COALESCE(EXCLUDED.menu, daily_menus.menu),

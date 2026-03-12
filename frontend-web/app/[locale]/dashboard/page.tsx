@@ -42,7 +42,7 @@ export default function DashboardPage() {
   const groupsList = (groups as { data: unknown[] } | undefined)?.data as { id: string }[] | undefined;
 
   // Get absent children for the week
-  const attendanceRecords = (attendance as { data: { attendance?: [string, string, string][] } } | undefined)?.data?.attendance || [];
+  const attendanceRecords = (attendance as { data: { attendance?: { child_id: string; date: string; status: string }[] } } | undefined)?.data?.attendance || [];
 
   // Get this week (Monday to Friday only)
   const today = new Date();
@@ -68,13 +68,13 @@ export default function DashboardPage() {
     const dateStr = format(day, "yyyy-MM-dd");
     const absentIds = new Set(
       attendanceRecords
-        .filter(([_, date, status]) => date === dateStr && status === "absent")
-        .map(([childId]) => childId)
+        .filter((r) => r.date === dateStr && r.status === "absent")
+        .map((r) => r.child_id)
     );
     const presentIds = new Set(
       attendanceRecords
-        .filter(([_, date, status]) => date === dateStr && status === "present")
-        .map(([childId]) => childId)
+        .filter((r) => r.date === dateStr && r.status === "present")
+        .map((r) => r.child_id)
     );
     const absentThisDay = childrenList?.filter((child) => absentIds.has(child.id)) ?? [];
     const total = childrenList?.length ?? 0;
