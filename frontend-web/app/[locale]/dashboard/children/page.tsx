@@ -1739,7 +1739,7 @@ function JournalsSection({
 
           {/* Weather row */}
           <div className="flex items-center justify-end pr-3 border-r border-white/40">
-            <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide text-right leading-none bg-white/40 rounded px-2 py-1">🌤️ Météo</span>
+            <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide text-right leading-none bg-white/40 rounded-lg px-2 py-1">🌤️ Météo</span>
           </div>
           {weekDates.map((date, di) => {
             const dateStr = formatDate(date);
@@ -1761,7 +1761,7 @@ function JournalsSection({
             return (
               <div key={`field-${field}`} className="contents">
                 <div className="flex items-center justify-end pr-3 border-r border-white/40">
-                  <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide text-right leading-none bg-white/40 rounded px-2 py-1">
+                  <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide text-right leading-none bg-white/40 rounded-lg px-2 py-1">
                     {t(`fields.${field === "sommeil" ? "sommeil" : field}`)}
                   </span>
                 </div>
