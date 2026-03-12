@@ -1688,10 +1688,10 @@ function JournalsSection({
             const hasUnsaved = !!(localData[dateStr] && hasDayData(localData[dateStr]));
             const menuDuJour = getMenuForDate(dateStr);
             const colBg = isAbsent
-              ? "bg-status-danger/10 backdrop-blur-sm border-status-danger/30"
+              ? "bg-red-50 border-status-danger/30"
               : isToday
-              ? "bg-accent-yellow/30 backdrop-blur-sm border-accent-yellow/40"
-              : "bg-white/60 backdrop-blur-sm border-border-soft/40";
+              ? "bg-amber-50 border-accent-yellow/40"
+              : "bg-white border-border-soft/40";
             return (
               <div key={`header-${dateStr}`} className={`rounded-t-xl border-t border-x px-3 py-2 text-center shadow-soft ${colBg}`}>
                 <div className={`text-caption font-semibold uppercase tracking-wide ${isAbsent ? "text-status-danger" : isToday ? "text-ink" : "text-ink-muted"}`}>
@@ -1747,9 +1747,9 @@ function JournalsSection({
             const day = getDayData(dateStr);
             const isAbsent = !!day.absent;
             const isToday = dateStr === today;
-            const colBg = isAbsent ? "bg-status-danger/5 border-status-danger/20" : isToday ? "bg-accent-yellow/15 border-accent-yellow/40" : "bg-white/60 border-border-soft/40";
+            const colBg = isAbsent ? "bg-red-50 border-status-danger/20" : isToday ? "bg-amber-50 border-accent-yellow/40" : "bg-white border-border-soft/40";
             return (
-              <div key={`weather-${di}`} className={`border-x border-t border-white/30 p-2 ${colBg}`}>
+              <div key={`weather-${di}`} className={`border-x border-t border-slate-200 p-2 ${colBg}`}>
                 <WeatherPicker value={weather} onChange={(v) => updateWeather(dateStr, v)} />
               </div>
             );
@@ -1770,11 +1770,11 @@ function JournalsSection({
                   const day = getDayData(dateStr);
                   const isAbsent = !!day.absent;
                   const isToday = dateStr === today;
-                  const colBg = isAbsent ? "bg-status-danger/5 border-status-danger/20" : isToday ? "bg-accent-yellow/15 border-accent-yellow/40" : "bg-white/60 border-border-soft/40";
+                  const colBg = isAbsent ? "bg-red-50 border-status-danger/20" : isToday ? "bg-amber-50 border-accent-yellow/40" : "bg-white border-border-soft/40";
                   return (
                     <div
                       key={`${field}-${di}`}
-                      className={`border-x border-t border-white/30 p-2 ${isLast ? "rounded-b-xl border-b pb-3" : ""} ${colBg} ${isAbsent ? "opacity-30 pointer-events-none select-none" : ""}`}
+                      className={`border-x border-t border-slate-200 p-2 ${isLast ? "rounded-b-xl border-b pb-3" : ""} ${colBg} ${isAbsent ? "opacity-30 pointer-events-none select-none" : ""}`}
                     >
                       {renderField(field, day, dateStr)}
                     </div>
