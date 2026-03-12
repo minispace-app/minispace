@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import useSWR, { mutate as globalMutate } from "swr";
@@ -15,6 +15,7 @@ interface Child {
   first_name: string;
   last_name: string;
   birth_date: string;
+  photo_url: string | null;
   group_id: string | null;
   schedule_days?: number[] | null;
   start_date?: string | null;
@@ -141,10 +142,18 @@ function ParentJournalsSection({ child }: { child: Child }) {
 
 function ChildCard({ child, groupMap }: { child: Child; groupMap: Record<string, string> }) {
   const t = useTranslations("children");
+  const photoUrl = child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null;
+
   return (
     <div className="bg-surface-card rounded-xl shadow-card p-5">
       <div className="flex items-center gap-4">
-        <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="lg" />
+        <ChildAvatar
+          id={child.id}
+          firstName={child.first_name}
+          lastName={child.last_name}
+          size="lg"
+          photoUrl={photoUrl}
+        />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-ink text-h3">
             {child.first_name} {child.last_name}
@@ -902,6 +911,8 @@ export default function ParentChildrenPage() {
   const [activeTab, setActiveTab] = useState<"calendar" | "profile">("calendar");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
 
   const { data, mutate } = useSWR("parent-children", () => childrenApi.list().then((r) => r.data as Child[]));
   const { data: groupsData } = useSWR("groups-parent", () => groupsApi.list());
@@ -911,6 +922,35 @@ export default function ParentChildrenPage() {
   const groupMap = Object.fromEntries(groups.map((g) => [g.id, g.name]));
 
   const selectedChild = children.find((c) => c.id === selectedChildId);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedChild) return;
+
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      alert("Format d'image invalide (JPEG, PNG ou WebP attendu)");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Fichier trop volumineux (5 MB maximum)");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await childrenApi.uploadAvatar(selectedChild.id, formData);
+      mutate();
+      if (avatarFileInputRef.current) avatarFileInputRef.current.value = "";
+    } catch (err) {
+      alert("Erreur lors du téléchargement de la photo");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -925,6 +965,7 @@ export default function ParentChildrenPage() {
           )}
           {children.map((child) => {
             const isActive = selectedChildId === child.id;
+            const photoUrl = child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null;
             return (
               <button
                 key={child.id}
@@ -935,7 +976,13 @@ export default function ParentChildrenPage() {
                     : "text-ink-secondary hover:bg-surface-soft hover:text-ink"
                 }`}
               >
-                <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="sm" />
+                <ChildAvatar
+                  id={child.id}
+                  firstName={child.first_name}
+                  lastName={child.last_name}
+                  size="sm"
+                  photoUrl={photoUrl}
+                />
                 <span className={`text-body truncate ${isActive ? "font-semibold" : ""}`}>
                   {child.first_name} {child.last_name}
                 </span>
@@ -985,6 +1032,25 @@ export default function ParentChildrenPage() {
                 <div className="space-y-4">
                   <ChildCard child={selectedChild} groupMap={groupMap} />
                   <ChildBirthDateEdit child={selectedChild} onUpdated={() => mutate()} />
+                  <div className="bg-surface-card rounded-xl shadow-card p-5">
+                    <h3 className="text-body font-semibold text-ink mb-3">📷 Photo</h3>
+                    <input
+                      ref={avatarFileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleAvatarUpload}
+                      disabled={uploadingAvatar}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => avatarFileInputRef.current?.click()}
+                      disabled={uploadingAvatar}
+                      className="px-4 py-2 bg-primary text-white text-body font-medium rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50"
+                    >
+                      {uploadingAvatar ? "Téléchargement..." : "Changer la photo"}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1003,6 +1069,7 @@ export default function ParentChildrenPage() {
           <div className="flex gap-2 overflow-x-auto px-4 py-2.5 flex-shrink-0 scrollbar-none">
             {children.map((child) => {
               const isActive = selectedChildId === child.id;
+              const photoUrl = child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null;
               return (
                 <button
                   key={child.id}
@@ -1011,11 +1078,15 @@ export default function ParentChildrenPage() {
                     isActive ? "bg-ink text-white" : "bg-surface-soft text-ink-secondary"
                   }`}
                 >
-                  <span className={`w-4 h-4 rounded-pill flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${
-                    isActive ? "bg-white/25 text-white" : `${childAvatarColor(child.id)} text-white`
-                  }`}>
-                    {child.first_name[0]}
-                  </span>
+                  <div className={isActive ? "opacity-75" : ""}>
+                    <ChildAvatar
+                      id={child.id}
+                      firstName={child.first_name}
+                      lastName={child.last_name}
+                      size="sm"
+                      photoUrl={photoUrl}
+                    />
+                  </div>
                   {child.first_name}
                 </button>
               );
@@ -1058,6 +1129,25 @@ export default function ParentChildrenPage() {
                   <>
                     <ChildCard child={selectedChild} groupMap={groupMap} />
                     <ChildBirthDateEdit child={selectedChild} onUpdated={() => mutate()} />
+                    <div className="bg-surface-card rounded-xl shadow-card p-5">
+                      <h3 className="text-body font-semibold text-ink mb-3">📷 Photo</h3>
+                      <input
+                        ref={avatarFileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleAvatarUpload}
+                        disabled={uploadingAvatar}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => avatarFileInputRef.current?.click()}
+                        disabled={uploadingAvatar}
+                        className="px-4 py-2 bg-primary text-white text-body font-medium rounded-pill hover:opacity-90 transition-all duration-[180ms] disabled:opacity-50"
+                      >
+                        {uploadingAvatar ? "Téléchargement..." : "Changer la photo"}
+                      </button>
+                    </div>
                   </>
                 )}
               </div>

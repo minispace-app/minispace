@@ -18,6 +18,7 @@ interface Child {
   id: string;
   first_name: string;
   last_name: string;
+  photo_url?: string | null;
 }
 
 export default function DashboardPage() {
@@ -190,6 +191,7 @@ export default function DashboardPage() {
                                     firstName={child.first_name}
                                     lastName={child.last_name}
                                     size="sm"
+                                    photoUrl={child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null}
                                   />
                                   <span className="text-caption font-medium text-status-danger truncate">
                                     {child.first_name}
@@ -274,6 +276,7 @@ export default function DashboardPage() {
                               firstName={child.first_name}
                               lastName={child.last_name}
                               size="md"
+                              photoUrl={child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null}
                             />
                             <div className="flex-1">
                               <span className="text-body-lg font-semibold text-status-danger">

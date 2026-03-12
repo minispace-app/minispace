@@ -15,6 +15,10 @@ pub struct Child {
     pub is_active: bool,
     pub start_date: Option<NaiveDate>,
     pub schedule_days: Option<Vec<i32>>,
+    #[serde(skip_serializing)]
+    pub avatar_iv: Option<Vec<u8>>,
+    #[serde(skip_serializing)]
+    pub avatar_tag: Option<Vec<u8>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

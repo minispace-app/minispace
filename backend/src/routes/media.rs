@@ -282,10 +282,36 @@ pub async fn serve_media(
         .map_err(|e| (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({"error": format!("database error: {}", e)})),
-        ))?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "file not found in database"}))))?;
+        ))?;
 
-        (doc.is_encrypted, doc.encryption_iv, doc.encryption_tag, doc.content_type)
+        if let Some(doc) = doc {
+            (doc.is_encrypted, doc.encryption_iv, doc.encryption_tag, doc.content_type)
+        } else {
+            // Third fallback: check children table for avatar
+            #[derive(sqlx::FromRow)]
+            struct ChildAvatarRow {
+                avatar_iv: Vec<u8>,
+                avatar_tag: Vec<u8>,
+            }
+
+            let avatar = sqlx::query_as::<_, ChildAvatarRow>(&format!(
+                r#"
+                SELECT avatar_iv, avatar_tag FROM "{schema}".children
+                WHERE photo_url = $1 AND avatar_iv IS NOT NULL AND avatar_tag IS NOT NULL
+                "#,
+                schema = schema
+            ))
+            .bind(storage_path)
+            .fetch_optional(&state.db)
+            .await
+            .map_err(|e| (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": format!("database error: {}", e)})),
+            ))?
+            .ok_or_else(|| (StatusCode::NOT_FOUND, Json(json!({"error": "file not found in database"}))))?;
+
+            (true, Some(avatar.avatar_iv), Some(avatar.avatar_tag), "image/jpeg".to_string())
+        }
     };
 
     // Read file from disk

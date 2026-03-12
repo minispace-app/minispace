@@ -263,6 +263,10 @@ export const childrenApi = {
     apiClient.post("/children/import", formData),
   exportCsv: () =>
     apiClient.get("/children/export", { responseType: "blob" }),
+  uploadAvatar: (childId: string, formData: FormData) =>
+    apiClient.post(`/children/${childId}/avatar`, formData),
+  deleteAvatar: (childId: string) =>
+    apiClient.delete(`/children/${childId}/avatar`),
 };
 
 // Tenant user management (admin_garderie)

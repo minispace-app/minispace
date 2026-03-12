@@ -789,6 +789,77 @@ impl ChildService {
         .await?;
         Ok(())
     }
+
+    /// Update child avatar photo_url and encryption metadata (iv, tag).
+    pub async fn update_avatar(
+        pool: &PgPool,
+        tenant: &str,
+        child_id: Uuid,
+        photo_url: &str,
+        iv: Vec<u8>,
+        tag: Vec<u8>,
+    ) -> anyhow::Result<Child> {
+        let schema = schema_name(tenant);
+        let child = sqlx::query_as::<_, Child>(&format!(
+            "UPDATE {schema}.children
+             SET photo_url = $1, avatar_iv = $2, avatar_tag = $3, updated_at = NOW()
+             WHERE id = $4
+             RETURNING *"
+        ))
+        .bind(photo_url)
+        .bind(&iv)
+        .bind(&tag)
+        .bind(child_id)
+        .fetch_one(pool)
+        .await?;
+        Ok(child)
+    }
+
+    /// Delete child avatar: clear photo_url and encryption fields, return old photo_url.
+    pub async fn delete_avatar(
+        pool: &PgPool,
+        tenant: &str,
+        child_id: Uuid,
+    ) -> anyhow::Result<Option<String>> {
+        let schema = schema_name(tenant);
+        let old_url: Option<String> = sqlx::query_scalar(&format!(
+            "UPDATE {schema}.children
+             SET photo_url = NULL, avatar_iv = NULL, avatar_tag = NULL, updated_at = NOW()
+             WHERE id = $1
+             RETURNING photo_url"
+        ))
+        .bind(child_id)
+        .fetch_optional(pool)
+        .await?
+        .flatten();
+        Ok(old_url)
+    }
+
+    /// Fetch avatar encryption metadata for serve_media fallback.
+    /// Returns (photo_url, iv, tag) if avatar exists and is encrypted.
+    pub async fn get_avatar_storage_path(
+        pool: &PgPool,
+        tenant: &str,
+        photo_url: &str,
+    ) -> anyhow::Result<Option<(String, Vec<u8>, Vec<u8>)>> {
+        let schema = schema_name(tenant);
+        #[derive(sqlx::FromRow)]
+        struct AvatarRow {
+            photo_url: String,
+            avatar_iv: Vec<u8>,
+            avatar_tag: Vec<u8>,
+        }
+
+        let row = sqlx::query_as::<_, AvatarRow>(&format!(
+            "SELECT photo_url, avatar_iv, avatar_tag FROM {schema}.children
+             WHERE photo_url = $1 AND avatar_iv IS NOT NULL AND avatar_tag IS NOT NULL"
+        ))
+        .bind(photo_url)
+        .fetch_optional(pool)
+        .await?;
+
+        Ok(row.map(|r| (r.photo_url, r.avatar_iv, r.avatar_tag)))
+    }
 }
 
 impl Default for crate::models::child::ImportResult {

@@ -216,6 +216,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/children/{id}/invited-parents", get(routes::children::list_invited_parents).post(routes::children::assign_invited_parent))
         .route("/children/{id}/invited-parents/{email}", delete(routes::children::remove_invited_parent))
         .route("/children/{id}/export", get(routes::children::export_child))
+        .route("/children/{id}/avatar", post(routes::children::upload_child_avatar).delete(routes::children::delete_child_avatar))
         // WebSocket
         .route("/ws", get(routes::websocket::ws_handler))
         // Tenant user management (admin_garderie)

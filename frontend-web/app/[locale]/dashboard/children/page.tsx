@@ -38,6 +38,7 @@ interface Child {
   first_name: string;
   last_name: string;
   birth_date: string;
+  photo_url: string | null;
   group_id: string | null;
   is_active: boolean;
   start_date: string | null;
@@ -202,6 +203,11 @@ function ChildDetails({
   const [scheduleDays, setScheduleDays] = useState<number[]>(child.schedule_days ?? [1, 2, 3, 4, 5]);
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Avatar state
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [deletingAvatar, setDeletingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Update state when child changes
   useEffect(() => {
     setFirstName(child.first_name);
@@ -359,6 +365,50 @@ function ChildDetails({
     }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      alert("Format d'image invalide (JPEG, PNG ou WebP attendu)");
+      return;
+    }
+
+    // Validate file size (5 MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Fichier trop volumineux (5 MB maximum)");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await childrenApi.uploadAvatar(child.id, formData);
+      onUpdated();
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (err) {
+      alert("Erreur lors du téléchargement de la photo");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer la photo ?")) return;
+    setDeletingAvatar(true);
+    try {
+      await childrenApi.deleteAvatar(child.id);
+      onUpdated();
+    } catch (err) {
+      alert("Erreur lors de la suppression de la photo");
+    } finally {
+      setDeletingAvatar(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Edit details section */}
@@ -487,6 +537,47 @@ function ChildDetails({
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Avatar section */}
+      {canWrite && (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+              📷 Photo
+            </h3>
+          </div>
+          <div className="px-5 py-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleAvatarUpload}
+              disabled={uploadingAvatar}
+              className="hidden"
+            />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar || deletingAvatar}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all duration-[180ms] disabled:opacity-50"
+              >
+                {uploadingAvatar ? "Téléchargement..." : "Changer la photo"}
+              </button>
+              {child.photo_url && (
+                <button
+                  type="button"
+                  onClick={handleAvatarDelete}
+                  disabled={uploadingAvatar || deletingAvatar}
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-all duration-[180ms] disabled:opacity-50"
+                >
+                  {deletingAvatar ? "Suppression..." : "Supprimer"}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1853,10 +1944,18 @@ function ChildCard({
     return `${Math.floor(months / 12)} ${t("years")}`;
   };
 
+  const photoUrl = child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null;
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden p-5">
       <div className="flex items-center gap-4">
-        <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="lg" />
+        <ChildAvatar
+          id={child.id}
+          firstName={child.first_name}
+          lastName={child.last_name}
+          size="lg"
+          photoUrl={photoUrl}
+        />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-slate-800 text-lg">
             {child.first_name} {child.last_name}
@@ -2041,7 +2140,8 @@ export default function ChildrenPage() {
               : isWeekday;
             const todayStatus = childAttendance?.[today] ??
               (isScheduled ? "attendu" : undefined);
-            
+            const photoUrl = child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null;
+
             return (
               <button
                 key={child.id}
@@ -2052,7 +2152,7 @@ export default function ChildrenPage() {
                     : "text-ink-secondary hover:bg-surface-soft hover:text-ink"
                 }`}
               >
-                <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="sm" />
+                <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="sm" photoUrl={photoUrl} />
                 <span className={`text-body truncate ${isActive ? "font-semibold" : ""}`}>
                   {child.first_name} {child.last_name}
                 </span>
@@ -2195,6 +2295,7 @@ export default function ChildrenPage() {
               const todayStatus = childAttendance?.[today] ??
                 (isScheduled ? "attendu" : undefined);
 
+              const photoUrl = child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null;
               return (
                 <button
                   key={child.id}
@@ -2205,11 +2306,13 @@ export default function ChildrenPage() {
                       : "bg-surface-soft text-ink-secondary"
                   }`}
                 >
-                  <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${
-                    isActive ? "bg-white/25 text-white" : `${childAvatarColor(child.id)} text-white`
-                  }`}>
-                    {child.first_name[0]}
-                  </span>
+                  <ChildAvatar
+                    id={child.id}
+                    firstName={child.first_name}
+                    lastName={child.last_name}
+                    size="sm"
+                    photoUrl={photoUrl}
+                  />
                   <span>{child.first_name}</span>
                   <ChildStatusIndicators
                     childId={child.id}
