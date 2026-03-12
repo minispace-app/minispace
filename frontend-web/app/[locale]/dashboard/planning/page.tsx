@@ -512,7 +512,7 @@ function MenusSection() {
               const isLast = sectionIndex === menuSections.length - 1;
               return [
                 <div key={`section-header-${section.key}`} className="flex items-center justify-end pr-3 border-r border-white/40">
-                  <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide text-right leading-none">
+                  <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide text-right leading-none bg-white/40 rounded px-2 py-1">
                     {t(section.tKey)}
                   </span>
                 </div>,
