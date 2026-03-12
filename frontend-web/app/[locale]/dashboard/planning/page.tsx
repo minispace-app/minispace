@@ -511,11 +511,10 @@ function MenusSection() {
             {menuSections.flatMap((section, sectionIndex) => {
               const isLast = sectionIndex === menuSections.length - 1;
               return [
-                <div
-                  key={`section-header-${section.key}`}
-                  className={`flex items-start px-2 pt-3 text-caption font-medium text-ink-secondary ${isLast ? "pb-3" : ""}`}
-                >
-                  {t(section.tKey)}
+                <div key={`section-header-${section.key}`} className="flex items-center justify-end pr-3 border-r border-white/40">
+                  <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide text-right leading-none">
+                    {t(section.tKey)}
+                  </span>
                 </div>,
                 ...weekDates.map((date, dayIndex) => {
                   const dateStr = formatDate(date);
