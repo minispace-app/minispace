@@ -2188,8 +2188,13 @@ export default function ChildrenPage() {
             {filteredChildren.map((child) => {
               const isActive = selectedChildId === child.id;
               const childAttendance = attendanceByChild.get(child.id);
-              const todayStatus = childAttendance ? childAttendance[today] : undefined;
-              
+              const isWeekday = todayISODay >= 1 && todayISODay <= 5;
+              const isScheduled = child.schedule_days
+                ? child.schedule_days.includes(todayISODay)
+                : isWeekday;
+              const todayStatus = childAttendance?.[today] ??
+                (isScheduled ? "attendu" : undefined);
+
               return (
                 <button
                   key={child.id}
