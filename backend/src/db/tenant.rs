@@ -133,6 +133,15 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
     .execute(pool)
     .await?;
 
+    // Idempotent: add avatar encryption columns for existing schemas
+    sqlx::raw_sql(&format!(
+        r#"ALTER TABLE "{schema}".children
+           ADD COLUMN IF NOT EXISTS avatar_iv  BYTEA,
+           ADD COLUMN IF NOT EXISTS avatar_tag BYTEA"#
+    ))
+    .execute(pool)
+    .await?;
+
     // Idempotent: fix existing FK to use ON DELETE SET NULL instead of RESTRICT
     sqlx::raw_sql(&format!(
         r#"ALTER TABLE "{schema}".children
@@ -584,6 +593,7 @@ pub async fn provision_tenant_schema(pool: &PgPool, slug: &str) -> anyhow::Resul
         r#"CREATE TABLE IF NOT EXISTS "{schema}".daily_menus (
             id                   UUID PRIMARY KEY DEFAULT public.uuid_generate_v4(),
             date                 DATE NOT NULL UNIQUE,
+            weather              "{schema}".weather_condition,
             menu                 TEXT,
             collation_matin      TEXT,
             diner                TEXT,

@@ -248,6 +248,7 @@ export default function ParentPrivacyPage() {
                       firstName={child.first_name}
                       lastName={child.last_name}
                       size="md"
+                      photoUrl={child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null}
                     />
                     <div>
                       <p className="font-medium text-slate-900">

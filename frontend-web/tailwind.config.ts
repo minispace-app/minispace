@@ -12,13 +12,13 @@ const config: Config = {
         "surface-card": "#FFFFFF",
         "surface-soft": "#F5F7F8",
         primary: {
-          DEFAULT: "#6B7CFF",
-          light: "#8A97FF",
-          soft: "#E7EBFF",
+          DEFAULT: "#4A6CF7",
+          light: "#7A96F9",
+          soft: "#E0E7FF",
         },
         accent: {
-          green: "#7ED6A6",
-          mint: "#B7EAD3",
+          green: "#5B9BD5",
+          mint: "#B0C8EE",
           blue: "#8EC9F7",
           purple: "#A69BFF",
           orange: "#F5B266",

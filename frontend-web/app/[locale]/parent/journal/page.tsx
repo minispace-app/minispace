@@ -31,6 +31,7 @@ interface Child {
   id: string;
   first_name: string;
   last_name: string;
+  photo_url?: string | null;
 }
 
 type FieldKey = typeof FIELD_ROWS[number];
@@ -42,7 +43,6 @@ function emptyEntry(date: string): DailyJournal {
 
 function renderReadOnlyField(field: FieldKey, day: DailyJournal) {
   switch (field) {
-    case "temperature":        return <WeatherPicker value={day.temperature ?? null} readOnly />;
     case "appetit":            return <EmojiPicker options={APPETIT_OPTIONS} value={day.appetit ?? null} readOnly />;
     case "humeur":             return <EmojiPicker options={HUMEUR_OPTIONS} value={day.humeur ?? null} readOnly />;
     case "sommeil":            return <SleepBar value={day.sommeil_minutes ?? null} readOnly />;
@@ -83,6 +83,7 @@ export default function ParentJournalPage() {
   );
   interface MenuEntry {
     date: string;
+    weather?: string;
     menu?: string;
     collation_matin?: string;
     diner?: string;
@@ -94,6 +95,7 @@ export default function ParentJournalPage() {
     const menuEntry = serverMenus.find((m) => m.date === dateStr);
     if (!menuEntry) return null;
     return {
+      weather: menuEntry.weather,
       collation_matin: menuEntry.collation_matin,
       diner: menuEntry.diner,
       collation_apres_midi: menuEntry.collation_apres_midi,
@@ -244,6 +246,7 @@ export default function ParentJournalPage() {
           <div className="flex-1 overflow-y-auto py-2">
             {children.map((child) => {
               const isActive = effectiveChildId === child.id;
+              const photoUrl = child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null;
               return (
                 <button
                   key={child.id}
@@ -252,7 +255,7 @@ export default function ParentJournalPage() {
                     isActive ? "bg-blue-50 border-l-blue-600" : "border-l-transparent hover:bg-slate-50"
                   }`}
                 >
-                  <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="sm" />
+                  <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="sm" photoUrl={photoUrl} />
                   <span className={`text-sm truncate ${isActive ? "font-semibold text-blue-700" : "text-slate-700"}`}>
                     {child.first_name} {child.last_name}
                   </span>
@@ -287,6 +290,7 @@ export default function ParentJournalPage() {
           <div className="flex gap-2 overflow-x-auto px-4 py-2.5 border-b border-slate-100 flex-shrink-0 scrollbar-none">
             {children.map((child) => {
               const isActive = effectiveChildId === child.id;
+              const photoUrl = child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null;
               return (
                 <button
                   key={child.id}
@@ -295,11 +299,15 @@ export default function ParentJournalPage() {
                     isActive ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
                   }`}
                 >
-                  <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${
-                    isActive ? "bg-white/25 text-white" : `${childAvatarColor(child.id)} text-white`
-                  }`}>
-                    {child.first_name[0]}
-                  </span>
+                  <div className={isActive ? "opacity-75" : ""}>
+                    <ChildAvatar
+                      id={child.id}
+                      firstName={child.first_name}
+                      lastName={child.last_name}
+                      size="sm"
+                      photoUrl={photoUrl}
+                    />
+                  </div>
                   {child.first_name}
                 </button>
               );

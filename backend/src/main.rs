@@ -205,6 +205,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/settings", get(routes::settings::get_settings).put(routes::settings::update_settings))
         // Children
         .route("/children", get(routes::children::list_children).post(routes::children::create_child))
+        .route("/children/import", post(routes::children::import_children))
+        .route("/children/export", get(routes::children::export_all_children))
         .route("/children/available-invitations", get(routes::children::list_available_invitations))
         .route("/children/{id}", put(routes::children::update_child).delete(routes::children::delete_child))
         .route("/children/{id}/parents", get(routes::children::list_parents).post(routes::children::assign_parent))
@@ -214,6 +216,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/children/{id}/invited-parents", get(routes::children::list_invited_parents).post(routes::children::assign_invited_parent))
         .route("/children/{id}/invited-parents/{email}", delete(routes::children::remove_invited_parent))
         .route("/children/{id}/export", get(routes::children::export_child))
+        .route("/children/{id}/avatar", post(routes::children::upload_child_avatar).delete(routes::children::delete_child_avatar))
         // WebSocket
         .route("/ws", get(routes::websocket::ws_handler))
         // Tenant user management (admin_garderie)

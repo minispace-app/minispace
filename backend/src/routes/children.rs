@@ -1,12 +1,14 @@
 use axum::{
-    extract::{Path, State},
-    http::{HeaderMap, StatusCode},
+    body::Body,
+    extract::{Multipart, Path, State},
+    http::{header, HeaderMap, Response, StatusCode},
     Json,
 };
-use chrono::{DateTime, NaiveDate, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::{DateTime, NaiveDate, Utc, Local};
+use serde::Serialize;
 use serde_json::{json, Value};
 use uuid::Uuid;
+use std::io::Write;
 
 use crate::{
     db::tenant::schema_name,
@@ -589,6 +591,102 @@ pub async fn remove_invited_parent(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))
 }
 
+/// POST /children/import — import children from an xlsx/csv file (admin only)
+pub async fn import_children(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
+    user: AuthenticatedUser,
+    mut multipart: Multipart,
+) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    if let Some(err) = require_admin(&user) {
+        return Err(err);
+    }
+
+    // Extract the file field from multipart
+    let mut file_bytes: Option<Vec<u8>> = None;
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Erreur multipart: {e}") })))
+    })? {
+        let name = field.name().unwrap_or("").to_string();
+        if name == "file" || file_bytes.is_none() {
+            let bytes = field.bytes().await.map_err(|e| {
+                (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Erreur lecture fichier: {e}") })))
+            })?;
+            file_bytes = Some(bytes.to_vec());
+        }
+    }
+
+    let bytes = file_bytes.ok_or_else(|| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": "Aucun fichier fourni (champ 'file' manquant)" })))
+    })?;
+
+    let result = ChildService::import_from_excel(
+        &state.db,
+        &tenant,
+        bytes,
+        state.email.clone(),
+        &state.config.app_base_url,
+        Some(user.user_id),
+    )
+    .await
+    .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({ "error": e.to_string() }))))?;
+
+    let label = format!("{} enfants créés", result.created_children);
+    audit::log(state.db.clone(), &tenant, AuditEntry {
+        user_id:        Some(user.user_id),
+        user_name:      None,
+        action:         "child.import".to_string(),
+        resource_type:  Some("child".to_string()),
+        resource_id:    None,
+        resource_label: Some(label),
+        ip_address:     client_ip(&headers),
+    });
+
+    Ok((StatusCode::OK, Json(serde_json::to_value(&result).unwrap())))
+}
+
+/// GET /children/export — export all active children as CSV (admin only)
+pub async fn export_all_children(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
+    user: AuthenticatedUser,
+) -> Result<Response<Body>, (StatusCode, Json<Value>)> {
+    if let Some(err) = require_admin(&user) {
+        return Err(err);
+    }
+
+    let csv_bytes = ChildService::export_all_as_csv(&state.db, &tenant)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    let today = Local::now().format("%Y-%m-%d").to_string();
+    let filename = format!("enfants-{today}.csv");
+
+    audit::log(state.db.clone(), &tenant, AuditEntry {
+        user_id:        Some(user.user_id),
+        user_name:      None,
+        action:         "child.export_all".to_string(),
+        resource_type:  Some("child".to_string()),
+        resource_id:    None,
+        resource_label: Some(filename.clone()),
+        ip_address:     client_ip(&headers),
+    });
+
+    let response = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "text/csv; charset=utf-8")
+        .header(
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{filename}\""),
+        )
+        .body(Body::from(csv_bytes))
+        .unwrap();
+
+    Ok(response)
+}
+
 pub async fn list_available_invitations(
     State(state): State<AppState>,
     TenantSlug(tenant): TenantSlug,
@@ -615,4 +713,177 @@ pub async fn list_available_invitations(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
 
     Ok(Json(serde_json::to_value(invitations).unwrap()))
+}
+
+pub async fn upload_child_avatar(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
+    user: AuthenticatedUser,
+    Path(child_id): Path<Uuid>,
+    multipart: Multipart,
+) -> Result<(StatusCode, Json<Value>), (StatusCode, Json<Value>)> {
+    // Permission check: Admin → allow. Parent → must be parent of child. Educateur → 403.
+    match user.role {
+        UserRole::Educateur => return Err((StatusCode::FORBIDDEN, Json(json!({ "error": "Accès refusé" })))),
+        UserRole::Parent => {
+            match ChildService::is_parent_of(&state.db, &tenant, child_id, user.user_id).await {
+                Ok(false) => return Err((StatusCode::FORBIDDEN, Json(json!({ "error": "Accès refusé" })))),
+                Err(e) => return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+                _ => {}
+            }
+        }
+        _ => {} // Admin or Super Admin
+    }
+
+    // Parse multipart and extract file
+    let mut file_bytes: Option<Vec<u8>> = None;
+    let mut content_type: Option<String> = None;
+    let mut mpart = multipart;
+
+    while let Some(field) = mpart.next_field().await.map_err(|e| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Erreur multipart: {e}") })))
+    })? {
+        let field_name = field.name().unwrap_or("").to_string();
+        let field_content_type = field.content_type().map(|ct| ct.to_string());
+
+        if field_name == "file" {
+            content_type = field_content_type;
+            let bytes = field.bytes().await.map_err(|e| {
+                (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Erreur lecture fichier: {e}") })))
+            })?;
+            file_bytes = Some(bytes.to_vec());
+        }
+    }
+
+    let file_bytes = file_bytes.ok_or_else(|| {
+        (StatusCode::BAD_REQUEST, Json(json!({ "error": "Aucun fichier fourni (champ 'file' manquant)" })))
+    })?;
+
+    // Validate content type (jpeg, png, webp)
+    let content_type = content_type.unwrap_or_default();
+    if !["image/jpeg", "image/png", "image/webp"].contains(&content_type.as_str()) {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": "Format d'image invalide (JPEG, PNG ou WebP attendu)" }))));
+    }
+
+    // Validate file size (max 5 MB)
+    if file_bytes.len() > 5 * 1024 * 1024 {
+        return Err((StatusCode::BAD_REQUEST, Json(json!({ "error": "Fichier trop volumineux (5 MB maximum)" }))));
+    }
+
+    // Decode, resize to max 512×512, encode as JPEG
+    let img = image::load_from_memory(&file_bytes)
+        .map_err(|e| (StatusCode::BAD_REQUEST, Json(json!({ "error": format!("Erreur décodage image: {e}") }))))?;
+
+    let resized = if img.width() > 512 || img.height() > 512 {
+        img.resize(512, 512, image::imageops::FilterType::Lanczos3)
+    } else {
+        img
+    };
+
+    let mut jpeg_bytes = Vec::new();
+    resized
+        .write_to(&mut std::io::Cursor::new(&mut jpeg_bytes), image::ImageFormat::Jpeg)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Erreur encodage JPEG: {e}") }))))?;
+
+    // Encrypt with tenant key
+    let master_key_bytes = hex::decode(&state.config.encryption_master_key)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Clé invalide: {e}") }))))?;
+    if master_key_bytes.len() != 32 {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": "Clé maître invalide" }))));
+    }
+    let mut master_key = [0u8; 32];
+    master_key.copy_from_slice(&master_key_bytes);
+
+    let tenant_key = crate::services::encryption::derive_tenant_key(&master_key, &tenant)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Dérivation clé échouée: {e}") }))))?;
+
+    let (encrypted_data, iv, tag) = crate::services::encryption::encrypt_file(&jpeg_bytes, &tenant_key)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Chiffrement échoué: {e}") }))))?;
+
+    // Generate random filename and build path
+    let random_hex = hex::encode(rand::random::<[u8; 16]>());
+    let avatars_dir = std::path::PathBuf::from(&state.config.media_dir)
+        .join(&tenant)
+        .join("avatars");
+
+    tokio::fs::create_dir_all(&avatars_dir)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Erreur création répertoire: {e}") }))))?;
+
+    let file_path = avatars_dir.join(&random_hex);
+    tokio::fs::write(&file_path, &encrypted_data)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": format!("Erreur écriture fichier: {e}") }))))?;
+
+    // Delete old avatar if exists
+    let schema = schema_name(&tenant);
+    let old_url: Option<String> = sqlx::query_scalar(&format!(
+        "SELECT photo_url FROM {schema}.children WHERE id = $1"
+    ))
+    .bind(child_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?
+    .flatten();
+
+    if let Some(old_path) = old_url {
+        let old_file = std::path::PathBuf::from(&state.config.media_dir).join(&old_path);
+        let _ = tokio::fs::remove_file(old_file).await;
+    }
+
+    // Update avatar in database
+    let photo_url = format!("{tenant}/avatars/{random_hex}");
+    let updated_child = ChildService::update_avatar(&state.db, &tenant, child_id, &photo_url, iv, tag)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    // Audit log
+    audit::log(state.db.clone(), &tenant, AuditEntry {
+        user_id:        Some(user.user_id),
+        user_name:      None,
+        action:         "child.avatar_upload".to_string(),
+        resource_type:  Some("child".to_string()),
+        resource_id:    Some(child_id.to_string()),
+        resource_label: Some(format!("{} {}", updated_child.first_name, updated_child.last_name)),
+        ip_address:     client_ip(&headers),
+    });
+
+    Ok((StatusCode::OK, Json(json!({ "photo_url": photo_url }))))
+}
+
+pub async fn delete_child_avatar(
+    State(state): State<AppState>,
+    TenantSlug(tenant): TenantSlug,
+    headers: HeaderMap,
+    user: AuthenticatedUser,
+    Path(child_id): Path<Uuid>,
+) -> Result<StatusCode, (StatusCode, Json<Value>)> {
+    if let Some(err) = require_admin(&user) {
+        return Err(err);
+    }
+
+    // Get old photo_url and delete avatar
+    let old_url = ChildService::delete_avatar(&state.db, &tenant, child_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() }))))?;
+
+    // Delete physical file if exists
+    if let Some(old_path) = old_url {
+        let file_path = std::path::PathBuf::from(&state.config.media_dir).join(&old_path);
+        let _ = tokio::fs::remove_file(file_path).await;
+    }
+
+    // Audit log
+    audit::log(state.db.clone(), &tenant, AuditEntry {
+        user_id:        Some(user.user_id),
+        user_name:      None,
+        action:         "child.avatar_delete".to_string(),
+        resource_type:  Some("child".to_string()),
+        resource_id:    Some(child_id.to_string()),
+        resource_label: None,
+        ip_address:     client_ip(&headers),
+    });
+
+    Ok(StatusCode::NO_CONTENT)
 }

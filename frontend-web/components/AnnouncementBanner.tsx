@@ -25,19 +25,29 @@ export function AnnouncementBanner() {
   if (!announcement) return null;
 
   const isRed = announcement.color === "red";
-  const colors = isRed
-    ? "bg-red-50 border-red-200 text-red-800"
-    : "bg-yellow-50 border-yellow-200 text-yellow-800";
-  const iconColor = isRed ? "text-red-500" : "text-yellow-500";
 
   return (
-    <div className={`flex items-center gap-3 px-4 py-2.5 border-b text-sm ${colors}`}>
-      {isRed ? (
-        <AlertTriangle className={`w-4 h-4 flex-shrink-0 ${iconColor}`} />
-      ) : (
-        <Info className={`w-4 h-4 flex-shrink-0 ${iconColor}`} />
-      )}
-      <p className="flex-1">{announcement.message}</p>
+    <div className="px-4 pt-3 flex-shrink-0">
+      <div
+        className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-soft text-sm font-medium ${
+          isRed
+            ? "bg-red-50/80 backdrop-blur-sm border border-red-200/60 text-red-800"
+            : "bg-amber-50/80 backdrop-blur-sm border border-amber-200/60 text-amber-800"
+        }`}
+      >
+        <span
+          className={`w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-md ${
+            isRed ? "bg-red-100 text-red-500" : "bg-amber-100 text-amber-500"
+          }`}
+        >
+          {isRed ? (
+            <AlertTriangle className="w-4 h-4" />
+          ) : (
+            <Info className="w-4 h-4" />
+          )}
+        </span>
+        <p className="flex-1 leading-snug">{announcement.message}</p>
+      </div>
     </div>
   );
 }

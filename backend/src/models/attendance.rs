@@ -80,3 +80,10 @@ pub struct AttendanceMonthQuery {
 pub struct AttendanceMonthAllQuery {
     pub month: String, // YYYY-MM
 }
+
+#[derive(Debug, Serialize)]
+pub struct AttendanceMonthResponse {
+    pub child_id: Uuid,
+    pub date: String,
+    pub status: String,
+}

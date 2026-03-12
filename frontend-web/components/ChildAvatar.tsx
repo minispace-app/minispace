@@ -22,6 +22,7 @@ interface Props {
   firstName: string;
   lastName: string;
   size?: "sm" | "md" | "lg";
+  photoUrl?: string | null;
 }
 
 const SIZE = {
@@ -30,7 +31,15 @@ const SIZE = {
   lg: "w-11 h-11 text-body",
 };
 
-export function ChildAvatar({ id, firstName, lastName, size = "md" }: Props) {
+export function ChildAvatar({ id, firstName, lastName, size = "md", photoUrl }: Props) {
+  if (photoUrl) {
+    return (
+      <div className={`${SIZE[size]} rounded-pill overflow-hidden flex-shrink-0`}>
+        <img src={photoUrl} className="w-full h-full object-cover" alt="" />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`${SIZE[size]} ${childAvatarColor(id)} rounded-pill flex items-center justify-center text-white font-bold flex-shrink-0`}

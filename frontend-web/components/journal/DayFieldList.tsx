@@ -1,6 +1,6 @@
 "use client";
 
-import { Sun, StickyNote, Smile, Heart, Moon, Stethoscope, Pill, MessageCircle, BookOpen, UserX, UtensilsCrossed } from "lucide-react";
+import { Sun, StickyNote, Smile, Heart, Moon, Stethoscope, Pill, MessageCircle, BookOpen, UserX, Utensils, Coffee, Apple } from "lucide-react";
 import { WeatherPicker } from "./WeatherPicker";
 import { EmojiPicker, EmojiOption } from "./EmojiPicker";
 import { SleepBar } from "./SleepBar";
@@ -13,7 +13,7 @@ interface Props {
   onFieldChange?: (field: keyof DailyJournal, value: unknown) => void;
   appetitOptions: EmojiOption[];
   humeurOptions: EmojiOption[];
-  menuDuJour?: { collation_matin?: string; diner?: string; collation_apres_midi?: string } | null;
+  menuDuJour?: { weather?: string; collation_matin?: string; diner?: string; collation_apres_midi?: string } | null;
   weeklyTheme?: { title: string; date: string; end_date?: string } | null;
   placeholders?: {
     menu?: string;
@@ -35,7 +35,6 @@ const MEALS_FIELDS: FieldConfig[] = [
 ];
 
 const WELLBEING_FIELDS: FieldConfig[] = [
-  { key: "temperature",     label: "Température",              Icon: Sun },
   { key: "appetit",         label: "Appétit",                  Icon: Smile },
   { key: "humeur",          label: "Humeur",                   Icon: Heart },
   { key: "sommeil_minutes", label: "Sommeil",                  Icon: Moon },
@@ -63,14 +62,6 @@ export function DayFieldList({
 
   function renderControl(cfg: FieldConfig) {
     switch (cfg.key) {
-      case "temperature":
-        return (
-          <WeatherPicker
-            value={day.temperature ?? null}
-            onChange={set("temperature") as (v: string | null) => void}
-            readOnly={readOnly || isAbsent}
-          />
-        );
       case "appetit":
         return (
           <EmojiPicker
@@ -169,6 +160,23 @@ export function DayFieldList({
         </div>
       )}
 
+      {/* Weather (garderie-level, from daily_menus) */}
+      {menuDuJour?.weather && (
+        <div className="px-4 py-3 border-b border-border-soft">
+          <div className="flex items-start gap-2 p-3 bg-sky-50 rounded-xl">
+            <span className="text-xl flex-shrink-0 mt-0.5">🌤️</span>
+            <div className="flex-1">
+              <span className="text-caption font-semibold uppercase tracking-wide text-sky-700 block mb-1">
+                Météo
+              </span>
+              <div className="text-body text-ink font-medium">
+                <WeatherPicker value={menuDuJour.weather} readOnly />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Menu du jour card (garderie-level, read-only) */}
       {menuDuJour && (() => {
         const hasMenu = menuDuJour.collation_matin || menuDuJour.diner || menuDuJour.collation_apres_midi;
@@ -176,10 +184,10 @@ export function DayFieldList({
         return (
           <div className="px-4 py-3 border-b border-border-soft space-y-2">
             {menuDuJour.collation_matin && (
-              <div className="flex items-start gap-2 p-3 bg-accent-blue/15 rounded-xl">
-                <span className="text-xl flex-shrink-0 mt-0.5">🌅</span>
+              <div className="flex items-start gap-2 p-3 bg-sky-50 rounded-xl">
+                <Coffee className="w-4 h-4 text-sky-700 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <span className="text-caption font-semibold uppercase tracking-wide text-accent-blue block mb-1">
+                  <span className="text-caption font-semibold uppercase tracking-wide text-sky-700 block mb-1">
                     Collation matin
                   </span>
                   <p className="text-body text-ink whitespace-pre-wrap">{menuDuJour.collation_matin}</p>
@@ -187,10 +195,10 @@ export function DayFieldList({
               </div>
             )}
             {menuDuJour.diner && (
-              <div className="flex items-start gap-2 p-3 bg-accent-orange/15 rounded-xl">
-                <UtensilsCrossed className="w-4 h-4 text-accent-orange flex-shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 p-3 bg-orange-50 rounded-xl">
+                <Utensils className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <span className="text-caption font-semibold uppercase tracking-wide text-accent-orange block mb-1">
+                  <span className="text-caption font-semibold uppercase tracking-wide text-orange-600 block mb-1">
                     Dîner
                   </span>
                   <p className="text-body text-ink whitespace-pre-wrap">{menuDuJour.diner}</p>
@@ -198,10 +206,10 @@ export function DayFieldList({
               </div>
             )}
             {menuDuJour.collation_apres_midi && (
-              <div className="flex items-start gap-2 p-3 bg-accent-purple/15 rounded-xl">
-                <span className="text-xl flex-shrink-0 mt-0.5">🌙</span>
+              <div className="flex items-start gap-2 p-3 bg-violet-50 rounded-xl">
+                <Apple className="w-4 h-4 text-violet-700 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <span className="text-caption font-semibold uppercase tracking-wide text-accent-purple block mb-1">
+                  <span className="text-caption font-semibold uppercase tracking-wide text-violet-700 block mb-1">
                     Collation après-midi
                   </span>
                   <p className="text-body text-ink whitespace-pre-wrap">{menuDuJour.collation_apres_midi}</p>
@@ -279,9 +287,9 @@ export function DayFieldList({
         </div>
 
         {/* Section: Bien-être et observations */}
-        <div className="bg-accent-green/5 border-t border-border-soft">
+        <div className="bg-teal-50/40 border-t border-border-soft">
           <div className="px-4 pt-4 pb-2">
-            <h3 className="text-caption font-bold uppercase tracking-wider text-accent-green mb-3 flex items-center gap-2">
+            <h3 className="text-caption font-bold uppercase tracking-wider text-teal-700 mb-3 flex items-center gap-2">
               <span>💚</span>
               Bien-être et observations
             </h3>
@@ -289,7 +297,7 @@ export function DayFieldList({
           {WELLBEING_FIELDS.map((cfg) => (
             <div key={cfg.key} className="px-4 py-3 border-t border-border-soft/60">
               <div className="flex items-center gap-2 mb-2">
-                <cfg.Icon className="w-4 h-4 text-accent-green flex-shrink-0" />
+                <cfg.Icon className="w-4 h-4 text-teal-600 flex-shrink-0" />
                 <span className="text-caption font-semibold uppercase tracking-wide text-ink-secondary">
                   {cfg.label}
                 </span>

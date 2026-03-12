@@ -53,6 +53,8 @@ hex = "0.4"
 prometheus = "0.13"
 lazy_static = "1"
 clap = { version = "4", features = ["derive"] }
+calamine = { version = "0.25", features = ["dates"] }
+csv = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

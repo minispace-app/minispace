@@ -5,13 +5,14 @@ import { useTranslations } from "next-intl";
 import useSWR from "swr";
 import { useAuth } from "../../../../hooks/useAuth";
 import { authApi, childrenApi } from "../../../../lib/api";
-import { childAvatarColor } from "../../../../components/ChildAvatar";
+import { childAvatarColor, ChildAvatar } from "../../../../components/ChildAvatar";
 import { Eye, EyeOff, Save, AlertCircle, Check } from "lucide-react";
 
 interface Child {
   id: string;
   first_name: string;
   last_name: string;
+  photo_url?: string | null;
 }
 
 export default function ParentProfilePage() {
@@ -255,17 +256,24 @@ export default function ParentProfilePage() {
           <p className="text-sm text-slate-500">{tChildren("noChildrenParent")}</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {childrenList.map((child) => (
-              <div
-                key={child.id}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-sm font-medium"
-              >
-                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 ${childAvatarColor(child.id)}`}>
-                  {child.first_name[0]}
-                </span>
-                {child.first_name} {child.last_name}
-              </div>
-            ))}
+            {childrenList.map((child) => {
+              const photoUrl = child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null;
+              return (
+                <div
+                  key={child.id}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-sm font-medium"
+                >
+                  <ChildAvatar
+                    id={child.id}
+                    firstName={child.first_name}
+                    lastName={child.last_name}
+                    size="sm"
+                    photoUrl={photoUrl}
+                  />
+                  {child.first_name} {child.last_name}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

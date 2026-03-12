@@ -322,10 +322,31 @@ function MenusSection() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
 
-      {/* Mobile: Day chips + single day view */}
+      {/* Mobile: Week nav + Day chips + single day view */}
       <div className="md:hidden flex-1 overflow-auto flex flex-col">
+        {/* Week navigation */}
+        <div className="flex-shrink-0 px-4 pt-3 pb-2 flex items-center justify-between gap-3">
+          <button
+            onClick={() => { setWeekStart(addDays(weekStart, -7)); setActiveDayIndex(0); }}
+            className="p-1.5 rounded-lg bg-white/70 backdrop-blur-sm border border-border-soft shadow-soft hover:bg-white/90 transition-all duration-[180ms]"
+          >
+            <ChevronLeft className="w-4 h-4 text-ink-secondary" />
+          </button>
+          <span className="text-body font-medium text-ink whitespace-nowrap">
+            {weekDates[0].toLocaleDateString("fr-CA", { day: "numeric", month: "short" })}
+            {" – "}
+            {weekDates[4].toLocaleDateString("fr-CA", { day: "numeric", month: "short", year: "numeric" })}
+          </span>
+          <button
+            onClick={() => { setWeekStart(addDays(weekStart, 7)); setActiveDayIndex(0); }}
+            className="p-1.5 rounded-lg bg-white/70 backdrop-blur-sm border border-border-soft shadow-soft hover:bg-white/90 transition-all duration-[180ms]"
+          >
+            <ChevronRight className="w-4 h-4 text-ink-secondary" />
+          </button>
+        </div>
+
         {/* Day chips */}
-        <div className="flex-shrink-0 px-4 py-3 border-b border-border-soft/50">
+        <div className="flex-shrink-0 px-4 pb-3">
           <div className="flex gap-2 overflow-x-auto scrollbar-none">
             {weekDates.map((date, i) => {
               const dateStr = formatDate(date);
@@ -461,45 +482,51 @@ function MenusSection() {
           </button>
         </div>
 
-        {/* Main: Week Grid */}
-        <div className="flex-1 overflow-auto flex flex-col">
-          <div className="rounded-xl overflow-hidden shadow-soft">
-            <div className="grid bg-border-soft/60 gap-px" style={{ gridTemplateColumns: "auto repeat(5, 1fr)" }}>
-              {/* Empty corner */}
-              <div className="bg-surface-soft" />
-              {/* Day headers */}
-              {weekDates.map((date, dayIndex) => {
-                const dateStr = formatDate(date);
-                const isToday = dateStr === today;
-                const dayLabel = tj(`days.${WEEK_DAYS[dayIndex]}`);
-                const dateLabel = date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
-                return (
-                  <div
-                    key={`day-header-${dateStr}`}
-                    className={`px-3 py-2 text-center ${isToday ? "bg-accent-yellow/30" : "bg-surface-soft"}`}
-                  >
-                    <div className={`text-caption font-semibold uppercase tracking-wide ${isToday ? "text-ink" : "text-ink-muted"}`}>{dayLabel}</div>
-                    <div className="text-caption font-medium mt-0.5 text-ink">{dateLabel}</div>
-                  </div>
-                );
-              })}
-
-              {/* Section rows */}
-              {menuSections.flatMap((section) => [
+        {/* Main: Week Grid — column cards */}
+        <div className="flex-1 overflow-auto pb-2">
+          <div className="grid gap-x-3 gap-y-0" style={{ gridTemplateColumns: "auto repeat(5, 1fr)" }}>
+            {/* Empty corner */}
+            <div className="pb-1" />
+            {/* Day headers */}
+            {weekDates.map((date, dayIndex) => {
+              const dateStr = formatDate(date);
+              const isToday = dateStr === today;
+              const dayLabel = tj(`days.${WEEK_DAYS[dayIndex]}`);
+              const dateLabel = date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
+              const colBg = isToday
+                ? "bg-amber-50 border-accent-yellow/40"
+                : "bg-white border-border-soft/40";
+              return (
                 <div
-                  key={`section-header-${section.key}`}
-                  className="px-3 py-3 bg-surface-soft flex items-center justify-center"
+                  key={`day-header-${dateStr}`}
+                  className={`rounded-t-xl border-t border-x px-3 py-2 text-center shadow-soft ${colBg}`}
                 >
-                  <span className="text-caption font-semibold text-ink-secondary text-center">{t(section.tKey)}</span>
+                  <div className={`text-caption font-semibold uppercase tracking-wide ${isToday ? "text-ink" : "text-ink-muted"}`}>{dayLabel}</div>
+                  <div className="text-caption font-medium mt-0.5 text-ink">{dateLabel}</div>
+                </div>
+              );
+            })}
+
+            {/* Section rows */}
+            {menuSections.flatMap((section, sectionIndex) => {
+              const isLast = sectionIndex === menuSections.length - 1;
+              return [
+                <div key={`section-header-${section.key}`} className="flex items-center justify-end pr-3 border-r border-slate-200">
+                  <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide text-right leading-none bg-white rounded-lg px-2 py-1">
+                    {t(section.tKey)}
+                  </span>
                 </div>,
                 ...weekDates.map((date, dayIndex) => {
                   const dateStr = formatDate(date);
                   const isToday = dateStr === today;
                   const hasLocal = localData[dateStr] !== undefined;
+                  const colBg = isToday
+                    ? "bg-amber-50 border-accent-yellow/40"
+                    : "bg-white border-border-soft/40";
                   return (
                     <div
                       key={`cell-${dateStr}-${section.key}`}
-                      className={`p-2 ${isToday ? "bg-accent-yellow/10" : "bg-surface-card"}`}
+                      className={`border-x border-t border-slate-200 p-2 ${isLast ? "rounded-b-xl border-b pb-3" : ""} ${colBg}`}
                     >
                       <TextareaField
                         value={getMenuForDate(dateStr, section.key)}
@@ -513,8 +540,8 @@ function MenusSection() {
                     </div>
                   );
                 }),
-              ])}
-            </div>
+              ];
+            })}
           </div>
         </div>
       </div>
@@ -910,7 +937,7 @@ export default function PlanningPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border-soft/50 flex-shrink-0">
+      <div className="flex items-center justify-between px-6 py-4 flex-shrink-0">
         <h1 className="text-h3 font-semibold text-ink">{t("title")}</h1>
       </div>
 

@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { childrenApi, groupsApi, usersApi, attendanceApi, journalApi, activitiesApi, menusApi, settingsApi } from "../../../../lib/api";
 import { useAuth } from "../../../../hooks/useAuth";
 import { getTodayInMontreal, formatDateInMontreal } from "../../../../lib/dateUtils";
-import { Plus, ChevronDown, ChevronUp, UserPlus, X, Pencil, ChevronLeft, ChevronRight, Loader2, Check, BookOpen, Clock } from "lucide-react";
+import { Plus, ChevronDown, ChevronUp, UserPlus, X, Pencil, ChevronLeft, ChevronRight, Loader2, Check, BookOpen, Clock, CheckCircle, XCircle, AlertCircle, ThermometerSun, FileText, UserX, UserCheck, Notebook, CircleCheck, CircleX } from "lucide-react";
 import { ChildAvatar, childAvatarColor } from "../../../../components/ChildAvatar";
 import { WeatherPicker } from "../../../../components/journal/WeatherPicker";
 import { EmojiPicker } from "../../../../components/journal/EmojiPicker";
@@ -38,6 +38,7 @@ interface Child {
   first_name: string;
   last_name: string;
   birth_date: string;
+  photo_url: string | null;
   group_id: string | null;
   is_active: boolean;
   start_date: string | null;
@@ -86,6 +87,62 @@ interface JournalDay {
 
 type AttendanceStatus = "attendu" | "present" | "absent" | "malade" | "vacances" | "present_hors_contrat";
 
+// ── Child Status Indicators Component ──
+function ChildStatusIndicators({ 
+  childId, 
+  today, 
+  currentMonthStr, 
+  attendanceStatus 
+}: { 
+  childId: string; 
+  today: string; 
+  currentMonthStr: string;
+  attendanceStatus?: string;
+}) {
+  const { data: journalData, isLoading } = useSWR(
+    `journal-summary-${childId}-${currentMonthStr}`,
+    () => journalApi.getMonthSummary(childId, currentMonthStr).then((r: { data: { journals?: JournalDay[] } }) => r.data.journals || []),
+    { revalidateOnFocus: false, dedupingInterval: 60000 }
+  );
+
+  const hasJournalToday = journalData && Array.isArray(journalData) 
+    ? journalData.some((j: JournalDay) => j.date === today)
+    : false;
+
+  return (
+    <div className="flex items-center gap-1 flex-shrink-0">
+      {/* Journal indicator - Icône livre/journal */}
+      {hasJournalToday && (
+        <div
+          className="w-5 h-5 rounded-md bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm"
+          title="Journal rempli"
+        >
+          <BookOpen className="w-3 h-3 text-white" strokeWidth={2.5} />
+        </div>
+      )}
+
+      {/* Attendance indicator - Présent (vert) ou Absent (rouge) */}
+      {(attendanceStatus === 'present' || attendanceStatus === 'present_hors_contrat' || attendanceStatus === 'attendu') && (
+        <div
+          className="w-5 h-5 rounded-md bg-green-500 flex items-center justify-center flex-shrink-0 shadow-sm"
+          title={attendanceStatus === 'attendu' ? 'Attendu' : attendanceStatus === 'present_hors_contrat' ? 'Présent hors contrat' : 'Présent'}
+        >
+          <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+        </div>
+      )}
+
+      {(attendanceStatus === 'absent' || attendanceStatus === 'malade') && (
+        <div
+          className="w-5 h-5 rounded-md bg-red-500 flex items-center justify-center flex-shrink-0 shadow-sm"
+          title={attendanceStatus === 'malade' ? 'Absent (malade)' : 'Absent'}
+        >
+          <X className="w-3.5 h-3.5 text-white" strokeWidth={3} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 const ATTENDANCE_COLORS: Record<AttendanceStatus, { bg: string; text: string; icon: React.ReactNode; label: string }> = {
   attendu: { bg: "bg-gray-100", text: "text-gray-600", icon: "⏰", label: "Attendu" },
   present: { bg: "bg-green-100", text: "text-green-600", icon: "✓", label: "Présent" },
@@ -102,6 +159,18 @@ const STAFF_STATUSES = [
   { key: "malade",  label: "Malade",  icon: "🤒", cls: "bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-300" },
   { key: "present_hors_contrat", label: "Hors contrat", icon: "✓", cls: "bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300" },
   { key: "attendu", label: "Attendu", icon: "⏰", cls: "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300" },
+];
+
+// Quick toggle statuses for single date click (only present/absent)
+const QUICK_TOGGLE_STATUSES = [
+  { key: "present", label: "Présent", icon: "✓", cls: "bg-green-100 text-green-700 hover:bg-green-200 border-green-300" },
+  { key: "absent",  label: "Absent",  icon: "✗", cls: "bg-red-100 text-red-700 hover:bg-red-200 border-red-300" },
+];
+
+// Multi-select statuses (only present/absent)
+const BULK_STATUSES = [
+  { key: "present", label: "Présent", icon: "✓", cls: "bg-green-100 text-green-700 hover:bg-green-200 border-green-300" },
+  { key: "absent",  label: "Absent",  icon: "✗", cls: "bg-red-100 text-red-700 hover:bg-red-200 border-red-300" },
 ];
 
 function ChildDetails({
@@ -133,6 +202,11 @@ function ChildDetails({
   const [startDate, setStartDate] = useState(child.start_date ?? "");
   const [scheduleDays, setScheduleDays] = useState<number[]>(child.schedule_days ?? [1, 2, 3, 4, 5]);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // Avatar state
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [deletingAvatar, setDeletingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Update state when child changes
   useEffect(() => {
@@ -291,6 +365,50 @@ function ChildDetails({
     }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      alert("Format d'image invalide (JPEG, PNG ou WebP attendu)");
+      return;
+    }
+
+    // Validate file size (5 MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Fichier trop volumineux (5 MB maximum)");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      await childrenApi.uploadAvatar(child.id, formData);
+      onUpdated();
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (err) {
+      alert("Erreur lors du téléchargement de la photo");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer la photo ?")) return;
+    setDeletingAvatar(true);
+    try {
+      await childrenApi.deleteAvatar(child.id);
+      onUpdated();
+    } catch (err) {
+      alert("Erreur lors de la suppression de la photo");
+    } finally {
+      setDeletingAvatar(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Edit details section */}
@@ -419,6 +537,47 @@ function ChildDetails({
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Avatar section */}
+      {canWrite && (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+              📷 Photo
+            </h3>
+          </div>
+          <div className="px-5 py-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleAvatarUpload}
+              disabled={uploadingAvatar}
+              className="hidden"
+            />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAvatar || deletingAvatar}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all duration-[180ms] disabled:opacity-50"
+              >
+                {uploadingAvatar ? "Téléchargement..." : "Changer la photo"}
+              </button>
+              {child.photo_url && (
+                <button
+                  type="button"
+                  onClick={handleAvatarDelete}
+                  disabled={uploadingAvatar || deletingAvatar}
+                  className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-all duration-[180ms] disabled:opacity-50"
+                >
+                  {deletingAvatar ? "Suppression..." : "Supprimer"}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -915,6 +1074,7 @@ function CalendarSection({
   setStatusModalDate,
   dayDetailDate,
   setDayDetailDate,
+  onStatusChange,
 }: {
   child: Child;
   currentMonth: Date;
@@ -923,6 +1083,7 @@ function CalendarSection({
   setStatusModalDate: (date: string | null) => void;
   dayDetailDate: string | null;
   setDayDetailDate: (date: string | null) => void;
+  onStatusChange?: () => void;
 }) {
   const t = useTranslations("calendar");
 
@@ -956,6 +1117,7 @@ function CalendarSection({
     try {
       await attendanceApi.setBulkStatus(child.id, Array.from(selectedDates), status);
       mutateAttendance();
+      onStatusChange?.();
       clearSelection();
     } finally {
       setBulkLoading(false);
@@ -1068,7 +1230,7 @@ function CalendarSection({
             const handleClick = () => {
               if (disabled) return;
               if (selectMode) { toggleDate(dateStr); }
-              else { setDayDetailDate(dateStr); }
+              else { setStatusModalDate(dateStr); }
             };
 
             return (
@@ -1196,7 +1358,7 @@ function CalendarSection({
                   onClick={() => {
                     if (disabled) return;
                     if (selectMode) toggleDate(dateStr);
-                    else setDayDetailDate(dateStr);
+                    else setStatusModalDate(dateStr);
                   }}
                   disabled={disabled}
                   className={`aspect-square rounded p-1 transition flex flex-col items-center justify-center text-xs ${
@@ -1226,12 +1388,12 @@ function CalendarSection({
 
       {/* Bulk action bar (shared desktop + mobile) */}
       {selectMode && selectedDates.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white rounded-xl shadow-2xl border border-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap max-w-lg w-full mx-4">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white rounded-xl shadow-2xl border border-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap w-fit mx-4">
           <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
             {selectedDates.size} jour{selectedDates.size > 1 ? "s" : ""}
           </span>
           <div className="flex gap-2 flex-wrap flex-1">
-            {STAFF_STATUSES.map((s) => (
+            {BULK_STATUSES.map((s) => (
               <button
                 key={s.key}
                 onClick={() => handleBulkStatus(s.key)}
@@ -1257,6 +1419,7 @@ function CalendarSection({
           onStatusChange={() => {
             setStatusModalDate(null);
             mutateAttendance();
+            onStatusChange?.();
           }}
         />
       )}
@@ -1301,10 +1464,11 @@ function StaffStatusModal({
     }
   };
 
-  const statuses: Array<{ key: string; label: string; color: string }> = [
-    { key: "present", label: "✓ Présent", color: "bg-green-100 text-green-700 border-green-300 hover:bg-green-200" },
-    { key: "absent", label: "✗ Absent", color: "bg-red-100 text-red-700 border-red-300 hover:bg-red-200" },
-  ];
+  const statuses: Array<{ key: string; label: string; color: string }> = QUICK_TOGGLE_STATUSES.map(s => ({
+    key: s.key,
+    label: `${s.icon} ${s.key === "present" ? "Présent" : "Absent"}`,
+    color: s.cls
+  }));
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1358,6 +1522,10 @@ function JournalsSection({
   saveTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
 }) {
   const t = useTranslations("journal");
+  const { mutate: mutateGlobal } = useSWRConfig();
+
+  const [localMenuWeather, setLocalMenuWeather] = useState<Record<string, string | null>>({});
+  const weatherSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const weekStartStr = formatDate(weekStart);
   const weekDates = WEEK_DAYS.map((_, i) => addDays(weekStart, i));
@@ -1376,11 +1544,12 @@ function JournalsSection({
   const serverEntries: DailyJournal[] =
     (journalData as { data: DailyJournal[] } | undefined)?.data ?? [];
 
-  const { data: menusData } = useSWR(["menus-week-journal-dash", weekStartStr], () =>
+  const { data: menusData, mutate: mutateMenus } = useSWR(["menus-week-journal-dash", weekStartStr], () =>
     menusApi.getWeek(weekStartStr)
   );
   interface MenuEntry {
     date: string;
+    weather?: string;
     menu?: string;
     collation_matin?: string;
     diner?: string;
@@ -1392,10 +1561,21 @@ function JournalsSection({
     const menuEntry = serverMenus.find((m) => m.date === dateStr);
     if (!menuEntry) return null;
     return {
+      weather: menuEntry.weather,
       collation_matin: menuEntry.collation_matin,
       diner: menuEntry.diner,
       collation_apres_midi: menuEntry.collation_apres_midi,
     };
+  };
+
+  const getWeatherForDate = (dateStr: string): string | null => {
+    if (localMenuWeather[dateStr] !== undefined) return localMenuWeather[dateStr];
+    const menu = getMenuForDate(dateStr);
+    return menu?.weather ?? null;
+  };
+
+  const updateWeather = (dateStr: string, weather: string | null) => {
+    setLocalMenuWeather((prev) => ({ ...prev, [dateStr]: weather }));
   };
 
   // Load activities (weekly themes)
@@ -1457,6 +1637,7 @@ function JournalsSection({
         );
         setLocalData({});
         mutate();
+        mutateGlobal(`journal-summary-${child.id}-${format(new Date(), "yyyy-MM")}`);
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 2000);
       } catch {
@@ -1466,9 +1647,34 @@ function JournalsSection({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localData]);
 
+  // Auto-save weather debounce (updates menu table, not journals)
+  useEffect(() => {
+    if (Object.keys(localMenuWeather).length === 0) return;
+    if (weatherSaveTimerRef.current) clearTimeout(weatherSaveTimerRef.current);
+    weatherSaveTimerRef.current = setTimeout(async () => {
+      setSaveStatus("saving");
+      try {
+        await Promise.all(
+          Object.entries(localMenuWeather).map(([dateStr, weather]) => {
+            return menusApi.upsert({ date: dateStr, weather });
+          })
+        );
+        setLocalMenuWeather({});
+        mutateMenus();
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 2000);
+      } catch {
+        setSaveStatus("idle");
+      }
+    }, 1500);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localMenuWeather]);
+
   const prevWeek = () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (weatherSaveTimerRef.current) clearTimeout(weatherSaveTimerRef.current);
     setLocalData({});
+    setLocalMenuWeather({});
     setSaveStatus("idle");
     const newStart = addDays(weekStart, -7);
     setWeekStart(newStart);
@@ -1477,7 +1683,9 @@ function JournalsSection({
 
   const nextWeek = () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    if (weatherSaveTimerRef.current) clearTimeout(weatherSaveTimerRef.current);
     setLocalData({});
+    setLocalMenuWeather({});
     setSaveStatus("idle");
     const newStart = addDays(weekStart, 7);
     setWeekStart(newStart);
@@ -1513,7 +1721,6 @@ function JournalsSection({
   function renderField(field: FieldKey, day: DayData, dateStr: string) {
     const set = (val: DayData[keyof DayData]) => updateField(dateStr, field as keyof DayData, val);
     switch (field) {
-      case "temperature": return <WeatherPicker value={day.temperature ?? null} onChange={(v) => set(v)} />;
       case "appetit":     return <EmojiPicker options={APPETIT_OPTIONS} value={day.appetit ?? null} onChange={(v) => set(v)} />;
       case "humeur":      return <EmojiPicker options={HUMEUR_OPTIONS} value={day.humeur ?? null} onChange={(v) => set(v)} />;
       case "sommeil":     return <SleepBar value={day.sommeil_minutes ?? null} onChange={(v) => updateField(dateStr, "sommeil_minutes", v)} />;
@@ -1528,14 +1735,14 @@ function JournalsSection({
   // Week nav bar
   const weekNav = (
     <div className="flex items-center gap-2">
-      <button onClick={prevWeek} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition" title={t("prevWeek")}>
-        <ChevronLeft className="w-4 h-4 text-slate-600" />
+      <button onClick={prevWeek} className="p-1.5 rounded-xs bg-white border border-border-soft shadow-soft hover:bg-surface-soft text-ink-secondary hover:text-ink transition" title={t("prevWeek")}>
+        <ChevronLeft className="w-4 h-4" />
       </button>
-      <span className="text-sm text-slate-600 font-medium whitespace-nowrap">
+      <span className="text-sm text-ink font-semibold whitespace-nowrap">
         {weekStart.toLocaleDateString("fr-CA", { day: "numeric", month: "short", year: "numeric" })}
       </span>
-      <button onClick={nextWeek} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition" title={t("nextWeek")}>
-        <ChevronRight className="w-4 h-4 text-slate-600" />
+      <button onClick={nextWeek} className="p-1.5 rounded-xs bg-white border border-border-soft shadow-soft hover:bg-surface-soft text-ink-secondary hover:text-ink transition" title={t("nextWeek")}>
+        <ChevronRight className="w-4 h-4" />
       </button>
     </div>
   );
@@ -1543,11 +1750,13 @@ function JournalsSection({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-100">
-        {weekNav}
-        <div className="flex items-center gap-1.5 text-xs text-slate-400 ml-2">
-          <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>Envoi automatique à <strong className="text-slate-600">{autoSendTime}</strong> en semaine</span>
+      <div className="flex items-center justify-between gap-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
+        <div className="flex items-center gap-4">
+          {weekNav}
+          <div className="flex items-center gap-1.5 text-xs text-ink">
+            <Clock className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+            <span>Envoi automatique à <strong className="text-primary font-semibold">{autoSendTime}</strong> en semaine</span>
+          </div>
         </div>
         <div className="ml-auto">
           {saveIndicator}
@@ -1556,104 +1765,115 @@ function JournalsSection({
 
       {/* Desktop: Grid */}
       <div className="hidden md:block overflow-x-auto">
-        <div className="rounded-xl overflow-hidden shadow-soft">
-          <div className="grid min-w-[800px] bg-border-soft/60 gap-px" style={{ gridTemplateColumns: "160px repeat(5, 1fr)" }}>
-            {/* Header row */}
-            <div className="bg-surface-soft p-3 text-caption font-semibold text-ink-muted uppercase tracking-wide" />
-            {weekDates.map((date, i) => {
-              const dateStr = formatDate(date);
-              const isToday = dateStr === today;
-              const day = getDayData(dateStr);
-              const isAbsent = !!day.absent;
-              const hasUnsaved = !!(localData[dateStr] && hasDayData(localData[dateStr]));
-              const menuDuJour = getMenuForDate(dateStr);
-              return (
-                <div key={i} className={`p-3 text-center ${isAbsent ? "bg-status-danger/8" : isToday ? "bg-accent-yellow/30" : "bg-surface-soft"}`}>
-                  <div className={`text-caption font-semibold uppercase tracking-wide ${isAbsent ? "text-status-danger" : isToday ? "text-ink" : "text-ink-muted"}`}>
-                    {t(`days.${WEEK_DAYS[i]}`)}
-                  </div>
-                  <div className={`text-body font-medium mt-0.5 ${isAbsent ? "text-status-danger" : "text-ink"}`}>
-                    {date.getDate()}{" "}
-                    <span className={`font-normal ${isToday ? "text-primary/70" : "text-ink-muted"}`}>
-                      {date.toLocaleDateString("fr-CA", { month: "short" })}
-                    </span>
-                  </div>
-                  {isAbsent ? (
-                    <div className="w-1.5 h-1.5 rounded-pill bg-status-danger mx-auto mt-1" />
-                  ) : hasUnsaved ? (
-                    <div className="w-1.5 h-1.5 rounded-pill bg-accent-orange mx-auto mt-1" />
-                  ) : isToday ? (
-                    <div className="w-1.5 h-1.5 rounded-pill bg-primary mx-auto mt-1" />
-                  ) : null}
-                  {menuDuJour && ((() => {
-                    const hasMenu = menuDuJour.collation_matin || menuDuJour.diner || menuDuJour.collation_apres_midi;
-                    if (!hasMenu) return null;
-                    return (
-                      <div className="mt-1.5 space-y-0.5">
-                        {menuDuJour.collation_matin && (
-                          <div className="text-caption text-accent-blue bg-accent-blue/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_matin}>
-                            🌅 {menuDuJour.collation_matin}
-                          </div>
-                        )}
-                        {menuDuJour.diner && (
-                          <div className="text-caption text-accent-orange bg-accent-orange/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.diner}>
-                            🍽️ {menuDuJour.diner}
-                          </div>
-                        )}
-                        {menuDuJour.collation_apres_midi && (
-                          <div className="text-caption text-accent-purple bg-accent-purple/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_apres_midi}>
-                            🌙 {menuDuJour.collation_apres_midi}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })())}
-                </div>
-              );
-            })}
+        <div className="grid min-w-[700px] gap-x-3 gap-y-0" style={{ gridTemplateColumns: "auto repeat(5, 1fr)" }}>
 
-            {/* Absent toggle row */}
-            <div className="bg-surface-soft p-3 text-caption font-medium text-ink-secondary flex items-center gap-1.5">
-              Absent
-            </div>
-            {weekDates.map((date, di) => {
-              const dateStr = formatDate(date);
-              const day = getDayData(dateStr);
-              const isAbsent = !!day.absent;
-              const isToday = dateStr === today;
-              return (
-                <div key={`absent-${di}`} className={`p-2 flex items-center justify-center ${isAbsent ? "bg-status-danger/8" : isToday ? "bg-accent-yellow/15" : "bg-surface-card"}`}>
-                  <button
-                    type="button"
-                    onClick={() => updateField(dateStr, "absent" as keyof DayData, !isAbsent)}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-pill transition-all duration-[180ms] focus:outline-none ${isAbsent ? "bg-status-danger" : "bg-border-soft"}`}
-                  >
-                    <span className={`inline-block h-3 w-3 transform rounded-pill bg-white shadow transition-transform duration-[180ms] ${isAbsent ? "translate-x-5" : "translate-x-1"}`} />
-                  </button>
-                </div>
-              );
-            })}
+          {/* Empty corner */}
+          <div />
 
-            {/* Field rows */}
-            {FIELD_ROWS.map((field) => (
+          {/* Day headers */}
+          {weekDates.map((date, i) => {
+            const dateStr = formatDate(date);
+            const isToday = dateStr === today;
+            const day = getDayData(dateStr);
+            const isAbsent = !!day.absent;
+            const hasUnsaved = !!(localData[dateStr] && hasDayData(localData[dateStr]));
+            const menuDuJour = getMenuForDate(dateStr);
+            const colBg = isAbsent
+              ? "bg-red-50 border-status-danger/30"
+              : isToday
+              ? "bg-amber-50 border-accent-yellow/40"
+              : "bg-white border-border-soft/40";
+            return (
+              <div key={`header-${dateStr}`} className={`rounded-t-xl border-t border-x px-3 py-2 text-center shadow-soft ${colBg}`}>
+                <div className={`text-caption font-semibold uppercase tracking-wide ${isAbsent ? "text-status-danger" : isToday ? "text-ink" : "text-ink-muted"}`}>
+                  {t(`days.${WEEK_DAYS[i]}`)}
+                </div>
+                <div className={`text-body font-medium mt-0.5 ${isAbsent ? "text-status-danger" : "text-ink"}`}>
+                  {date.getDate()}{" "}
+                  <span className={`font-normal ${isToday ? "text-primary/70" : "text-ink-muted"}`}>
+                    {date.toLocaleDateString("fr-CA", { month: "short" })}
+                  </span>
+                </div>
+                {isAbsent ? (
+                  <div className="w-1.5 h-1.5 rounded-pill bg-status-danger mx-auto mt-1" />
+                ) : hasUnsaved ? (
+                  <div className="w-1.5 h-1.5 rounded-pill bg-accent-orange mx-auto mt-1" />
+                ) : isToday ? (
+                  <div className="w-1.5 h-1.5 rounded-pill bg-primary mx-auto mt-1" />
+                ) : null}
+                {menuDuJour && (() => {
+                  const hasMenu = menuDuJour.collation_matin || menuDuJour.diner || menuDuJour.collation_apres_midi;
+                  if (!hasMenu) return null;
+                  return (
+                    <div className="mt-1.5 space-y-0.5 text-left">
+                      {menuDuJour.collation_matin && (
+                        <div className="text-caption text-accent-blue bg-accent-blue/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_matin}>
+                          🌅 {menuDuJour.collation_matin}
+                        </div>
+                      )}
+                      {menuDuJour.diner && (
+                        <div className="text-caption text-accent-orange bg-accent-orange/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.diner}>
+                          🍽️ {menuDuJour.diner}
+                        </div>
+                      )}
+                      {menuDuJour.collation_apres_midi && (
+                        <div className="text-caption text-accent-purple bg-accent-purple/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_apres_midi}>
+                          🌙 {menuDuJour.collation_apres_midi}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          })}
+
+          {/* Weather row */}
+          <div className="flex items-center justify-end pr-3 border-r border-white/40">
+            <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide text-right leading-none bg-white rounded-lg px-2 py-1">🌤️ Météo</span>
+          </div>
+          {weekDates.map((date, di) => {
+            const dateStr = formatDate(date);
+            const weather = getWeatherForDate(dateStr);
+            const day = getDayData(dateStr);
+            const isAbsent = !!day.absent;
+            const isToday = dateStr === today;
+            const colBg = isAbsent ? "bg-red-50 border-status-danger/20" : isToday ? "bg-amber-50 border-accent-yellow/40" : "bg-white border-border-soft/40";
+            return (
+              <div key={`weather-${di}`} className={`border-x border-t border-slate-200 p-2 ${colBg}`}>
+                <WeatherPicker value={weather} onChange={(v) => updateWeather(dateStr, v)} />
+              </div>
+            );
+          })}
+
+          {/* Field rows */}
+          {FIELD_ROWS.map((field, fi) => {
+            const isLast = fi === FIELD_ROWS.length - 1;
+            return (
               <div key={`field-${field}`} className="contents">
-                <div className="bg-surface-soft p-3 text-caption font-medium text-ink-secondary flex items-start pt-4">
-                  {t(`fields.${field === "sommeil" ? "sommeil" : field}`)}
+                <div className="flex items-center justify-end pr-3 border-r border-white/40">
+                  <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide text-right leading-none bg-white rounded-lg px-2 py-1">
+                    {t(`fields.${field === "sommeil" ? "sommeil" : field}`)}
+                  </span>
                 </div>
                 {weekDates.map((date, di) => {
                   const dateStr = formatDate(date);
                   const day = getDayData(dateStr);
                   const isAbsent = !!day.absent;
                   const isToday = dateStr === today;
+                  const colBg = isAbsent ? "bg-red-50 border-status-danger/20" : isToday ? "bg-amber-50 border-accent-yellow/40" : "bg-white border-border-soft/40";
                   return (
-                    <div key={`${field}-${di}`} className={`p-2 ${isAbsent ? "bg-status-danger/5 opacity-30 pointer-events-none select-none" : isToday ? "bg-accent-yellow/10" : "bg-surface-card"}`}>
+                    <div
+                      key={`${field}-${di}`}
+                      className={`border-x border-t border-slate-200 p-2 ${isLast ? "rounded-b-xl border-b pb-3" : ""} ${colBg} ${isAbsent ? "opacity-30 pointer-events-none select-none" : ""}`}
+                    >
                       {renderField(field, day, dateStr)}
                     </div>
                   );
                 })}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
 
@@ -1661,6 +1881,23 @@ function JournalsSection({
       <div className="md:hidden space-y-2">
         <DayTabBar tabs={tabs} activeIndex={activeDayIndex} onSelect={setActiveDayIndex} />
         <div className="space-y-4">
+          {/* Weather picker (garderie-wide, applies to all children) */}
+          <div className="px-4 py-3 border border-border-soft rounded-xl bg-sky-50/30">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-caption font-semibold uppercase tracking-wide text-sky-700 flex items-center gap-1.5">
+                <span className="text-base">🌤️</span>
+                Météo du jour
+              </label>
+              <span className="text-caption text-ink-muted">
+                (Partagée pour tous)
+              </span>
+            </div>
+            <WeatherPicker
+              value={getWeatherForDate(formatDate(weekDates[activeDayIndex]))}
+              onChange={(v) => updateWeather(formatDate(weekDates[activeDayIndex]), v)}
+            />
+          </div>
+
           <DayFieldList
             day={getDayData(formatDate(weekDates[activeDayIndex]))}
             menuDuJour={getMenuForDate(formatDate(weekDates[activeDayIndex]))}
@@ -1707,10 +1944,18 @@ function ChildCard({
     return `${Math.floor(months / 12)} ${t("years")}`;
   };
 
+  const photoUrl = child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null;
+
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden p-5">
       <div className="flex items-center gap-4">
-        <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="lg" />
+        <ChildAvatar
+          id={child.id}
+          firstName={child.first_name}
+          lastName={child.last_name}
+          size="lg"
+          photoUrl={photoUrl}
+        />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-slate-800 text-lg">
             {child.first_name} {child.last_name}
@@ -1734,6 +1979,7 @@ export default function ChildrenPage() {
   const canWrite = user?.role === "admin_garderie" || user?.role === "super_admin";
   const [selectedChildId, setSelectedChildId] = useState<string>("");
   const [showForm, setShowForm] = useState(false);
+  const [filterGroupId, setFilterGroupId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"calendar" | "journals" | "profile">("calendar");
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statusModalDate, setStatusModalDate] = useState<string | null>(null);
@@ -1791,7 +2037,50 @@ export default function ChildrenPage() {
   const groups: Group[] = (groupsData as { data: Group[] } | undefined)?.data ?? [];
   const groupMap = Object.fromEntries(groups.map((g) => [g.id, g.name]));
 
-  const selectedChild = children.find((c) => c.id === selectedChildId);
+  // Fetch attendance for all children for current month
+  const todayDate = getTodayInMontreal();
+  const today = format(todayDate, "yyyy-MM-dd");
+  const currentMonthStr = format(new Date(), "yyyy-MM");
+  // ISO day of week: 1=Mon, 2=Tue, ..., 7=Sun
+  const todayISODay = todayDate.getDay() === 0 ? 7 : todayDate.getDay();
+  
+  const { data: attendanceAllData, error: attendanceError, mutate: mutateAttendanceAll } = useSWR(
+    `attendance-all-${currentMonthStr}`,
+    async () => {
+      const response = await attendanceApi.getMonthAllChildren(currentMonthStr);
+      return response.data.attendance || [];
+    }
+  );
+
+  // Map attendance by child_id and date for quick lookup
+  const attendanceByChild = new Map<string, Record<string, string>>();
+  if (attendanceAllData && Array.isArray(attendanceAllData)) {
+    attendanceAllData.forEach((record: { child_id: string; date: string; status: string }) => {
+      if (!attendanceByChild.has(record.child_id)) {
+        attendanceByChild.set(record.child_id, {});
+      }
+      attendanceByChild.get(record.child_id)![record.date] = record.status;
+    });
+  }
+
+  // Filter children by selected group
+  const filteredChildren = filterGroupId
+    ? children.filter((c) => c.group_id === filterGroupId)
+    : children;
+
+  // Auto-select first filtered child if current selection is not in filtered list
+  useEffect(() => {
+    if (filteredChildren.length > 0) {
+      const isCurrentChildInFiltered = filteredChildren.some((c) => c.id === selectedChildId);
+      if (!isCurrentChildInFiltered) {
+        setSelectedChildId(filteredChildren[0].id);
+      }
+    } else if (selectedChildId) {
+      setSelectedChildId("");
+    }
+  }, [filterGroupId, filteredChildren.length, filteredChildren, selectedChildId]);
+
+  const selectedChild = filteredChildren.find((c) => c.id === selectedChildId);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1821,12 +2110,38 @@ export default function ChildrenPage() {
         <div className="px-4 py-4 border-b border-border-soft/50">
           <h1 className="text-body font-semibold text-ink">{t("title")}</h1>
         </div>
+        
+        {/* Group filter */}
+        {groups.length > 0 && (
+          <div className="px-3 py-2 border-b border-border-soft/50">
+            <select
+              value={filterGroupId}
+              onChange={(e) => setFilterGroupId(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">{t("allGroups")}</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        
         <div className="flex-1 overflow-y-auto py-2 px-2">
-          {children.length === 0 && (
+          {filteredChildren.length === 0 && (
             <p className="px-4 py-3 text-body text-ink-muted">{t("noChildren")}</p>
           )}
-          {children.map((child) => {
+          {filteredChildren.map((child) => {
             const isActive = selectedChildId === child.id;
+            const childAttendance = attendanceByChild.get(child.id);
+            const isWeekday = todayISODay >= 1 && todayISODay <= 5;
+            const isScheduled = child.schedule_days
+              ? child.schedule_days.includes(todayISODay)
+              : isWeekday;
+            const todayStatus = childAttendance?.[today] ??
+              (isScheduled ? "attendu" : undefined);
+            const photoUrl = child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null;
+
             return (
               <button
                 key={child.id}
@@ -1837,10 +2152,16 @@ export default function ChildrenPage() {
                     : "text-ink-secondary hover:bg-surface-soft hover:text-ink"
                 }`}
               >
-                <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="sm" />
+                <ChildAvatar id={child.id} firstName={child.first_name} lastName={child.last_name} size="sm" photoUrl={photoUrl} />
                 <span className={`text-body truncate ${isActive ? "font-semibold" : ""}`}>
                   {child.first_name} {child.last_name}
                 </span>
+                <ChildStatusIndicators 
+                  childId={child.id}
+                  today={today}
+                  currentMonthStr={currentMonthStr}
+                  attendanceStatus={todayStatus}
+                />
               </button>
             );
           })}
@@ -1895,6 +2216,7 @@ export default function ChildrenPage() {
                   setStatusModalDate={setStatusModalDate}
                   dayDetailDate={dayDetailDate}
                   setDayDetailDate={setDayDetailDate}
+                  onStatusChange={mutateAttendanceAll}
                 />
               )}
               {activeTab === "journals" && selectedChild && (
@@ -1944,27 +2266,60 @@ export default function ChildrenPage() {
           )}
         </div>
 
+        {/* Group filter (mobile) */}
+        {groups.length > 0 && (
+          <div className="px-4 py-2 border-b border-border-soft/50 flex-shrink-0">
+            <select
+              value={filterGroupId}
+              onChange={(e) => setFilterGroupId(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">{t("allGroups")}</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Child chips */}
-        {children.length > 0 && (
+        {filteredChildren.length > 0 && (
           <div className="flex gap-2 overflow-x-auto px-4 py-2.5 border-b border-border-soft/50 flex-shrink-0 scrollbar-none">
-            {children.map((child) => {
+            {filteredChildren.map((child) => {
               const isActive = selectedChildId === child.id;
+              const childAttendance = attendanceByChild.get(child.id);
+              const isWeekday = todayISODay >= 1 && todayISODay <= 5;
+              const isScheduled = child.schedule_days
+                ? child.schedule_days.includes(todayISODay)
+                : isWeekday;
+              const todayStatus = childAttendance?.[today] ??
+                (isScheduled ? "attendu" : undefined);
+
+              const photoUrl = child.photo_url ? `${process.env.NEXT_PUBLIC_API_URL}/media/files/${child.photo_url}` : null;
               return (
                 <button
                   key={child.id}
                   onClick={() => setSelectedChildId(child.id)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-body font-medium transition-all duration-[180ms] ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-body font-medium transition-all duration-[180ms] flex-shrink-0 ${
                     isActive
                       ? "bg-ink text-white"
                       : "bg-surface-soft text-ink-secondary"
                   }`}
                 >
-                  <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${
-                    isActive ? "bg-white/25 text-white" : `${childAvatarColor(child.id)} text-white`
-                  }`}>
-                    {child.first_name[0]}
-                  </span>
-                  {child.first_name}
+                  <ChildAvatar
+                    id={child.id}
+                    firstName={child.first_name}
+                    lastName={child.last_name}
+                    size="sm"
+                    photoUrl={photoUrl}
+                  />
+                  <span>{child.first_name}</span>
+                  <ChildStatusIndicators
+                    childId={child.id}
+                    today={today}
+                    currentMonthStr={currentMonthStr}
+                    attendanceStatus={todayStatus}
+                  />
                 </button>
               );
             })}
@@ -2005,6 +2360,7 @@ export default function ChildrenPage() {
                     setStatusModalDate={setStatusModalDate}
                     dayDetailDate={dayDetailDate}
                     setDayDetailDate={setDayDetailDate}
+                    onStatusChange={mutateAttendanceAll}
                   />
                 )}
                 {activeTab === "journals" && selectedChild && (
