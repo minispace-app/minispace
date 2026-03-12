@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 import { childrenApi, groupsApi, usersApi, attendanceApi, journalApi, activitiesApi, menusApi, settingsApi } from "../../../../lib/api";
 import { useAuth } from "../../../../hooks/useAuth";
 import { getTodayInMontreal, formatDateInMontreal } from "../../../../lib/dateUtils";
@@ -109,33 +109,33 @@ function ChildStatusIndicators({
     : false;
 
   return (
-    <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+    <div className="flex items-center gap-1 flex-shrink-0">
       {/* Journal indicator - Icône livre/journal */}
       {hasJournalToday && (
-        <div 
-          className="w-6 h-6 rounded-md bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm" 
+        <div
+          className="w-5 h-5 rounded-md bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm"
           title="Journal rempli"
         >
-          <BookOpen className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
+          <BookOpen className="w-3 h-3 text-white" strokeWidth={2.5} />
         </div>
       )}
-      
+
       {/* Attendance indicator - Présent (vert) ou Absent (rouge) */}
       {(attendanceStatus === 'present' || attendanceStatus === 'present_hors_contrat' || attendanceStatus === 'attendu') && (
-        <div 
-          className="w-6 h-6 rounded-md bg-green-500 flex items-center justify-center flex-shrink-0 shadow-sm"
+        <div
+          className="w-5 h-5 rounded-md bg-green-500 flex items-center justify-center flex-shrink-0 shadow-sm"
           title={attendanceStatus === 'attendu' ? 'Attendu' : attendanceStatus === 'present_hors_contrat' ? 'Présent hors contrat' : 'Présent'}
         >
-          <Check className="w-4 h-4 text-white" strokeWidth={3} />
+          <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />
         </div>
       )}
-      
+
       {(attendanceStatus === 'absent' || attendanceStatus === 'malade') && (
-        <div 
-          className="w-6 h-6 rounded-md bg-red-500 flex items-center justify-center flex-shrink-0 shadow-sm"
+        <div
+          className="w-5 h-5 rounded-md bg-red-500 flex items-center justify-center flex-shrink-0 shadow-sm"
           title={attendanceStatus === 'malade' ? 'Absent (malade)' : 'Absent'}
         >
-          <X className="w-4 h-4 text-white" strokeWidth={3} />
+          <X className="w-3.5 h-3.5 text-white" strokeWidth={3} />
         </div>
       )}
     </div>
@@ -158,6 +158,18 @@ const STAFF_STATUSES = [
   { key: "malade",  label: "Malade",  icon: "🤒", cls: "bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-300" },
   { key: "present_hors_contrat", label: "Hors contrat", icon: "✓", cls: "bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300" },
   { key: "attendu", label: "Attendu", icon: "⏰", cls: "bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300" },
+];
+
+// Quick toggle statuses for single date click (only present/absent)
+const QUICK_TOGGLE_STATUSES = [
+  { key: "present", label: "Présent", icon: "✓", cls: "bg-green-100 text-green-700 hover:bg-green-200 border-green-300" },
+  { key: "absent",  label: "Absent",  icon: "✗", cls: "bg-red-100 text-red-700 hover:bg-red-200 border-red-300" },
+];
+
+// Multi-select statuses (only present/absent)
+const BULK_STATUSES = [
+  { key: "present", label: "Présent", icon: "✓", cls: "bg-green-100 text-green-700 hover:bg-green-200 border-green-300" },
+  { key: "absent",  label: "Absent",  icon: "✗", cls: "bg-red-100 text-red-700 hover:bg-red-200 border-red-300" },
 ];
 
 function ChildDetails({
@@ -971,6 +983,7 @@ function CalendarSection({
   setStatusModalDate,
   dayDetailDate,
   setDayDetailDate,
+  onStatusChange,
 }: {
   child: Child;
   currentMonth: Date;
@@ -979,6 +992,7 @@ function CalendarSection({
   setStatusModalDate: (date: string | null) => void;
   dayDetailDate: string | null;
   setDayDetailDate: (date: string | null) => void;
+  onStatusChange?: () => void;
 }) {
   const t = useTranslations("calendar");
 
@@ -1012,6 +1026,7 @@ function CalendarSection({
     try {
       await attendanceApi.setBulkStatus(child.id, Array.from(selectedDates), status);
       mutateAttendance();
+      onStatusChange?.();
       clearSelection();
     } finally {
       setBulkLoading(false);
@@ -1124,7 +1139,7 @@ function CalendarSection({
             const handleClick = () => {
               if (disabled) return;
               if (selectMode) { toggleDate(dateStr); }
-              else { setDayDetailDate(dateStr); }
+              else { setStatusModalDate(dateStr); }
             };
 
             return (
@@ -1252,7 +1267,7 @@ function CalendarSection({
                   onClick={() => {
                     if (disabled) return;
                     if (selectMode) toggleDate(dateStr);
-                    else setDayDetailDate(dateStr);
+                    else setStatusModalDate(dateStr);
                   }}
                   disabled={disabled}
                   className={`aspect-square rounded p-1 transition flex flex-col items-center justify-center text-xs ${
@@ -1282,12 +1297,12 @@ function CalendarSection({
 
       {/* Bulk action bar (shared desktop + mobile) */}
       {selectMode && selectedDates.size > 0 && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white rounded-xl shadow-2xl border border-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap max-w-lg w-full mx-4">
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white rounded-xl shadow-2xl border border-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap w-fit mx-4">
           <span className="text-sm font-semibold text-slate-700 whitespace-nowrap">
             {selectedDates.size} jour{selectedDates.size > 1 ? "s" : ""}
           </span>
           <div className="flex gap-2 flex-wrap flex-1">
-            {STAFF_STATUSES.map((s) => (
+            {BULK_STATUSES.map((s) => (
               <button
                 key={s.key}
                 onClick={() => handleBulkStatus(s.key)}
@@ -1313,6 +1328,7 @@ function CalendarSection({
           onStatusChange={() => {
             setStatusModalDate(null);
             mutateAttendance();
+            onStatusChange?.();
           }}
         />
       )}
@@ -1357,10 +1373,11 @@ function StaffStatusModal({
     }
   };
 
-  const statuses: Array<{ key: string; label: string; color: string }> = [
-    { key: "present", label: "✓ Présent", color: "bg-green-100 text-green-700 border-green-300 hover:bg-green-200" },
-    { key: "absent", label: "✗ Absent", color: "bg-red-100 text-red-700 border-red-300 hover:bg-red-200" },
-  ];
+  const statuses: Array<{ key: string; label: string; color: string }> = QUICK_TOGGLE_STATUSES.map(s => ({
+    key: s.key,
+    label: `${s.icon} ${s.key === "present" ? "Présent" : "Absent"}`,
+    color: s.cls
+  }));
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1414,6 +1431,7 @@ function JournalsSection({
   saveTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>;
 }) {
   const t = useTranslations("journal");
+  const { mutate: mutateGlobal } = useSWRConfig();
 
   const [localMenuWeather, setLocalMenuWeather] = useState<Record<string, string | null>>({});
   const weatherSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1435,7 +1453,7 @@ function JournalsSection({
   const serverEntries: DailyJournal[] =
     (journalData as { data: DailyJournal[] } | undefined)?.data ?? [];
 
-  const { data: menusData } = useSWR(["menus-week-journal-dash", weekStartStr], () =>
+  const { data: menusData, mutate: mutateMenus } = useSWR(["menus-week-journal-dash", weekStartStr], () =>
     menusApi.getWeek(weekStartStr)
   );
   interface MenuEntry {
@@ -1528,6 +1546,7 @@ function JournalsSection({
         );
         setLocalData({});
         mutate();
+        mutateGlobal(`journal-summary-${child.id}-${format(new Date(), "yyyy-MM")}`);
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 2000);
       } catch {
@@ -1550,8 +1569,7 @@ function JournalsSection({
           })
         );
         setLocalMenuWeather({});
-        // Refetch menus to get updated data
-        if (swrKey) mutate();
+        mutateMenus();
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 2000);
       } catch {
@@ -1626,14 +1644,14 @@ function JournalsSection({
   // Week nav bar
   const weekNav = (
     <div className="flex items-center gap-2">
-      <button onClick={prevWeek} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition" title={t("prevWeek")}>
-        <ChevronLeft className="w-4 h-4 text-slate-600" />
+      <button onClick={prevWeek} className="p-1.5 rounded-xs bg-white border border-border-soft shadow-soft hover:bg-surface-soft text-ink-secondary hover:text-ink transition" title={t("prevWeek")}>
+        <ChevronLeft className="w-4 h-4" />
       </button>
-      <span className="text-sm text-slate-600 font-medium whitespace-nowrap">
+      <span className="text-sm text-ink font-semibold whitespace-nowrap">
         {weekStart.toLocaleDateString("fr-CA", { day: "numeric", month: "short", year: "numeric" })}
       </span>
-      <button onClick={nextWeek} className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition" title={t("nextWeek")}>
-        <ChevronRight className="w-4 h-4 text-slate-600" />
+      <button onClick={nextWeek} className="p-1.5 rounded-xs bg-white border border-border-soft shadow-soft hover:bg-surface-soft text-ink-secondary hover:text-ink transition" title={t("nextWeek")}>
+        <ChevronRight className="w-4 h-4" />
       </button>
     </div>
   );
@@ -1641,11 +1659,13 @@ function JournalsSection({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-100">
-        {weekNav}
-        <div className="flex items-center gap-1.5 text-xs text-slate-400 ml-2">
-          <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>Envoi automatique à <strong className="text-slate-600">{autoSendTime}</strong> en semaine</span>
+      <div className="flex items-center justify-between gap-4 p-3 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
+        <div className="flex items-center gap-4">
+          {weekNav}
+          <div className="flex items-center gap-1.5 text-xs text-ink">
+            <Clock className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+            <span>Envoi automatique à <strong className="text-primary font-semibold">{autoSendTime}</strong> en semaine</span>
+          </div>
         </div>
         <div className="ml-auto">
           {saveIndicator}
@@ -1654,124 +1674,115 @@ function JournalsSection({
 
       {/* Desktop: Grid */}
       <div className="hidden md:block overflow-x-auto">
-        <div className="rounded-xl overflow-hidden shadow-soft">
-          <div className="grid min-w-[800px] bg-border-soft/60 gap-px" style={{ gridTemplateColumns: "160px repeat(5, 1fr)" }}>
-            {/* Header row */}
-            <div className="bg-surface-soft p-3 text-caption font-semibold text-ink-muted uppercase tracking-wide" />
-            {weekDates.map((date, i) => {
-              const dateStr = formatDate(date);
-              const isToday = dateStr === today;
-              const day = getDayData(dateStr);
-              const isAbsent = !!day.absent;
-              const hasUnsaved = !!(localData[dateStr] && hasDayData(localData[dateStr]));
-              const menuDuJour = getMenuForDate(dateStr);
-              return (
-                <div key={i} className={`p-3 text-center ${isAbsent ? "bg-status-danger/8" : isToday ? "bg-accent-yellow/30" : "bg-surface-soft"}`}>
-                  <div className={`text-caption font-semibold uppercase tracking-wide ${isAbsent ? "text-status-danger" : isToday ? "text-ink" : "text-ink-muted"}`}>
-                    {t(`days.${WEEK_DAYS[i]}`)}
-                  </div>
-                  <div className={`text-body font-medium mt-0.5 ${isAbsent ? "text-status-danger" : "text-ink"}`}>
-                    {date.getDate()}{" "}
-                    <span className={`font-normal ${isToday ? "text-primary/70" : "text-ink-muted"}`}>
-                      {date.toLocaleDateString("fr-CA", { month: "short" })}
-                    </span>
-                  </div>
-                  {isAbsent ? (
-                    <div className="w-1.5 h-1.5 rounded-pill bg-status-danger mx-auto mt-1" />
-                  ) : hasUnsaved ? (
-                    <div className="w-1.5 h-1.5 rounded-pill bg-accent-orange mx-auto mt-1" />
-                  ) : isToday ? (
-                    <div className="w-1.5 h-1.5 rounded-pill bg-primary mx-auto mt-1" />
-                  ) : null}
-                  {menuDuJour && ((() => {
-                    const hasMenu = menuDuJour.collation_matin || menuDuJour.diner || menuDuJour.collation_apres_midi;
-                    if (!hasMenu) return null;
-                    return (
-                      <div className="mt-1.5 space-y-0.5">
-                        {menuDuJour.collation_matin && (
-                          <div className="text-caption text-accent-blue bg-accent-blue/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_matin}>
-                            🌅 {menuDuJour.collation_matin}
-                          </div>
-                        )}
-                        {menuDuJour.diner && (
-                          <div className="text-caption text-accent-orange bg-accent-orange/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.diner}>
-                            🍽️ {menuDuJour.diner}
-                          </div>
-                        )}
-                        {menuDuJour.collation_apres_midi && (
-                          <div className="text-caption text-accent-purple bg-accent-purple/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_apres_midi}>
-                            🌙 {menuDuJour.collation_apres_midi}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })())}
-                </div>
-              );
-            })}
+        <div className="grid min-w-[700px] gap-x-3 gap-y-0" style={{ gridTemplateColumns: "auto repeat(5, 1fr)" }}>
 
-            {/* Weather row (garderie-wide, stored in daily_menus) */}
-            <div className="bg-surface-soft p-3 text-caption font-medium text-ink-secondary flex items-center gap-1.5">
-              🌤️ Météo
-            </div>
-            {weekDates.map((date, di) => {
-              const dateStr = formatDate(date);
-              const weather = getWeatherForDate(dateStr);
-              const day = getDayData(dateStr);
-              const isAbsent = !!day.absent;
-              const isToday = dateStr === today;
-              return (
-                <div key={`weather-${di}`} className={`p-2 ${isAbsent ? "bg-status-danger/5" : isToday ? "bg-accent-yellow/10" : "bg-surface-card"}`}>
-                  <WeatherPicker
-                    value={weather}
-                    onChange={(v) => updateWeather(dateStr, v)}
-                  />
-                </div>
-              );
-            })}
+          {/* Empty corner */}
+          <div />
 
-            {/* Absent toggle row */}
-            <div className="bg-surface-soft p-3 text-caption font-medium text-ink-secondary flex items-center gap-1.5">
-              Absent
-            </div>
-            {weekDates.map((date, di) => {
-              const dateStr = formatDate(date);
-              const day = getDayData(dateStr);
-              const isAbsent = !!day.absent;
-              const isToday = dateStr === today;
-              return (
-                <div key={`absent-${di}`} className={`p-2 flex items-center justify-center ${isAbsent ? "bg-status-danger/8" : isToday ? "bg-accent-yellow/15" : "bg-surface-card"}`}>
-                  <button
-                    type="button"
-                    onClick={() => updateField(dateStr, "absent" as keyof DayData, !isAbsent)}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-pill transition-all duration-[180ms] focus:outline-none ${isAbsent ? "bg-status-danger" : "bg-border-soft"}`}
-                  >
-                    <span className={`inline-block h-3 w-3 transform rounded-pill bg-white shadow transition-transform duration-[180ms] ${isAbsent ? "translate-x-5" : "translate-x-1"}`} />
-                  </button>
+          {/* Day headers */}
+          {weekDates.map((date, i) => {
+            const dateStr = formatDate(date);
+            const isToday = dateStr === today;
+            const day = getDayData(dateStr);
+            const isAbsent = !!day.absent;
+            const hasUnsaved = !!(localData[dateStr] && hasDayData(localData[dateStr]));
+            const menuDuJour = getMenuForDate(dateStr);
+            const colBg = isAbsent
+              ? "bg-status-danger/10 backdrop-blur-sm border-status-danger/30"
+              : isToday
+              ? "bg-accent-yellow/30 backdrop-blur-sm border-accent-yellow/40"
+              : "bg-white/60 backdrop-blur-sm border-border-soft/40";
+            return (
+              <div key={`header-${dateStr}`} className={`rounded-t-xl border-t border-x px-3 py-2 text-center shadow-soft ${colBg}`}>
+                <div className={`text-caption font-semibold uppercase tracking-wide ${isAbsent ? "text-status-danger" : isToday ? "text-ink" : "text-ink-muted"}`}>
+                  {t(`days.${WEEK_DAYS[i]}`)}
                 </div>
-              );
-            })}
+                <div className={`text-body font-medium mt-0.5 ${isAbsent ? "text-status-danger" : "text-ink"}`}>
+                  {date.getDate()}{" "}
+                  <span className={`font-normal ${isToday ? "text-primary/70" : "text-ink-muted"}`}>
+                    {date.toLocaleDateString("fr-CA", { month: "short" })}
+                  </span>
+                </div>
+                {isAbsent ? (
+                  <div className="w-1.5 h-1.5 rounded-pill bg-status-danger mx-auto mt-1" />
+                ) : hasUnsaved ? (
+                  <div className="w-1.5 h-1.5 rounded-pill bg-accent-orange mx-auto mt-1" />
+                ) : isToday ? (
+                  <div className="w-1.5 h-1.5 rounded-pill bg-primary mx-auto mt-1" />
+                ) : null}
+                {menuDuJour && (() => {
+                  const hasMenu = menuDuJour.collation_matin || menuDuJour.diner || menuDuJour.collation_apres_midi;
+                  if (!hasMenu) return null;
+                  return (
+                    <div className="mt-1.5 space-y-0.5 text-left">
+                      {menuDuJour.collation_matin && (
+                        <div className="text-caption text-accent-blue bg-accent-blue/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_matin}>
+                          🌅 {menuDuJour.collation_matin}
+                        </div>
+                      )}
+                      {menuDuJour.diner && (
+                        <div className="text-caption text-accent-orange bg-accent-orange/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.diner}>
+                          🍽️ {menuDuJour.diner}
+                        </div>
+                      )}
+                      {menuDuJour.collation_apres_midi && (
+                        <div className="text-caption text-accent-purple bg-accent-purple/15 rounded-xs px-1 py-0.5 truncate" title={menuDuJour.collation_apres_midi}>
+                          🌙 {menuDuJour.collation_apres_midi}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          })}
 
-            {/* Field rows */}
-            {FIELD_ROWS.map((field) => (
+          {/* Weather row */}
+          <div className="flex items-center justify-end pr-3 border-r border-white/40">
+            <span className="text-[10px] font-semibold text-ink/40 uppercase tracking-wide text-right leading-none">🌤️ Météo</span>
+          </div>
+          {weekDates.map((date, di) => {
+            const dateStr = formatDate(date);
+            const weather = getWeatherForDate(dateStr);
+            const day = getDayData(dateStr);
+            const isAbsent = !!day.absent;
+            const isToday = dateStr === today;
+            const colBg = isAbsent ? "bg-status-danger/5 border-status-danger/20" : isToday ? "bg-accent-yellow/15 border-accent-yellow/40" : "bg-white/60 border-border-soft/40";
+            return (
+              <div key={`weather-${di}`} className={`border-x border-t border-white/30 p-2 ${colBg}`}>
+                <WeatherPicker value={weather} onChange={(v) => updateWeather(dateStr, v)} />
+              </div>
+            );
+          })}
+
+          {/* Field rows */}
+          {FIELD_ROWS.map((field, fi) => {
+            const isLast = fi === FIELD_ROWS.length - 1;
+            return (
               <div key={`field-${field}`} className="contents">
-                <div className="bg-surface-soft p-3 text-caption font-medium text-ink-secondary flex items-start pt-4">
-                  {t(`fields.${field === "sommeil" ? "sommeil" : field}`)}
+                <div className="flex items-center justify-end pr-3 border-r border-white/40">
+                  <span className="text-[10px] font-semibold text-ink/40 uppercase tracking-wide text-right leading-none">
+                    {t(`fields.${field === "sommeil" ? "sommeil" : field}`)}
+                  </span>
                 </div>
                 {weekDates.map((date, di) => {
                   const dateStr = formatDate(date);
                   const day = getDayData(dateStr);
                   const isAbsent = !!day.absent;
                   const isToday = dateStr === today;
+                  const colBg = isAbsent ? "bg-status-danger/5 border-status-danger/20" : isToday ? "bg-accent-yellow/15 border-accent-yellow/40" : "bg-white/60 border-border-soft/40";
                   return (
-                    <div key={`${field}-${di}`} className={`p-2 ${isAbsent ? "bg-status-danger/5 opacity-30 pointer-events-none select-none" : isToday ? "bg-accent-yellow/10" : "bg-surface-card"}`}>
+                    <div
+                      key={`${field}-${di}`}
+                      className={`border-x border-t border-white/30 p-2 ${isLast ? "rounded-b-xl border-b pb-3" : ""} ${colBg} ${isAbsent ? "opacity-30 pointer-events-none select-none" : ""}`}
+                    >
                       {renderField(field, day, dateStr)}
                     </div>
                   );
                 })}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
 
@@ -1931,8 +1942,10 @@ export default function ChildrenPage() {
   const todayDate = getTodayInMontreal();
   const today = format(todayDate, "yyyy-MM-dd");
   const currentMonthStr = format(new Date(), "yyyy-MM");
+  // ISO day of week: 1=Mon, 2=Tue, ..., 7=Sun
+  const todayISODay = todayDate.getDay() === 0 ? 7 : todayDate.getDay();
   
-  const { data: attendanceAllData, error: attendanceError } = useSWR(
+  const { data: attendanceAllData, error: attendanceError, mutate: mutateAttendanceAll } = useSWR(
     `attendance-all-${currentMonthStr}`,
     async () => {
       const response = await attendanceApi.getMonthAllChildren(currentMonthStr);
@@ -2022,7 +2035,12 @@ export default function ChildrenPage() {
           {filteredChildren.map((child) => {
             const isActive = selectedChildId === child.id;
             const childAttendance = attendanceByChild.get(child.id);
-            const todayStatus = childAttendance ? childAttendance[today] : undefined;
+            const isWeekday = todayISODay >= 1 && todayISODay <= 5;
+            const isScheduled = child.schedule_days
+              ? child.schedule_days.includes(todayISODay)
+              : isWeekday;
+            const todayStatus = childAttendance?.[today] ??
+              (isScheduled ? "attendu" : undefined);
             
             return (
               <button
@@ -2098,6 +2116,7 @@ export default function ChildrenPage() {
                   setStatusModalDate={setStatusModalDate}
                   dayDetailDate={dayDetailDate}
                   setDayDetailDate={setDayDetailDate}
+                  onStatusChange={mutateAttendanceAll}
                 />
               )}
               {activeTab === "journals" && selectedChild && (
@@ -2175,7 +2194,7 @@ export default function ChildrenPage() {
                 <button
                   key={child.id}
                   onClick={() => setSelectedChildId(child.id)}
-                  className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-body font-medium transition-all duration-[180ms] ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-body font-medium transition-all duration-[180ms] min-w-0 ${
                     isActive
                       ? "bg-ink text-white"
                       : "bg-surface-soft text-ink-secondary"
@@ -2186,8 +2205,8 @@ export default function ChildrenPage() {
                   }`}>
                     {child.first_name[0]}
                   </span>
-                  {child.first_name}
-                  <ChildStatusIndicators 
+                  <span className="truncate">{child.first_name}</span>
+                  <ChildStatusIndicators
                     childId={child.id}
                     today={today}
                     currentMonthStr={currentMonthStr}
@@ -2233,6 +2252,7 @@ export default function ChildrenPage() {
                     setStatusModalDate={setStatusModalDate}
                     dayDetailDate={dayDetailDate}
                     setDayDetailDate={setDayDetailDate}
+                    onStatusChange={mutateAttendanceAll}
                   />
                 )}
                 {activeTab === "journals" && selectedChild && (
