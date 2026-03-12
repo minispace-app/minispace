@@ -2194,7 +2194,7 @@ export default function ChildrenPage() {
                 <button
                   key={child.id}
                   onClick={() => setSelectedChildId(child.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-body font-medium transition-all duration-[180ms] min-w-0 ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-pill text-body font-medium transition-all duration-[180ms] flex-shrink-0 ${
                     isActive
                       ? "bg-ink text-white"
                       : "bg-surface-soft text-ink-secondary"
@@ -2205,7 +2205,7 @@ export default function ChildrenPage() {
                   }`}>
                     {child.first_name[0]}
                   </span>
-                  <span className="truncate">{child.first_name}</span>
+                  <span>{child.first_name}</span>
                   <ChildStatusIndicators
                     childId={child.id}
                     today={today}
