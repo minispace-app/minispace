@@ -494,8 +494,8 @@ function MenusSection() {
               const dayLabel = tj(`days.${WEEK_DAYS[dayIndex]}`);
               const dateLabel = date.toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
               const colBg = isToday
-                ? "bg-accent-yellow/30 backdrop-blur-sm border-accent-yellow/40"
-                : "bg-white/60 backdrop-blur-sm border-border-soft/40";
+                ? "bg-amber-50 border-accent-yellow/40"
+                : "bg-white border-border-soft/40";
               return (
                 <div
                   key={`day-header-${dateStr}`}
@@ -511,7 +511,7 @@ function MenusSection() {
             {menuSections.flatMap((section, sectionIndex) => {
               const isLast = sectionIndex === menuSections.length - 1;
               return [
-                <div key={`section-header-${section.key}`} className="flex items-center justify-end pr-3 border-r border-white/40">
+                <div key={`section-header-${section.key}`} className="flex items-center justify-end pr-3 border-r border-slate-200">
                   <span className="text-caption font-semibold text-ink-muted uppercase tracking-wide text-right leading-none bg-white rounded-lg px-2 py-1">
                     {t(section.tKey)}
                   </span>
@@ -521,12 +521,12 @@ function MenusSection() {
                   const isToday = dateStr === today;
                   const hasLocal = localData[dateStr] !== undefined;
                   const colBg = isToday
-                    ? "bg-accent-yellow/15 border-accent-yellow/40"
-                    : "bg-white/60 border-border-soft/40";
+                    ? "bg-amber-50 border-accent-yellow/40"
+                    : "bg-white border-border-soft/40";
                   return (
                     <div
                       key={`cell-${dateStr}-${section.key}`}
-                      className={`border-x border-t border-white/30 p-2 ${isLast ? "rounded-b-xl border-b pb-3" : ""} ${colBg}`}
+                      className={`border-x border-t border-slate-200 p-2 ${isLast ? "rounded-b-xl border-b pb-3" : ""} ${colBg}`}
                     >
                       <TextareaField
                         value={getMenuForDate(dateStr, section.key)}
